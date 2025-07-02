@@ -1,18 +1,34 @@
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: Record<string, any>;
+}
+
+export interface ToolResult {
+  toolCallId: string;
+  result: string;
+  isError?: boolean;
+}
+
 export interface Message {
-  role: 'system' | 'user' | 'assistant';
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
+  toolCalls?: ToolCall[];
+  toolCallId?: string; // For tool result messages
 }
 
 export interface Response {
   content: string;
   tokensUsed?: number;
   finishReason?: 'stop' | 'length' | 'tool_calls';
+  toolCalls?: ToolCall[];
 }
 
 export interface StreamResponse {
   content: string;
   done: boolean;
   tokensUsed?: number;
+  toolCalls?: ToolCall[];
 }
 
 export interface ModelInfo {

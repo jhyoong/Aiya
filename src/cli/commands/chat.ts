@@ -6,10 +6,14 @@ import { OllamaProvider } from '../../core/providers/ollama.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { Message } from '../../core/providers/base.js';
+import { MCPToolService } from '../../core/tools/mcp-tools.js';
+import { ToolExecutor } from '../../core/tools/executor.js';
 
 interface ChatSession {
   messages: Message[];
   tokenCount: number;
+  toolService?: MCPToolService;
+  toolExecutor?: ToolExecutor;
 }
 
 export const chatCommand = new Command('chat')
@@ -41,10 +45,28 @@ export const chatCommand = new Command('chat')
       console.log(chalk.gray('   Type "exit" to quit, "help" for commands'));
       console.log();
       
+      // Initialize MCP tool service
+      const toolService = new MCPToolService([mcpClient]);
+      await toolService.initialize();
+      
+      const toolExecutor = new ToolExecutor(toolService, process.env.AIYA_VERBOSE === 'true');
+      
       const session: ChatSession = {
         messages: [],
-        tokenCount: 0
+        tokenCount: 0,
+        toolService,
+        toolExecutor
       };
+      
+      // Add system message with tool definitions
+      const toolsSystemMessage = toolService.generateToolsSystemMessage();
+      if (toolsSystemMessage) {
+        session.messages.push({
+          role: 'system',
+          content: toolsSystemMessage
+        });
+        console.log(chalk.gray('🔧 Tools available: ') + chalk.cyan(toolService.getAvailableToolNames().join(', ')));
+      }
       
       // Load initial context if specified
       if (options.file || options.context) {
@@ -162,6 +184,8 @@ async function startChatLoop(
     try {
       console.log(chalk.green('🤖 Aiya: '), { newline: false });
       
+      let assistantMessage: Message;
+      
       if (useStreaming) {
         let response = '';
         for await (const chunk of provider.stream(session.messages)) {
@@ -174,20 +198,52 @@ async function startChatLoop(
         }
         console.log(); // New line after streaming
         
-        session.messages.push({
+        assistantMessage = {
           role: 'assistant',
           content: response
-        });
+        };
       } else {
         const response = await provider.chat(session.messages);
         console.log(response.content);
         
-        session.messages.push({
+        assistantMessage = {
           role: 'assistant',
           content: response.content
-        });
+        };
         
         session.tokenCount += response.tokensUsed || 0;
+      }
+      
+      // Process message for tool calls
+      if (session.toolExecutor) {
+        const { updatedMessage, toolResults, hasToolCalls } = await session.toolExecutor.processMessage(assistantMessage);
+        
+        // Add the assistant message (with tool calls if any)
+        session.messages.push(updatedMessage);
+        
+        if (hasToolCalls) {
+          // Add tool result messages
+          session.messages.push(...toolResults);
+          
+          // Get follow-up response from the model
+          console.log(chalk.yellow('🔄 Processing tool results...'));
+          
+          try {
+            const followUpResponse = await provider.chat(session.messages);
+            console.log(chalk.green('🤖 Aiya: ') + followUpResponse.content);
+            
+            session.messages.push({
+              role: 'assistant',
+              content: followUpResponse.content
+            });
+            
+            session.tokenCount += followUpResponse.tokensUsed || 0;
+          } catch (error) {
+            console.log(chalk.red(`❌ Error processing tool results: ${error}`));
+          }
+        }
+      } else {
+        session.messages.push(assistantMessage);
       }
       
       // Show token count

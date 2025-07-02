@@ -20,12 +20,12 @@ export class OllamaProvider extends LLMProvider {
 
   async chat(messages: Message[]): Promise<Response> {
     try {
+      // Convert messages to Ollama format, handling tool messages
+      const ollamaMessages = this.convertMessagesToOllamaFormat(messages);
+      
       const response = await this.client.chat({
         model: this.model,
-        messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
+        messages: ollamaMessages,
         stream: false
       });
 
@@ -50,12 +50,12 @@ export class OllamaProvider extends LLMProvider {
 
   async *stream(messages: Message[]): AsyncGenerator<StreamResponse> {
     try {
+      // Convert messages to Ollama format, handling tool messages
+      const ollamaMessages = this.convertMessagesToOllamaFormat(messages);
+      
       const stream = await this.client.chat({
         model: this.model,
-        messages: messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
+        messages: ollamaMessages,
         stream: true
       });
 
@@ -146,5 +146,33 @@ export class OllamaProvider extends LLMProvider {
     } catch {
       return defaultContextLength;
     }
+  }
+
+  /**
+   * Convert our message format to Ollama format, handling tool messages
+   */
+  private convertMessagesToOllamaFormat(messages: Message[]): Array<{ role: string; content: string }> {
+    return messages.map(msg => {
+      // Handle tool messages by converting them to user messages with context
+      if (msg.role === 'tool') {
+        return {
+          role: 'user',
+          content: `Tool result: ${msg.content}`
+        };
+      }
+      
+      // For assistant messages with tool calls, include the tool call info
+      if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+        return {
+          role: msg.role,
+          content: msg.content // The content already contains the tool call JSON
+        };
+      }
+      
+      return {
+        role: msg.role,
+        content: msg.content
+      };
+    });
   }
 }
