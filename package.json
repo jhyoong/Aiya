@@ -1,20 +1,7 @@
 {
-  "name": "@yoongjh/aiya",
+  "name": "aiya-cli",
   "version": "1.0.0",
   "description": "Simple terminal tool for custom model endpoints",
-  "main": "dist/cli/index.js",
-  "bin": {
-    "aiya": "dist/cli/index.js"
-  },
-  "type": "module",
-  "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "start": "node dist/cli/index.js",
-    "test": "echo \"Manual testing framework - see tests/integration/\"",
-    "lint": "echo \"Linting not configured yet\"",
-    "typecheck": "tsc --noEmit"
-  },
   "keywords": [
     "ai",
     "development",
@@ -23,14 +10,36 @@
     "ollama",
     "mcp"
   ],
-  "author": "minijh",
+  "homepage": "https://github.com/jhyoong/Aiya#readme",
+  "bugs": {
+    "url": "https://github.com/jhyoong/Aiya/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jhyoong/Aiya.git"
+  },
   "license": "MIT",
+  "author": "jhyoong",
+  "type": "module",
+  "main": "dist/cli/index.js",
+  "types": "./dist/cli/index.d.ts",
+  "bin": {
+    "aiya": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/cli/index.js",
+    "test": "echo \"Manual testing framework - see tests/integration/\"",
+    "lint": "echo \"Linting not configured yet\"",
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
+    "chalk": "^5.3.0",
     "commander": "^12.0.0",
-    "ollama": "^0.5.0",
-    "yaml": "^2.4.0",
     "glob": "^10.3.0",
-    "chalk": "^5.3.0"
+    "ollama": "^0.5.0",
+    "yaml": "^2.4.0"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

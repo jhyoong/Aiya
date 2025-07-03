@@ -1,6 +1,6 @@
 # Aiya
 
-AI-powered development assistant with secure file operations and local LLM integration.
+Artificial Intelligence: Your Assistant (AIYA). A simple terminal tool for code editing which connects to local models.
 
 ## Features
 
@@ -13,12 +13,12 @@ AI-powered development assistant with secure file operations and local LLM integ
 ## Prerequisites
 
 - Node.js 18 or higher
-- Ollama running locally with a compatible model (e.g., qwen2.5:8b)
+- Ollama running locally with a tool-compatible model (e.g., qwen3:8b)
 
 ## Installation
 
 ```bash
-npm install -g @yoongjh/aiya
+npm install -g aiya-cli
 ```
 
 Or run from source:
@@ -34,7 +34,7 @@ npm run build
 
 1. Initialize Aiya in your project:
 ```bash
-aiya init --model qwen2.5:8b
+aiya init --model qwen3:8b
 ```
 
 2. Start an interactive chat session:
@@ -60,7 +60,7 @@ These options are available on all commands:
 Initialize Aiya configuration for the current project.
 
 Options:
-- `-m, --model <model>` - Specify the Ollama model to use (default: qwen2.5:8b)
+- `-m, --model <model>` - Specify the Ollama model to use (default: qwen3:8b)
 - `--base-url <url>` - Ollama server endpoint (default: http://localhost:11434)
 - `--check-connection` - Verify connection to Ollama server
 
@@ -110,8 +110,8 @@ For advanced configuration, you can also use the nested format:
 ```yaml
 provider:
   type: ollama
-  baseUrl: http://localhost:11434
-  model: qwen2.5:8b
+  baseUrl: http://192.1xx.xxx.xxx:11434
+  model: qwen3:8b
 
 security:
   allowedExtensions:
