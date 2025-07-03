@@ -2,6 +2,9 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A simple terminal tool for code editing which connects to local models.
 
+[![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/loccon)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Features
 
 - Interactive chat sessions with AI models via Ollama
