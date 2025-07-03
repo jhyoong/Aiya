@@ -43,7 +43,7 @@ export class ToolExecutor {
     }
 
     if (this.verbose) {
-      console.log(chalk.yellow(`🔧 Detected ${toolCalls.length} tool call(s)`));
+      console.log(chalk.yellow(` Detected ${toolCalls.length} tool call(s)`));
     }
 
     // Execute all tool calls
@@ -96,6 +96,18 @@ export class ToolExecutor {
   }
 
   /**
+   * Check if a single message needs tool execution
+   */
+  messageNeedsToolExecution(message: Message): boolean {
+    if (message.role !== 'assistant') {
+      return false;
+    }
+
+    const toolCalls = this.mcpService.detectToolCalls(message.content);
+    return toolCalls !== null && toolCalls.length > 0;
+  }
+
+  /**
    * Extract clean content from assistant message (remove tool call JSON)
    */
   extractCleanContent(content: string): string {
@@ -137,7 +149,7 @@ export class ToolExecutor {
     const failed = toolResults.filter(r => r.isError).length;
     
     if (failed === 0) {
-      return `✅ All ${successful} tool call(s) executed successfully`;
+      return `All ${successful} tool call(s) executed successfully`;
     } else if (successful === 0) {
       return `❌ All ${failed} tool call(s) failed`;
     } else {

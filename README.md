@@ -6,7 +6,7 @@ AI-powered development assistant with secure file operations and local LLM integ
 
 - Interactive chat sessions with AI models via Ollama
 - Secure file operations restricted to workspace boundaries
-- File and content search with glob pattern support
+- Fuzzy search for files in the workspace
 - Project-aware configuration management
 - Streaming responses for real-time interaction
 
@@ -18,7 +18,7 @@ AI-powered development assistant with secure file operations and local LLM integ
 ## Installation
 
 ```bash
-npm install -g aiya
+npm install -g @yoongjh/aiya
 ```
 
 Or run from source:
@@ -42,11 +42,17 @@ aiya init --model qwen2.5:8b
 aiya chat
 ```
 
-3. Search for files or content:
+3. Search for files:
 ```bash
-aiya search "*.ts"
-aiya search --content "import" "src/**"
+aiya search chat
+aiya search config
 ```
+
+## Global Options
+
+These options are available on all commands:
+- `--verbose, -v` - Enable verbose logging for debugging
+- `--config <path>` - Specify custom config file path
 
 ## Commands
 
@@ -58,28 +64,22 @@ Options:
 - `--base-url <url>` - Ollama server endpoint (default: http://localhost:11434)
 - `--check-connection` - Verify connection to Ollama server
 
-### `aiya chat [options]`
+### `aiya chat`
 Start an interactive chat session with the AI.
 
-Options:
-- `-f, --file <path>` - Include file content in context
-- `-c, --context <pattern>` - Include files matching pattern in context
-- `--no-stream` - Disable streaming responses
 
 Chat commands:
 - `/read <file>` - Read and display file content
 - `/search <pattern>` - Search for files
 - `/tokens` - Show token usage statistics
 - `help` - Show available commands
-- `exit` - End the session
+- `clear` - Clear conversation history
+- `exit` or `quit` - End the session
 
-### `aiya search <pattern> [options]`
-Search for files and content in the workspace.
+### `aiya search <query>`
+Fuzzy search for files in the workspace.
 
-Options:
-- `-c, --content <text>` - Search for files containing specific text
-- `-t, --type <type>` - Search type: "file" or "content"
-- `--max-results <num>` - Maximum number of results (default: 50)
+The search uses simple fuzzy matching - it finds files where the query characters appear in order within the filename. Exact matches are ranked higher than partial matches.
 
 ## Configuration
 
@@ -87,6 +87,15 @@ Aiya uses YAML configuration files with the following hierarchy:
 1. Project-level: `.aiya.yaml` in current directory
 2. Global: `~/.aiya/config.yaml`
 3. Environment variables
+
+### Environment Variables
+
+You can override configuration using environment variables:
+- `AIYA_MODEL` - Override model selection
+- `AIYA_BASE_URL` - Override server endpoint
+- `AIYA_STREAMING` - Enable/disable streaming (true/false)
+- `AIYA_VERBOSE` - Enable verbose logging (true/false)
+- `AIYA_CONFIG_PATH` - Custom config file path
 
 Example `.aiya.yaml`:
 ```yaml
@@ -118,7 +127,19 @@ ui:
   showTokens: true
 ```
 
-## Security
+## MCP Tool System
+
+Aiya includes a built-in Model Context Protocol (MCP) tool system that enables file operations:
+
+### Available Tools
+- **File Operations**: Read, write, and edit files within the workspace
+- **Directory Listing**: Browse directory contents
+- **File Search**: Fuzzy search for files in the workspace
+
+### Tool Usage
+The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access.
+
+## Basic Security
 
 - All file operations are restricted to the current workspace directory
 - Configurable file extension allow-lists prevent access to sensitive files
@@ -147,7 +168,7 @@ Aiya is built with a modular architecture:
 
 - **Providers**: Abstraction layer for different LLM services (currently Ollama)
 - **MCP Integration**: Model Context Protocol for secure file operations
-- **Security Layer**: Workspace-restricted file access and validation
+- **Basic Security Layer**: Workspace-restricted file access and validation
 - **CLI Interface**: Commander.js-based command structure with interactive features
 
 ## License

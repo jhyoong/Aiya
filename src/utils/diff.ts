@@ -130,7 +130,7 @@ export class DiffGenerator {
     }
     
     let output = '';
-    output += chalk.blue(`📝 Changes to ${filePath}:\n`);
+    output += chalk.blue(`Changes to ${filePath}:\n`);
     output += chalk.gray(`   +${diff.stats.additions} -${diff.stats.deletions}\n\n`);
     output += this.formatDiff(diff, { showLineNumbers: true, colorOutput: true });
     

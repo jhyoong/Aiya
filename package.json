@@ -1,7 +1,7 @@
 {
-  "name": "aiya",
+  "name": "@yoongjh/aiya",
   "version": "1.0.0",
-  "description": "AI-powered development assistant with secure file operations",
+  "description": "Simple terminal tool for custom model endpoints",
   "main": "dist/cli/index.js",
   "bin": {
     "aiya": "dist/cli/index.js"
@@ -23,7 +23,7 @@
     "ollama",
     "mcp"
   ],
-  "author": "",
+  "author": "minijh",
   "license": "MIT",
   "dependencies": {
     "commander": "^12.0.0",

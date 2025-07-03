@@ -5,13 +5,9 @@ import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 
 export const searchCommand = new Command('search')
-  .description('Search for files and content in the workspace')
-  .argument('<pattern>', 'Search pattern (glob pattern for files)')
-  .option('-c, --content <text>', 'Search for files containing this text')
-  .option('-t, --type <type>', 'Search type: "file" (names) or "content" (file contents)', 'file')
-  .option('--max-results <num>', 'Maximum number of results to show', '50')
-  .option('--no-relative', 'Show absolute paths instead of relative')
-  .action(async (pattern, options) => {
+  .description('Fuzzy search for files in the workspace')
+  .argument('<query>', 'Search query')
+  .action(async (query) => {
     try {
       const configManager = new ConfigManager();
       const config = await configManager.load();
@@ -27,11 +23,7 @@ export const searchCommand = new Command('search')
       
       console.log(chalk.blue('🔍 Searching...'));
       
-      if (options.type === 'content' || options.content) {
-        await searchContent(mcpClient, pattern, options.content || pattern, options);
-      } else {
-        await searchFiles(mcpClient, pattern, options.content, options);
-      }
+      await fuzzySearch(mcpClient, query);
       
     } catch (error) {
       console.error(chalk.red('❌ Search failed:'));
@@ -40,179 +32,100 @@ export const searchCommand = new Command('search')
     }
   });
 
-async function searchFiles(
-  mcpClient: FilesystemMCPClient, 
-  pattern: string, 
-  contentFilter?: string,
-  options?: any
-): Promise<void> {
+async function fuzzySearch(mcpClient: FilesystemMCPClient, query: string): Promise<void> {
   try {
-    const result = await mcpClient.callTool('search_files', { 
-      pattern, 
-      content: contentFilter 
-    });
+    // Get all files in the workspace
+    const result = await mcpClient.callTool('search_files', { pattern: '**/*' });
     
     if (result.isError) {
       console.error(chalk.red(`Error: ${result.content[0]?.text}`));
       return;
     }
     
-    const files = JSON.parse(result.content[0]?.text || '[]') as string[];
-    const maxResults = parseInt(options?.maxResults || '50');
-    const displayFiles = files.slice(0, maxResults);
+    const allFiles = JSON.parse(result.content[0]?.text || '[]') as string[];
     
-    if (files.length === 0) {
-      console.log(chalk.yellow('No files found matching the pattern'));
-      return;
-    }
-    
-    console.log(chalk.green(`📁 Found ${files.length} file(s):`));
-    if (files.length > maxResults) {
-      console.log(chalk.gray(`   (showing first ${maxResults} results)`));
-    }
-    
-    displayFiles.forEach((file, index) => {
-      const fileIcon = getFileIcon(file);
-      const displayPath = options?.relative !== false ? file : file;
-      console.log(`${chalk.gray(`${(index + 1).toString().padStart(3)}:`)} ${fileIcon} ${chalk.cyan(displayPath)}`);
-    });
-    
-    if (contentFilter) {
-      console.log(chalk.gray(`\n🔍 Files containing: "${contentFilter}"`));
-    }
-    
-  } catch (error) {
-    console.error(chalk.red(`File search error: ${error}`));
-  }
-}
-
-async function searchContent(
-  mcpClient: FilesystemMCPClient,
-  pattern: string,
-  searchText: string,
-  options?: any
-): Promise<void> {
-  try {
-    // First get matching files
-    const fileResult = await mcpClient.callTool('search_files', { 
-      pattern,
-      content: searchText 
-    });
-    
-    if (fileResult.isError) {
-      console.error(chalk.red(`Error: ${fileResult.content[0]?.text}`));
-      return;
-    }
-    
-    const files = JSON.parse(fileResult.content[0]?.text || '[]') as string[];
-    const maxResults = parseInt(options?.maxResults || '50');
-    
-    if (files.length === 0) {
-      console.log(chalk.yellow(`No files found containing "${searchText}"`));
-      return;
-    }
-    
-    console.log(chalk.green(`📝 Found "${searchText}" in ${files.length} file(s):`));
-    if (files.length > maxResults) {
-      console.log(chalk.gray(`   (showing first ${maxResults} results)`));
-    }
-    console.log();
-    
-    // Show content matches for each file
-    for (const file of files.slice(0, maxResults)) {
-      await showContentMatches(mcpClient, file, searchText);
-      console.log(); // Add spacing between files
-    }
-    
-  } catch (error) {
-    console.error(chalk.red(`Content search error: ${error}`));
-  }
-}
-
-async function showContentMatches(
-  mcpClient: FilesystemMCPClient,
-  filePath: string,
-  searchText: string
-): Promise<void> {
-  try {
-    const result = await mcpClient.callTool('read_file', { path: filePath });
-    
-    if (result.isError) {
-      console.log(chalk.red(`   ❌ ${filePath}: ${result.content[0]?.text}`));
-      return;
-    }
-    
-    const content = result.content[0]?.text || '';
-    const lines = content.split('\n');
-    const matches: Array<{ lineNum: number; line: string }> = [];
-    
-    lines.forEach((line, index) => {
-      if (line.toLowerCase().includes(searchText.toLowerCase())) {
-        matches.push({ lineNum: index + 1, line: line.trim() });
-      }
-    });
+    // Simple fuzzy matching - check if query chars appear in order
+    const matches = allFiles
+      .map(file => ({
+        file,
+        score: calculateFuzzyScore(file, query)
+      }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
     
     if (matches.length === 0) {
+      console.log(chalk.yellow('No files found matching the query'));
       return;
     }
     
-    const fileIcon = getFileIcon(filePath);
-    console.log(`${fileIcon} ${chalk.cyan(filePath)} ${chalk.gray(`(${matches.length} match${matches.length > 1 ? 'es' : ''})`)}`);
+    console.log(chalk.green(`📁 Found ${matches.length} file(s):`));
     
-    // Show up to 3 matches per file
-    matches.slice(0, 3).forEach(match => {
-      const lineNumStr = match.lineNum.toString().padStart(4);
-      const highlightedLine = highlightSearchText(match.line, searchText);
-      console.log(`   ${chalk.gray(lineNumStr + ':')} ${highlightedLine}`);
+    matches.forEach((match, index) => {
+      const highlightedFile = highlightQuery(match.file, query);
+      console.log(`${chalk.gray(`${(index + 1).toString().padStart(3)}:`)} ${highlightedFile}`);
     });
     
-    if (matches.length > 3) {
-      console.log(chalk.gray(`   ... and ${matches.length - 3} more match${matches.length - 3 > 1 ? 'es' : ''}`));
-    }
-    
   } catch (error) {
-    console.log(chalk.red(`   ❌ ${filePath}: Error reading file`));
+    console.error(chalk.red(`Search error: ${error}`));
   }
 }
 
-function getFileIcon(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase();
+function calculateFuzzyScore(filename: string, query: string): number {
+  const lowerFilename = filename.toLowerCase();
+  const lowerQuery = query.toLowerCase();
   
-  const iconMap: Record<string, string> = {
-    'js': '📄',
-    'ts': '📘',
-    'tsx': '📘',
-    'jsx': '📄',
-    'py': '🐍',
-    'rs': '🦀',
-    'go': '🐹',
-    'java': '☕',
-    'c': '📄',
-    'cpp': '📄',
-    'h': '📄',
-    'hpp': '📄',
-    'md': '📝',
-    'txt': '📄',
-    'json': '📋',
-    'yaml': '📋',
-    'yml': '📋',
-    'html': '🌐',
-    'css': '🎨',
-    'scss': '🎨',
-    'sass': '🎨',
-    'sql': '🗃️',
-    'sh': '⚡',
-    'bash': '⚡'
-  };
+  // Exact match gets highest score
+  if (lowerFilename.includes(lowerQuery)) {
+    return 100;
+  }
   
-  return iconMap[ext || ''] || '📄';
+  // Check if all query characters appear in order
+  let queryIndex = 0;
+  let score = 0;
+  
+  for (let i = 0; i < lowerFilename.length && queryIndex < lowerQuery.length; i++) {
+    if (lowerFilename[i] === lowerQuery[queryIndex]) {
+      queryIndex++;
+      score += 1;
+    }
+  }
+  
+  // Return score only if all query characters were found
+  return queryIndex === lowerQuery.length ? score : 0;
 }
 
-function highlightSearchText(line: string, searchText: string): string {
-  const regex = new RegExp(`(${escapeRegex(searchText)})`, 'gi');
-  return line.replace(regex, chalk.yellow.bold('$1'));
-}
-
-function escapeRegex(text: string): string {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function highlightQuery(filename: string, query: string): string {
+  const lowerFilename = filename.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  
+  // Highlight exact matches
+  if (lowerFilename.includes(lowerQuery)) {
+    const index = lowerFilename.indexOf(lowerQuery);
+    return (
+      filename.substring(0, index) +
+      chalk.yellow.bold(filename.substring(index, index + query.length)) +
+      filename.substring(index + query.length)
+    );
+  }
+  
+  // Highlight individual characters
+  let result = '';
+  let queryIndex = 0;
+  
+  for (let i = 0; i < filename.length && queryIndex < query.length; i++) {
+    if (filename[i]?.toLowerCase() === query[queryIndex]?.toLowerCase()) {
+      result += chalk.yellow.bold(filename[i]);
+      queryIndex++;
+    } else {
+      result += chalk.cyan(filename[i]);
+    }
+  }
+  
+  // Add remaining characters
+  if (result.length < filename.length) {
+    result += chalk.cyan(filename.substring(result.length));
+  }
+  
+  return result;
 }

@@ -18,10 +18,7 @@ interface ChatSession {
 
 export const chatCommand = new Command('chat')
   .description('Start an interactive chat session')
-  .option('-f, --file <path>', 'Include file content in context')
-  .option('-c, --context <pattern>', 'Include files matching pattern in context')
-  .option('--no-stream', 'Disable streaming responses')
-  .action(async (options) => {
+  .action(async () => {
     try {
       const configManager = new ConfigManager();
       const config = await configManager.load();
@@ -40,9 +37,9 @@ export const chatCommand = new Command('chat')
         throw new Error('Cannot connect to Ollama server');
       }
       
-      console.log(chalk.blue('🤖 Aiya Chat Session Started'));
-      console.log(chalk.gray(`   Model: ${config.provider.model}`));
-      console.log(chalk.gray('   Type "exit" to quit, "help" for commands'));
+      console.log(chalk.blue('Aiya Chat Session Started'));
+      console.log(chalk.gray(` ├─ Model: ${config.provider.model}`));
+      console.log(chalk.gray(' └─ Type "exit" to quit, "help" for commands'));
       console.log();
       
       // Initialize MCP tool service
@@ -65,16 +62,11 @@ export const chatCommand = new Command('chat')
           role: 'system',
           content: toolsSystemMessage
         });
-        console.log(chalk.gray('🔧 Tools available: ') + chalk.cyan(toolService.getAvailableToolNames().join(', ')));
-      }
-      
-      // Load initial context if specified
-      if (options.file || options.context) {
-        await loadInitialContext(session, mcpClient, options);
+        console.log(chalk.gray('Tools available: ') + chalk.cyan(toolService.getAvailableToolNames().join(', ')));
       }
       
       // Start interactive loop
-      await startChatLoop(session, provider, mcpClient, config.ui.streaming && !options.noStream);
+      await startChatLoop(session, provider, mcpClient, config.ui.streaming);
       
     } catch (error) {
       console.error(chalk.red('❌ Chat session failed:'));
@@ -82,48 +74,6 @@ export const chatCommand = new Command('chat')
       process.exit(1);
     }
   });
-
-async function loadInitialContext(
-  session: ChatSession, 
-  mcpClient: FilesystemMCPClient, 
-  options: any
-): Promise<void> {
-  try {
-    let contextContent = '';
-    
-    if (options.file) {
-      console.log(chalk.yellow(`📄 Loading file: ${options.file}`));
-      const result = await mcpClient.callTool('read_file', { path: options.file });
-      if (!result.isError && result.content[0]?.text) {
-        contextContent += `File: ${options.file}\n\`\`\`\n${result.content[0].text}\n\`\`\`\n\n`;
-      }
-    }
-    
-    if (options.context) {
-      console.log(chalk.yellow(`🔍 Loading context: ${options.context}`));
-      const result = await mcpClient.callTool('search_files', { pattern: options.context });
-      if (!result.isError && result.content[0]?.text) {
-        const files = JSON.parse(result.content[0].text) as string[];
-        for (const file of files.slice(0, 5)) { // Limit to first 5 files
-          const fileResult = await mcpClient.callTool('read_file', { path: file });
-          if (!fileResult.isError && fileResult.content[0]?.text) {
-            contextContent += `File: ${file}\n\`\`\`\n${fileResult.content[0].text}\n\`\`\`\n\n`;
-          }
-        }
-      }
-    }
-    
-    if (contextContent) {
-      session.messages.push({
-        role: 'system',
-        content: `Project context:\n\n${contextContent}`
-      });
-      console.log(chalk.green('✅ Context loaded'));
-    }
-  } catch (error) {
-    console.warn(chalk.yellow(`⚠️  Failed to load context: ${error}`));
-  }
-}
 
 async function startChatLoop(
   session: ChatSession,
@@ -182,7 +132,10 @@ async function startChatLoop(
     });
     
     try {
-      console.log(chalk.green('🤖 Aiya: '), { newline: false });
+      // Track tokens at start of this prompt
+      const tokensBeforePrompt = session.tokenCount;
+      
+      process.stdout.write(chalk.green('Aiya: '));
       
       let assistantMessage: Message;
       
@@ -214,14 +167,24 @@ async function startChatLoop(
         session.tokenCount += response.tokensUsed || 0;
       }
       
-      // Process message for tool calls
+      // Process message for tool calls with iterative execution
       if (session.toolExecutor) {
-        const { updatedMessage, toolResults, hasToolCalls } = await session.toolExecutor.processMessage(assistantMessage);
+        let currentMessage = assistantMessage;
+        let iterationCount = 0;
+        const maxIterations = 10; // Prevent infinite loops
         
-        // Add the assistant message (with tool calls if any)
-        session.messages.push(updatedMessage);
-        
-        if (hasToolCalls) {
+        // Keep processing tool calls until no more are found
+        while (iterationCount < maxIterations) {
+          const { updatedMessage, toolResults, hasToolCalls } = await session.toolExecutor.processMessage(currentMessage);
+          
+          // Add the assistant message (with tool calls if any)
+          session.messages.push(updatedMessage);
+          
+          if (!hasToolCalls) {
+            // No tool calls found, we're done
+            break;
+          }
+          
           // Add tool result messages
           session.messages.push(...toolResults);
           
@@ -230,24 +193,52 @@ async function startChatLoop(
           
           try {
             const followUpResponse = await provider.chat(session.messages);
-            console.log(chalk.green('🤖 Aiya: ') + followUpResponse.content);
             
-            session.messages.push({
+            // Check if this is the final response or contains more tool calls
+            const hasMoreToolCalls = session.toolExecutor.messageNeedsToolExecution({
               role: 'assistant',
               content: followUpResponse.content
             });
             
+            if (hasMoreToolCalls) {
+              console.log(chalk.blue('Executing additional tools...'));
+            } else {
+              console.log(chalk.green('Aiya: ') + followUpResponse.content);
+            }
+            
+            currentMessage = {
+              role: 'assistant',
+              content: followUpResponse.content
+            };
+            
             session.tokenCount += followUpResponse.tokensUsed || 0;
+            iterationCount++;
+            
+            // If this response doesn't have tool calls, we'll exit the loop
+            if (!hasMoreToolCalls) {
+              session.messages.push(currentMessage);
+              break;
+            }
+            
           } catch (error) {
             console.log(chalk.red(`❌ Error processing tool results: ${error}`));
+            break;
           }
         }
+        
+        if (iterationCount >= maxIterations) {
+          console.log(chalk.yellow('⚠️  Maximum tool execution iterations reached'));
+        }
+        
       } else {
         session.messages.push(assistantMessage);
       }
       
-      // Show token count
-      console.log(chalk.gray(`[Tokens: ${session.tokenCount}]`));
+      // Calculate prompt tokens (total tokens used for this exchange)
+      const promptTokens = session.tokenCount - tokensBeforePrompt;
+      
+      // Show token count in format: prompt_tokens (session_total)
+      console.log(chalk.gray(`[Tokens: ${promptTokens} (${session.tokenCount})]`));
       
     } catch (error) {
       console.log(chalk.red(`❌ Error: ${error}`));
@@ -318,7 +309,7 @@ async function handleSlashCommand(
 }
 
 function showHelp(): void {
-  console.log(chalk.blue('📖 Aiya Chat Commands:'));
+  console.log(chalk.blue('Aiya Chat Commands:'));
   console.log(chalk.gray('  exit, quit     - Exit chat session'));
   console.log(chalk.gray('  clear          - Clear conversation history'));
   console.log(chalk.gray('  help           - Show this help'));

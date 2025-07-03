@@ -23,13 +23,13 @@ export const initCommand = new Command('init')
       // Initialize configuration
       await configManager.init(options.model, options.baseUrl);
       
-      console.log(chalk.green('✅ Aiya initialized successfully!'));
+      console.log(chalk.green('Aiya initialized successfully!'));
       console.log(chalk.gray(`   Model: ${options.model}`));
       console.log(chalk.gray(`   Endpoint: ${options.baseUrl}`));
       console.log(chalk.gray(`   Config created: .aiya.yaml`));
       
       // Show next steps
-      console.log(chalk.blue('\n📋 Next steps:'));
+      console.log(chalk.blue('\nNext steps:'));
       console.log(chalk.gray('   • Run `aiya chat` to start a conversation'));
       console.log(chalk.gray('   • Run `aiya search <pattern>` to search files'));
       console.log(chalk.gray('   • Edit .aiya.yaml to customize settings'));
@@ -56,11 +56,11 @@ async function checkOllamaConnection(model: string, baseUrl: string): Promise<vo
     if (!availableModels.includes(model)) {
       console.log(chalk.yellow(`⚠️  Model '${model}' not found. Available models:`));
       availableModels.forEach(m => console.log(chalk.gray(`   • ${m}`)));
-      console.log(chalk.yellow(`\n💡 To pull the model, run: ollama pull ${model}`));
+      console.log(chalk.yellow(`\nTo pull the model, run: ollama pull ${model}`));
       throw new Error(`Model '${model}' is not available`);
     }
     
-    console.log(chalk.green('✅ Ollama connection successful'));
+    console.log(chalk.green('Ollama connection successful'));
     console.log(chalk.gray(`   Model '${model}' is available`));
     
   } catch (error) {
