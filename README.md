@@ -1,17 +1,18 @@
 # Aiya
 
-Artificial Intelligence: Your Assistant (AIYA). A simple terminal tool for code editing which connects to local models.
+Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-assisted development with reactive interface and context management.
 
-[![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/loccon)
+[![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- Interactive chat sessions with AI models via Ollama
-- Secure file operations restricted to workspace boundaries
-- Fuzzy search for files in the workspace
-- Project-aware configuration management
-- Streaming responses for real-time interaction
+- **Reactive Terminal Interface**: Slash command suggestions with smart tab completion
+- **Interactive Chat Sessions**: AI conversations via Ollama with streaming responses
+- **Context Management**: Add files to conversation context.
+- **Secure File Operations**: Workspace-restricted file access with configurable security
+- **Fuzzy File Search**: Quick file discovery within your workspace
+- **Project-aware Configuration**: YAML-based configuration with environment variable support
 
 ## Prerequisites
 
@@ -27,8 +28,8 @@ npm install -g aiya-cli
 Or run from source:
 
 ```bash
-git clone <repository>
-cd aiya
+git clone https://github.com/jhyoong/Aiya.git
+cd Aiya
 npm install
 npm run build
 ```
@@ -68,16 +69,41 @@ Options:
 - `--check-connection` - Verify connection to Ollama server
 
 ### `aiya chat`
-Start an interactive chat session with the AI.
+Start an interactive chat session with the AI featuring a reactive terminal interface.
 
+#### Terminal Interface Features
 
-Chat commands:
-- `/read <file>` - Read and display file content
-- `/search <pattern>` - Search for files
-- `/tokens` - Show token usage statistics
-- `help` - Show available commands
-- `clear` - Clear conversation history
-- `exit` or `quit` - End the session
+#### Chat Commands
+- **Command Suggestions**: Type `/` to see available commands with grey text hints. Press Tab to quickly select commands.
+- `/read <file>` - Read and display file content in the terminal
+- `/add <file>` - Add file content to context for the next prompt (silent)
+- `/search <pattern>` - Search for files matching the pattern
+- `/tokens` - Show token usage statistics for the current session
+- `help` - Show available commands and usage
+- `clear` - Clear conversation history and added file context
+- `exit` or `quit` - End the chat session
+
+#### Usage Examples
+```bash
+# Type '/' to see suggestions
+💬 You: /
+# Shows: /read <file_path> in grey text
+
+# Type '/r' and press Tab to complete
+💬 You: /r<Tab>
+# Completes to: /read
+
+# Add files to context silently
+💬 You: /add src/utils.ts
+Added src/utils.ts to context for the next prompt
+
+💬 You: /add package.json
+Added package.json to context for the next prompt
+
+💬 You: Can you help optimize this utility function?
+# AI receives both files plus your question
+```
+*Note: This depends on your context window size*
 
 ### `aiya search <query>`
 Fuzzy search for files in the workspace.
@@ -167,12 +193,13 @@ npm run dev
 
 ## Architecture
 
-Aiya is built with a modular architecture:
+Aiya is built with a somewhat simple, modular architecture:
 
 - **Providers**: Abstraction layer for different LLM services (currently Ollama)
 - **MCP Integration**: Model Context Protocol for secure file operations
+- **Context Management**: Session-based file context with automatic cleanup
 - **Basic Security Layer**: Workspace-restricted file access and validation
-- **CLI Interface**: Commander.js-based command structure with interactive features
+- **CLI Interface**: Commander.js-based command structure
 
 ## License
 
