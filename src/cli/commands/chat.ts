@@ -191,33 +191,39 @@ async function* handleMessageStream(
         // Add tool result messages
         session.messages.push(...toolResults);
         
-        // Get follow-up response from the model
-        const followUpResponse = await provider.chat(session.messages);
-        session.tokenCount += followUpResponse.tokensUsed || 0;
-        
-        // Process follow-up response through ThinkingParser
+        // Get follow-up response from the model using streaming
+        let followUpResponse = '';
         const followUpParser = new ThinkingParser(session.thinkingMode, true);
-        const followUpResults = followUpParser.processChunk(followUpResponse.content);
         
-        for (const result of followUpResults) {
-          if (result.isThinking) {
-            // Yield thinking content
-            yield { content: '', thinking: result.content, done: false };
-          } else {
-            // Yield regular content
-            yield { content: result.content, done: false };
+        for await (const chunk of provider.stream(session.messages)) {
+          const results = followUpParser.processChunk(chunk.content);
+          
+          for (const result of results) {
+            if (result.isThinking) {
+              // Yield thinking content
+              yield { content: '', thinking: result.content, done: false };
+            } else {
+              // Yield regular content
+              yield { content: result.content, done: false };
+              followUpResponse += result.content;
+            }
+          }
+          
+          if (chunk.done) {
+            session.tokenCount += chunk.tokensUsed || 0;
+            break;
           }
         }
         
         // Check if this follow-up response contains more tool calls
         const hasMoreToolCalls = session.toolExecutor.messageNeedsToolExecution({
           role: 'assistant',
-          content: followUpResponse.content
+          content: followUpResponse
         });
         
         currentMessage = {
           role: 'assistant',
-          content: followUpResponse.content
+          content: followUpResponse
         };
         
         iterationCount++;

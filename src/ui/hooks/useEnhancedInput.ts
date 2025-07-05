@@ -93,14 +93,96 @@ function shouldSkipInkProcessing(_inputChar: string, key: any): boolean {
   return false;
 }
 
+// Helper functions for paste handling
+function isPasteOperation(inputChar: string, timeSinceLastInput: number): boolean {
+  // Consider it a paste if:
+  // 1. Multiple characters received at once, OR
+  // 2. Single character but arriving very quickly after another (< 10ms)
+  return inputChar.length > 1 || (inputChar.length === 1 && timeSinceLastInput < 10);
+}
+
+function isSpecialKey(key: any): boolean {
+  return key.return || key.escape || key.backspace || key.delete || 
+         key.leftArrow || key.rightArrow || key.upArrow || key.downArrow ||
+         key.home || key.end || key.tab || key.ctrl || key.meta;
+}
+
 export const useEnhancedInput = (handler: InputHandler) => {
   const handlerRef = useRef(handler);
   const interceptedEvents = useRef<Map<string, number>>(new Map());
+  const pasteBuffer = useRef<string>('');
+  const pasteTimer = useRef<NodeJS.Timeout | null>(null);
+  const lastInputTime = useRef<number>(0);
+  const isInPasteMode = useRef<boolean>(false);
 
   // Update handler ref when it changes
   useEffect(() => {
     handlerRef.current = handler;
   }, [handler]);
+
+  // Paste handling functions
+  const flushPasteBuffer = () => {
+    if (pasteBuffer.current) {
+      const bufferedContent = pasteBuffer.current;
+      pasteBuffer.current = '';
+      isInPasteMode.current = false;
+      
+      // Create a key object indicating this is pasted content
+      const pasteKey: EnhancedKey = {
+        name: 'paste',
+        sequence: bufferedContent,
+        backspace: false,
+        delete: false,
+        return: false,
+        escape: false,
+        leftArrow: false,
+        rightArrow: false,
+        upArrow: false,
+        downArrow: false,
+        home: false,
+        end: false,
+        tab: false,
+        ctrl: false,
+        meta: false,
+        shift: false,
+      };
+      
+      handlerRef.current(bufferedContent, pasteKey);
+    }
+  };
+
+  const handlePasteInput = (inputChar: string) => {
+    pasteBuffer.current += inputChar;
+    
+    // Clear existing timer and set a new one
+    if (pasteTimer.current) {
+      clearTimeout(pasteTimer.current);
+    }
+    
+    // Flush the buffer after a short delay (50ms) to allow for chunked paste content
+    pasteTimer.current = setTimeout(() => {
+      flushPasteBuffer();
+    }, 50);
+  };
+
+  const handleNormalInput = (inputChar: string, key: EnhancedKey) => {
+    // If we were in paste mode, flush the buffer first
+    if (isInPasteMode.current) {
+      flushPasteBuffer();
+    }
+    
+    // Process the normal input
+    handlerRef.current(inputChar, key);
+  };
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pasteTimer.current) {
+        clearTimeout(pasteTimer.current);
+      }
+    };
+  }, []);
 
   // Key interception for specific sequences
   useEffect(() => {
@@ -116,8 +198,8 @@ export const useEnhancedInput = (handler: InputHandler) => {
         // Record this interception
         interceptedEvents.current.set(eventId, Date.now());
         
-        // Call handler immediately
-        handlerRef.current(str || '', enhancedKey);
+        // Use normal input handler for intercepted keys
+        handleNormalInput(str || '', enhancedKey);
         
         // Clean up old intercepted events
         setTimeout(() => {
@@ -146,6 +228,33 @@ export const useEnhancedInput = (handler: InputHandler) => {
 
     // Process with Ink's detected key information
     const enhancedKey = createEnhancedKeyFromInk(inputChar, key);
-    handlerRef.current(inputChar, enhancedKey);
+    
+    // Calculate time since last input for paste detection
+    const currentTime = Date.now();
+    const timeSinceLastInput = currentTime - lastInputTime.current;
+    lastInputTime.current = currentTime;
+    
+    // Handle special keys (non-character input) immediately
+    if (isSpecialKey(key)) {
+      handleNormalInput(inputChar, enhancedKey);
+      return;
+    }
+    
+    // Detect paste operations for character input
+    if (inputChar && !key.ctrl && !key.meta) {
+      const isPaste = isPasteOperation(inputChar, timeSinceLastInput);
+      
+      if (isPaste) {
+        // Handle as paste operation
+        isInPasteMode.current = true;
+        handlePasteInput(inputChar);
+      } else {
+        // Handle as normal character input
+        handleNormalInput(inputChar, enhancedKey);
+      }
+    } else {
+      // Handle other input normally
+      handleNormalInput(inputChar, enhancedKey);
+    }
   });
 };

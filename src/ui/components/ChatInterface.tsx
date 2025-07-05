@@ -92,31 +92,52 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     try {
       if (onMessageStream) {
         // Use streaming if available
-        let accumulatedContent = '';
-        let accumulatedThinking = '';
+        let currentPhaseContent = '';
+        let currentPhaseThinking = '';
+        let lastChunkType: 'thinking' | 'content' | null = null;
         
         for await (const chunk of onMessageStream(input)) {
           if (chunk.thinking) {
-            // For real-time display, append new thinking content
-            accumulatedThinking += chunk.thinking;
-            setCurrentThinking(accumulatedThinking);
+            // If we just had content and now have thinking, create a message for the previous phase
+            if (lastChunkType === 'content' && currentPhaseContent) {
+              const phaseMessage: Message = {
+                role: 'assistant',
+                content: currentPhaseContent,
+                timestamp: new Date(),
+                ...(currentPhaseThinking && { thinking: currentPhaseThinking }),
+              };
+              
+              setMessages(prev => [...prev, phaseMessage]);
+              
+              // Reset for new phase
+              currentPhaseContent = '';
+              currentPhaseThinking = '';
+              setCurrentContent('');
+            }
+            
+            currentPhaseThinking += chunk.thinking;
+            setCurrentThinking(currentPhaseThinking);
+            lastChunkType = 'thinking';
           }
           
           if (chunk.content) {
-            // For real-time display, append new content and show immediately
-            accumulatedContent += chunk.content;
-            setCurrentContent(accumulatedContent);
+            currentPhaseContent += chunk.content;
+            setCurrentContent(currentPhaseContent);
+            lastChunkType = 'content';
           }
           
           if (chunk.done) {
-            const assistantMessage: Message = {
-              role: 'assistant',
-              content: accumulatedContent,
-              timestamp: new Date(),
-              ...(accumulatedThinking && { thinking: accumulatedThinking }),
-            };
-
-            setMessages(prev => [...prev, assistantMessage]);
+            // Create final message for any remaining content
+            if (currentPhaseContent || currentPhaseThinking) {
+              const finalMessage: Message = {
+                role: 'assistant',
+                content: currentPhaseContent,
+                timestamp: new Date(),
+                ...(currentPhaseThinking && { thinking: currentPhaseThinking }),
+              };
+              setMessages(prev => [...prev, finalMessage]);
+            }
+            
             setCurrentThinking('');
             setCurrentContent('');
             setStatus('success');
