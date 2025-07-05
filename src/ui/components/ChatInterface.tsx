@@ -40,7 +40,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     
     // Get terminal width, default to 80 if not available
     const terminalWidth = process.stdout.columns || 80;
-    const prefix = '💭 │ ';
+    const prefix = '│ ';
     const maxLineLength = terminalWidth - prefix.length - 2;
     
     // Split content into words and format with proper wrapping
@@ -165,11 +165,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             {messages.slice(-5).map((message: Message, index: number) => (
               <Box key={index} flexDirection="column" marginBottom={1}>
                 <Text color={message.role === 'user' ? 'blue' : 'green'}>
-                  {message.role === 'user' ? '🧑 You' : '🤖 Assistant'}
+                  {message.role === 'user' ? '>' : 'Aiya'}
                 </Text>
                 {message.thinking && (
                   <Box marginBottom={1}>
-                    <Text color="yellow" dimColor>{formatThinkingContent(message.thinking)}</Text>
+                    <Text color="gray" dimColor>{formatThinkingContent(message.thinking)}</Text>
                   </Box>
                 )}
                 <Text>{message.content}</Text>
@@ -183,13 +183,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         
         {currentThinking && (
           <Box marginBottom={1}>
-            <Text color="yellow" dimColor>{formatThinkingContent(currentThinking)}</Text>
+            <Text color="grey" dimColor>{formatThinkingContent(currentThinking)}</Text>
           </Box>
         )}
         
         {currentContent && (
           <Box marginBottom={1}>
-            <Text color="green">🤖 Assistant</Text>
+            <Text color="green">Aiya</Text>
             <Text>{currentContent}</Text>
             <Text color="gray" dimColor>streaming...</Text>
           </Box>

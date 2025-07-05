@@ -3,9 +3,7 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { chatCommand } from './commands/chat.js';
-import { chatInkCommand } from './commands/chat-ink.js';
 import { searchCommand } from './commands/search.js';
-import { searchInkCommand } from './commands/search-ink.js';
 
 const program = new Command();
 
@@ -16,10 +14,8 @@ program
 
 // Add commands
 program.addCommand(initCommand);
-program.addCommand(chatInkCommand); // New default chat (Ink-based)
-program.addCommand(searchInkCommand); // New default search (Ink-based)
-program.addCommand(chatCommand); // Legacy chat
-program.addCommand(searchCommand); // Legacy search
+program.addCommand(chatCommand); // Ink-based chat interface
+program.addCommand(searchCommand); // Ink-based search interface
 
 // Global options
 program

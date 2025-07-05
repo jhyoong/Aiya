@@ -161,12 +161,24 @@ ui:
 Aiya includes a built-in Model Context Protocol (MCP) tool system that enables file operations:
 
 ### Available Tools
-- **File Operations**: Read, write, and edit files within the workspace
-- **Directory Listing**: Browse directory contents
-- **File Search**: Fuzzy search for files in the workspace
+
+#### Basic File Operations
+- **File I/O**: `read_file`, `write_file` - Read and write files within the workspace
+- **Directory Listing**: `list_directory` - Browse directory contents
+- **File Search**: `search_files` - Search for files using glob patterns
+
+#### Advanced File Manipulation
+- **Preview Changes**: `preview_diff` - Preview file changes before applying them
+- **Atomic Operations**: `atomic_write`, `atomic_edit` - Safe file operations with automatic backup
+- **Pattern Replacement**: `pattern_replace` - Regex-based content replacement with advanced options
+- **File Recovery**: `rollback_file` - Rollback files to previous backup versions
+
+#### Queue Management
+- **Batch Operations**: `queue_operation` - Queue multiple file operations for batch processing
+- **Queue Execution**: `execute_queue` - Execute all queued operations with optional preview
 
 ### Tool Usage
-The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access.
+The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, and batch processing for complex file manipulation tasks.
 
 ## Basic Security
 
