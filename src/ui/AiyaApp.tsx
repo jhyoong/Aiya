@@ -129,12 +129,6 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
 
   return (
     <Box flexDirection="column" height={24}>
-      <StatusBar
-        status={appStatus}
-        provider={provider}
-        model={model}
-      />
-      
       <Box flexGrow={1} paddingY={1}>
         {renderCurrentMode()}
       </Box>
@@ -144,6 +138,12 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
           Mode: {currentMode.toUpperCase()} | Use /chat, /search, /command to switch modes
         </Text>
       </Box>
+      
+      <StatusBar
+        status={appStatus}
+        provider={provider}
+        model={model}
+      />
     </Box>
   );
 };

@@ -173,13 +173,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   return (
     <Box flexDirection="column">
-      <SimpleStatusBar
-        status={status}
-        message={statusMessage}
-        provider={provider}
-        model={model}
-      />
-      
       <Box flexDirection="column" paddingY={1}>
         {messages.length > 0 && (
           <Box flexDirection="column" marginBottom={1}>
@@ -227,6 +220,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       ) : (
         <Text color="yellow">Processing your message...</Text>
       )}
+      
+      <SimpleStatusBar
+        status={status}
+        message={statusMessage}
+        provider={provider}
+        model={model}
+      />
     </Box>
   );
 };
