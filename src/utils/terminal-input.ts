@@ -19,6 +19,9 @@ export class TerminalInput {
   private currentSuggestion: SuggestionResult | null = null;
   private isRawMode: boolean = false;
   private options: TerminalInputOptions;
+  private terminalWidth: number = 80;
+  private updateTimeout: NodeJS.Timeout | null = null;
+  private lastLinesUsed: number = 1;
 
   constructor(options: TerminalInputOptions) {
     this.options = options;
@@ -30,13 +33,24 @@ export class TerminalInput {
     process.stdin.resume();
     process.stdin.setEncoding('utf8');
     
+    // Get initial terminal width
+    this.updateTerminalWidth();
+    
     process.stdin.on('data', this.handleKeypress.bind(this));
     process.stdin.on('end', this.handleClose.bind(this));
+    
+    // Listen for terminal resize events
+    process.stdout.on('resize', this.handleResize.bind(this));
     
     this.showPrompt();
   }
 
   stop(): void {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+      this.updateTimeout = null;
+    }
+    
     if (this.isRawMode) {
       process.stdin.setRawMode(false);
       process.stdin.pause();
@@ -66,6 +80,9 @@ export class TerminalInput {
       default:
         if (code >= 32 && code <= 126) { // Printable characters
           this.handleCharacter(key);
+        } else if (key.length > 1) {
+          // Handle pasted content (multiple characters at once)
+          this.handlePaste(key);
         }
     }
   }
@@ -73,14 +90,14 @@ export class TerminalInput {
   private handleCharacter(char: string): void {
     this.buffer = this.buffer.slice(0, this.cursorPosition) + char + this.buffer.slice(this.cursorPosition);
     this.cursorPosition++;
-    this.updateDisplay();
+    this.debouncedUpdateDisplay();
   }
 
   private handleBackspace(): void {
     if (this.cursorPosition > 0) {
       this.buffer = this.buffer.slice(0, this.cursorPosition - 1) + this.buffer.slice(this.cursorPosition);
       this.cursorPosition--;
-      this.updateDisplay();
+      this.debouncedUpdateDisplay();
     }
   }
 
@@ -123,12 +140,12 @@ export class TerminalInput {
       } else if (key === '\x1b[C') { // Right arrow
         if (this.cursorPosition < this.buffer.length) {
           this.cursorPosition++;
-          this.updateDisplay();
+          this.updateDisplay(); // Use immediate update for navigation
         }
       } else if (key === '\x1b[D') { // Left arrow
         if (this.cursorPosition > 0) {
           this.cursorPosition--;
-          this.updateDisplay();
+          this.updateDisplay(); // Use immediate update for navigation
         }
       }
     }
@@ -147,14 +164,37 @@ export class TerminalInput {
   }
 
   private updateDisplay(): void {
-    // Clear the current line
+    // Cancel any pending debounced updates
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+      this.updateTimeout = null;
+    }
+    
+    // Calculate lines needed
+    const promptLength = this.stripAnsi(this.options.prompt).length;
+    const totalLength = promptLength + this.buffer.length;
+    const linesNeeded = Math.max(1, Math.ceil(totalLength / this.terminalWidth));
+    
+    // Clear based on the maximum of current lines needed or previously used lines
+    const linesToClear = Math.max(linesNeeded, this.lastLinesUsed);
+    
+    // Clear all lines that might contain our content
+    for (let i = 0; i < linesToClear; i++) {
+      if (i > 0) {
+        process.stdout.write('\x1b[A'); // Move up one line
+      }
+      process.stdout.write('\r');
+      readline.clearLine(process.stdout, 0);
+    }
+    
+    // Move back to start position
     process.stdout.write('\r');
-    readline.clearLine(process.stdout, 0);
     
     // Show prompt and current input
     process.stdout.write(this.options.prompt + this.buffer);
     
     // Get suggestion if available
+    let suggestionLength = 0;
     if (this.options.onSuggestion) {
       const suggestion = this.options.onSuggestion(this.buffer);
       if (suggestion && suggestion.displayText !== this.buffer) {
@@ -162,15 +202,33 @@ export class TerminalInput {
         // Show the displayText in grey, but only the part after current input
         const displayPart = suggestion.displayText.slice(this.buffer.length);
         process.stdout.write(chalk.gray(displayPart));
+        suggestionLength = displayPart.length;
       } else {
         this.currentSuggestion = null;
       }
     }
     
-    // Position cursor correctly
-    const promptLength = this.stripAnsi(this.options.prompt).length;
-    const totalPosition = promptLength + this.cursorPosition;
-    process.stdout.write(`\r\x1b[${totalPosition + 1}G`);
+    // Update the lines used for next time (including suggestion)
+    const totalDisplayLength = promptLength + this.buffer.length + suggestionLength;
+    this.lastLinesUsed = Math.max(1, Math.ceil(totalDisplayLength / this.terminalWidth));
+    
+    // Position cursor correctly with multi-line support
+    const cursorTotalPosition = promptLength + this.cursorPosition;
+    const cursorLine = Math.floor(cursorTotalPosition / this.terminalWidth);
+    const cursorColumn = cursorTotalPosition % this.terminalWidth;
+    
+    // Move to correct line
+    const currentLine = Math.floor((promptLength + this.buffer.length) / this.terminalWidth);
+    const lineDiff = currentLine - cursorLine;
+    
+    if (lineDiff > 0) {
+      process.stdout.write(`\x1b[${lineDiff}A`); // Move up
+    } else if (lineDiff < 0) {
+      process.stdout.write(`\x1b[${-lineDiff}B`); // Move down
+    }
+    
+    // Move to correct column
+    process.stdout.write(`\r\x1b[${cursorColumn + 1}G`);
   }
 
   private clearSuggestion(): void {
@@ -178,6 +236,42 @@ export class TerminalInput {
   }
 
   private stripAnsi(str: string): string {
-    return str.replace(/\x1b\[[0-9;]*m/g, '');
+    // More comprehensive ANSI escape sequence removal
+    return str.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+  }
+
+  private updateTerminalWidth(): void {
+    this.terminalWidth = process.stdout.columns || 80;
+  }
+
+  private handleResize(): void {
+    this.updateTerminalWidth();
+    // Redraw the display with new terminal width
+    this.updateDisplay();
+  }
+
+  private debouncedUpdateDisplay(): void {
+    if (this.updateTimeout) {
+      clearTimeout(this.updateTimeout);
+    }
+    
+    this.updateTimeout = setTimeout(() => {
+      this.updateDisplay();
+      this.updateTimeout = null;
+    }, 10); // Small delay to prevent rapid successive updates
+  }
+
+  private handlePaste(text: string): void {
+    // Filter out non-printable characters except for printable ASCII
+    const cleanText = text.split('').filter(char => {
+      const code = char.charCodeAt(0);
+      return code >= 32 && code <= 126;
+    }).join('');
+    
+    if (cleanText) {
+      this.buffer = this.buffer.slice(0, this.cursorPosition) + cleanText + this.buffer.slice(this.cursorPosition);
+      this.cursorPosition += cleanText.length;
+      this.updateDisplay(); // Use immediate update for paste
+    }
   }
 }
