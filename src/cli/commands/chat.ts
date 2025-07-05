@@ -20,8 +20,8 @@ interface ChatSession {
   thinkingMode: 'on' | 'brief' | 'off';
 }
 
-export const chatCommand = new Command('chat')
-  .description('Start an interactive chat session')
+export const chatCommand = new Command('chat-legacy')
+  .description('Start an interactive chat session (legacy terminal input)')
   .action(async () => {
     try {
       const configManager = new ConfigManager();

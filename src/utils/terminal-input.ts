@@ -1,6 +1,12 @@
 import * as readline from 'readline';
 import chalk from 'chalk';
 
+/**
+ * @deprecated This file contains legacy terminal input handling.
+ * New commands should use Ink-based components from src/ui/components/
+ * This is maintained only for backward compatibility with legacy commands.
+ */
+
 export interface SuggestionResult {
   displayText: string;
   completionText: string;

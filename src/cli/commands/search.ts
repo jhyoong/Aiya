@@ -4,8 +4,8 @@ import { ConfigManager } from '../../core/config/manager.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
 
-export const searchCommand = new Command('search')
-  .description('Fuzzy search for files in the workspace')
+export const searchCommand = new Command('search-legacy')
+  .description('Fuzzy search for files in the workspace (legacy output)')
   .argument('<query>', 'Search query')
   .action(async (query) => {
     try {

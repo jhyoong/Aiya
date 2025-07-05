@@ -12,13 +12,19 @@ export class ThinkingParser {
   private inThinking: boolean = false;
   private thinkingContent: string = '';
   private mode: ThinkingMode;
+  private incrementalMode: boolean = false;
 
-  constructor(mode: ThinkingMode = 'on') {
+  constructor(mode: ThinkingMode = 'on', incrementalMode: boolean = false) {
     this.mode = mode;
+    this.incrementalMode = incrementalMode;
   }
 
   setMode(mode: ThinkingMode): void {
     this.mode = mode;
+  }
+
+  setIncrementalMode(enabled: boolean): void {
+    this.incrementalMode = enabled;
   }
 
   processChunk(chunk: string): ThinkingContent[] {
@@ -57,22 +63,46 @@ export class ThinkingParser {
         // Look for closing </think> tag
         const thinkEnd = this.buffer.indexOf('</think>');
         if (thinkEnd === -1) {
-          // No closing tag yet, accumulate thinking content
-          this.thinkingContent += this.buffer;
+          // No closing tag yet, handle thinking content
+          if (this.incrementalMode) {
+            // In incremental mode, emit thinking content immediately as raw text
+            const newThinkingContent = this.buffer;
+            if (newThinkingContent) {
+              results.push({
+                content: newThinkingContent,
+                isThinking: true
+              });
+            }
+            this.thinkingContent += this.buffer;
+          } else {
+            // Normal mode, just accumulate
+            this.thinkingContent += this.buffer;
+          }
           this.buffer = '';
           break;
         }
 
-        // Found closing tag, process thinking content
-        this.thinkingContent += this.buffer.substring(0, thinkEnd);
+        // Found closing tag, process final thinking content
+        const finalThinkingChunk = this.buffer.substring(0, thinkEnd);
+        this.thinkingContent += finalThinkingChunk;
         
-        // Add formatted thinking content based on mode
-        const formattedThinking = this.formatThinking(this.thinkingContent);
-        if (formattedThinking) {
-          results.push({
-            content: formattedThinking,
-            isThinking: true
-          });
+        if (this.incrementalMode) {
+          // Emit the final chunk if there's any content
+          if (finalThinkingChunk) {
+            results.push({
+              content: finalThinkingChunk,
+              isThinking: true
+            });
+          }
+        } else {
+          // Normal mode, emit all thinking content at once
+          const formattedThinking = this.formatThinking(this.thinkingContent);
+          if (formattedThinking) {
+            results.push({
+              content: formattedThinking,
+              isThinking: true
+            });
+          }
         }
 
         // Reset thinking state
@@ -84,6 +114,7 @@ export class ThinkingParser {
 
     return results;
   }
+
 
   private formatThinking(content: string): string {
     if (this.mode === 'off') {
