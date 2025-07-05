@@ -34,6 +34,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     usage: '/tokens',
     description: 'Show token usage statistics',
     parameters: []
+  },
+  {
+    name: 'thinking',
+    usage: '/thinking [mode]',
+    description: 'Set thinking display mode (on/brief/off)',
+    parameters: ['[mode]']
   }
 ];
 

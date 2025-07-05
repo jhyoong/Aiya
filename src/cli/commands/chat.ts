@@ -3,12 +3,13 @@ import chalk from 'chalk';
 import { ConfigManager } from '../../core/config/manager.js';
 import { OllamaProvider } from '../../core/providers/ollama.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
-import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
+import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
 import { Message } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { TerminalInput } from '../../utils/terminal-input.js';
 import { SuggestionEngine } from '../suggestions.js';
+import { ThinkingParser } from '../../utils/thinking-parser.js';
 
 interface ChatSession {
   messages: Message[];
@@ -16,6 +17,7 @@ interface ChatSession {
   toolService?: MCPToolService;
   toolExecutor?: ToolExecutor;
   addedFiles: string[];
+  thinkingMode: 'on' | 'brief' | 'off';
 }
 
 export const chatCommand = new Command('chat')
@@ -31,7 +33,7 @@ export const chatCommand = new Command('chat')
         config.security.allowedExtensions,
         config.security.maxFileSize
       );
-      const mcpClient = new FilesystemMCPClient(security);
+      const mcpClient = new EnhancedFilesystemMCPClient(security);
       await mcpClient.connect();
       
       // Verify connection
@@ -55,7 +57,8 @@ export const chatCommand = new Command('chat')
         tokenCount: 0,
         toolService,
         toolExecutor,
-        addedFiles: []
+        addedFiles: [],
+        thinkingMode: config.ui.thinking
       };
       
       // Add system message with tool definitions
@@ -81,7 +84,7 @@ export const chatCommand = new Command('chat')
 async function startChatLoop(
   session: ChatSession,
   provider: OllamaProvider,
-  mcpClient: FilesystemMCPClient,
+  mcpClient: EnhancedFilesystemMCPClient,
   useStreaming: boolean
 ): Promise<void> {
   const suggestionEngine = new SuggestionEngine();
@@ -106,7 +109,7 @@ async function handleUserInput(
   input: string,
   session: ChatSession,
   provider: OllamaProvider,
-  mcpClient: FilesystemMCPClient,
+  mcpClient: EnhancedFilesystemMCPClient,
   useStreaming: boolean
 ): Promise<void> {
   const trimmed = input.trim();
@@ -164,8 +167,21 @@ async function handleUserInput(
     
     if (useStreaming) {
       let response = '';
+      const thinkingParser = new ThinkingParser(session.thinkingMode);
+      
       for await (const chunk of provider.stream(session.messages)) {
-        process.stdout.write(chunk.content);
+        const results = thinkingParser.processChunk(chunk.content);
+        
+        for (const result of results) {
+          if (result.isThinking) {
+            // Display thinking content with special formatting
+            console.log(result.content);
+          } else {
+            // Display regular content
+            process.stdout.write(result.content);
+          }
+        }
+        
         response += chunk.content;
         if (chunk.done) {
           session.tokenCount += chunk.tokensUsed || 0;
@@ -271,7 +287,7 @@ async function handleUserInput(
 async function handleSlashCommand(
   command: string,
   session: ChatSession,
-  mcpClient: FilesystemMCPClient
+  mcpClient: EnhancedFilesystemMCPClient
 ): Promise<void> {
   const parts = command.slice(1).split(' ');
   const cmd = parts[0];
@@ -329,9 +345,26 @@ async function handleSlashCommand(
         console.log(chalk.gray(`Messages: ${session.messages.length}`));
         break;
         
+      case 'thinking':
+        if (args.length === 0) {
+          console.log(chalk.gray(`Current thinking mode: ${session.thinkingMode}`));
+          console.log(chalk.gray('Available modes: on, brief, off'));
+          return;
+        }
+        
+        const mode = args[0]?.toLowerCase();
+        if (mode === 'on' || mode === 'brief' || mode === 'off') {
+          session.thinkingMode = mode as 'on' | 'brief' | 'off';
+          console.log(chalk.green(`Thinking mode set to: ${mode}`));
+        } else {
+          console.log(chalk.red(`Invalid thinking mode: ${mode || 'undefined'}`));
+          console.log(chalk.gray('Available modes: on, brief, off'));
+        }
+        break;
+        
       default:
         console.log(chalk.red(`Unknown command: /${cmd}`));
-        console.log(chalk.gray('Available commands: /read, /add, /search, /tokens'));
+        console.log(chalk.gray('Available commands: /read, /add, /search, /tokens, /thinking'));
     }
   } catch (error) {
     console.log(chalk.red(`Command error: ${error}`));
@@ -347,5 +380,6 @@ function showHelp(): void {
   console.log(chalk.gray('  /add <file>    - Add file content to context for next prompt'));
   console.log(chalk.gray('  /search <pat>  - Search for files'));
   console.log(chalk.gray('  /tokens        - Show token usage'));
+  console.log(chalk.gray('  /thinking [mode] - Set thinking display mode (on/brief/off)'));
   console.log();
 }

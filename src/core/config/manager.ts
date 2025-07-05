@@ -18,6 +18,7 @@ export interface AiyaConfig {
     streaming: boolean;
     showTokens: boolean;
     theme: 'auto' | 'light' | 'dark';
+    thinking: 'on' | 'brief' | 'off';
   };
   mcp: {
     servers: Array<{
@@ -59,7 +60,8 @@ const DEFAULT_CONFIG: AiyaConfig = {
   ui: {
     streaming: true,
     showTokens: true,
-    theme: 'auto'
+    theme: 'auto',
+    thinking: 'on'
   },
   mcp: {
     servers: []
@@ -195,6 +197,13 @@ export class ConfigManager {
     
     if (process.env.AIYA_STREAMING) {
       this.config.ui.streaming = process.env.AIYA_STREAMING === 'true';
+    }
+    
+    if (process.env.AIYA_THINKING) {
+      const thinkingMode = process.env.AIYA_THINKING.toLowerCase();
+      if (thinkingMode === 'on' || thinkingMode === 'brief' || thinkingMode === 'off') {
+        this.config.ui.thinking = thinkingMode as 'on' | 'brief' | 'off';
+      }
     }
   }
 

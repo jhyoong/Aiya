@@ -2,7 +2,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { ConfigManager } from '../../core/config/manager.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
-import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
+import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
 
 export const searchCommand = new Command('search')
   .description('Fuzzy search for files in the workspace')
@@ -18,7 +18,7 @@ export const searchCommand = new Command('search')
         config.security.maxFileSize
       );
       
-      const mcpClient = new FilesystemMCPClient(security);
+      const mcpClient = new EnhancedFilesystemMCPClient(security);
       await mcpClient.connect();
       
       console.log(chalk.blue('🔍 Searching...'));
@@ -32,7 +32,7 @@ export const searchCommand = new Command('search')
     }
   });
 
-async function fuzzySearch(mcpClient: FilesystemMCPClient, query: string): Promise<void> {
+async function fuzzySearch(mcpClient: EnhancedFilesystemMCPClient, query: string): Promise<void> {
   try {
     // Get all files in the workspace
     const result = await mcpClient.callTool('search_files', { pattern: '**/*' });
