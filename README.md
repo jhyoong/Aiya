@@ -22,6 +22,8 @@ Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-as
 - Node.js 18 or higher
 - Ollama running locally with a tool-compatible model (e.g., qwen2.5:8b, qwen3:8b)
 
+[!NOTE] Support for other endpoints is still a work in progress. Currently only supports Ollama.
+
 ## Installation
 
 ```bash
