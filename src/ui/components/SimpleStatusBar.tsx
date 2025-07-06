@@ -6,6 +6,7 @@ interface SimpleStatusBarProps {
   message?: string | undefined;
   provider?: string | undefined;
   model?: string | undefined;
+  contextLength?: number | undefined;
 }
 
 export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
@@ -13,6 +14,7 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
   message,
   provider,
   model,
+  contextLength,
 }) => {
   const getStatusIcon = () => {
     switch (status) {
@@ -34,6 +36,7 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
         {message && ` | ${message}`}
         {provider && ` | ${provider}`}
         {model && `:${model}`}
+        {contextLength && ` | ${contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx`}
       </Text>
     </Box>
   );

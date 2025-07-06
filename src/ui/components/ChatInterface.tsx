@@ -18,6 +18,7 @@ interface ChatInterfaceProps {
   provider?: string | undefined;
   model?: string | undefined;
   onMessageStream?: ((message: string) => AsyncGenerator<{ content: string; thinking?: string; done: boolean }, void, unknown>) | undefined;
+  contextLength?: number | undefined;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -27,6 +28,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   provider,
   model,
   onMessageStream,
+  contextLength,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
@@ -226,6 +228,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         message={statusMessage}
         provider={provider}
         model={model}
+        contextLength={contextLength}
       />
     </Box>
   );

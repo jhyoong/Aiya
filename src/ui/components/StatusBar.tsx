@@ -6,6 +6,7 @@ interface StatusBarProps {
   message?: string | undefined;
   provider?: string | undefined;
   model?: string | undefined;
+  contextLength?: number | undefined;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -13,6 +14,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   message,
   provider,
   model,
+  contextLength,
 }) => {
   const getStatusColor = () => {
     switch (status) {
@@ -55,10 +57,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           <Text color="gray"> | {message}</Text>
         )}
       </Box>
-      {(provider || model) && (
+      {(provider || model || contextLength) && (
         <Box>
           {provider && <Text color="cyan">{provider}</Text>}
           {model && <Text color="magenta">:{model}</Text>}
+          {contextLength && (
+            <Text color="blue"> | {contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx</Text>
+          )}
         </Box>
       )}
     </Box>

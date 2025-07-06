@@ -65,6 +65,9 @@ export const chatCommand = new Command('chat')
         });
       }
       
+      // Get model information for context length
+      const modelInfo = await provider.getModelInfo();
+      
       // Render the Ink-based chat interface
       const { unmount } = render(
         React.createElement(ChatInterface, {
@@ -78,6 +81,7 @@ export const chatCommand = new Command('chat')
           },
           provider: 'Ollama',
           model: config.provider.model,
+          contextLength: modelInfo.contextLength,
         })
       );
       
