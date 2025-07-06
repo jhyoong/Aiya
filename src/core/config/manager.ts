@@ -28,6 +28,7 @@ export interface AiyaConfig {
       cwd?: string;
     }>;
   };
+  max_tokens?: number;
 }
 
 // Flat config format for project files
@@ -65,7 +66,8 @@ const DEFAULT_CONFIG: AiyaConfig = {
   },
   mcp: {
     servers: []
-  }
+  },
+  max_tokens: 4096
 };
 
 export class ConfigManager {
@@ -123,7 +125,7 @@ export class ConfigManager {
       model: model || DEFAULT_CONFIG.provider.model,
       endpoint: baseUrl || DEFAULT_CONFIG.provider.baseUrl,
       workspace: './',
-      max_tokens: 4096
+      max_tokens: 8192
     };
 
     const yamlContent = yaml.stringify(projectConfig, {
@@ -239,6 +241,10 @@ export class ConfigManager {
       };
     }
     
+    if (flatConfig.max_tokens !== undefined) {
+      normalized.max_tokens = flatConfig.max_tokens;
+    }
+    
     return normalized;
   }
 
@@ -259,6 +265,10 @@ export class ConfigManager {
     
     if (override.mcp) {
       result.mcp = { ...result.mcp, ...override.mcp };
+    }
+    
+    if (override.max_tokens !== undefined) {
+      result.max_tokens = override.max_tokens;
     }
     
     return result;

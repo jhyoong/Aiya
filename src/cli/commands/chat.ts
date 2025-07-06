@@ -27,7 +27,7 @@ export const chatCommand = new Command('chat')
       const configManager = new ConfigManager();
       const config = await configManager.load();
       
-      const provider = new OllamaProvider(config.provider.model, config.provider.baseUrl);
+      const provider = new OllamaProvider(config.provider.model, config.provider.baseUrl, config.max_tokens);
       const security = new WorkspaceSecurity(
         process.cwd(),
         config.security.allowedExtensions,

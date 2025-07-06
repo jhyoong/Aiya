@@ -2,14 +2,17 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-assisted development with reactive interface and context management.
 
+**Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
+
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- **Reactive Terminal Interface**: Slash command suggestions with smart tab completion
-- **Interactive Chat Sessions**: AI conversations via Ollama with streaming responses
-- **Context Management**: Add files to conversation context.
+- **Modern? Terminal UI**: Built with React/Ink for clean, responsive terminal interface
+- **Reactive Interface**: Slash command suggestions with smart tab completion and autocomplete
+- **Interactive Chat Sessions**: AI conversations with streaming responses and thinking display
+- **Context Management**: Add files to conversation context with visual feedback
 - **Secure File Operations**: Workspace-restricted file access with configurable security
 - **Fuzzy File Search**: Quick file discovery within your workspace
 - **Project-aware Configuration**: YAML-based configuration with environment variable support
@@ -17,7 +20,7 @@ Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-as
 ## Prerequisites
 
 - Node.js 18 or higher
-- Ollama running locally with a tool-compatible model (e.g., qwen3:8b)
+- Ollama running locally with a tool-compatible model (e.g., qwen2.5:8b, qwen3:8b)
 
 ## Installation
 
@@ -69,7 +72,7 @@ Options:
 - `--check-connection` - Verify connection to Ollama server
 
 ### `aiya chat`
-Start an interactive chat session with the AI featuring a reactive terminal interface.
+Start an interactive chat session with the AI featuring a modern terminal interface built with React/Ink.
 
 #### Terminal Interface Features
 
@@ -79,6 +82,7 @@ Start an interactive chat session with the AI featuring a reactive terminal inte
 - `/add <file>` - Add file content to context for the next prompt (silent)
 - `/search <pattern>` - Search for files matching the pattern
 - `/tokens` - Show token usage statistics for the current session
+- `/thinking` - Toggle thinking mode display (on/off/auto)
 - `help` - Show available commands and usage
 - `clear` - Clear conversation history and added file context
 - `exit` or `quit` - End the chat session
@@ -129,10 +133,10 @@ You can override configuration using environment variables:
 Example `.aiya.yaml`:
 ```yaml
 provider: ollama
-model: codellama:7b
+model: qwen3:8b
 endpoint: http://localhost:11434
 workspace: ./
-max_tokens: 4096
+max_tokens: 32768
 ```
 
 For advanced configuration, you can also use the nested format:
@@ -154,6 +158,7 @@ security:
 ui:
   streaming: true
   showTokens: true
+  thinking: 'auto'
 ```
 
 ## MCP Tool System
@@ -205,13 +210,14 @@ npm run dev
 
 ## Architecture
 
-Aiya is built with a somewhat simple, modular architecture:
+Aiya is built with a modular architecture designed for extensibility:
 
-- **Providers**: Abstraction layer for different LLM services (currently Ollama)
+- **Terminal UI**: React/Ink-based modern terminal interface with streaming support
+- **Providers**: Abstraction layer for different LLM services (currently Ollama, extensible to OpenAI/Anthropic)
 - **MCP Integration**: Model Context Protocol for secure file operations
 - **Context Management**: Session-based file context with automatic cleanup
 - **Basic Security Layer**: Workspace-restricted file access and validation
-- **CLI Interface**: Commander.js-based command structure
+- **CLI Interface**: Commander.js-based command structure with global options
 
 ## License
 

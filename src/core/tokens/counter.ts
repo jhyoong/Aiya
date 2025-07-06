@@ -17,9 +17,11 @@ export class TokenCounter {
   private provider: LLMProvider;
   private sessionUsage: TokenUsage = { input: 0, output: 0, total: 0 };
   private messageHistory: number[] = [];
+  private contextLimit: number;
 
-  constructor(provider: LLMProvider) {
+  constructor(provider: LLMProvider, contextLimit?: number) {
     this.provider = provider;
+    this.contextLimit = contextLimit || 4096;
   }
 
   countText(text: string): number {
@@ -129,8 +131,7 @@ export class TokenCounter {
   }
 
   private getContextLimit(): number {
-    // Default fallback - should be overridden by specific provider implementations
-    return 4096;
+    return this.contextLimit;
   }
 
   private estimateCost(_tokens: number): number | undefined {
