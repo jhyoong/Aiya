@@ -1,6 +1,6 @@
 # Aiya
 
-Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-assisted development with reactive interface and context management.
+Artificial Intelligence: Your Assistant (AIYA). A modern? terminal tool for AI-assisted development with reactive interface and context management.
 
 **Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 
@@ -220,6 +220,11 @@ Aiya is built with a modular architecture designed for extensibility:
 - **Context Management**: Session-based file context with automatic cleanup
 - **Basic Security Layer**: Workspace-restricted file access and validation
 - **CLI Interface**: Commander.js-based command structure with global options
+
+## Changelog
+
+- **Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
+- **Version 1.0.0** - Basic terminal tool with Ollama support and filesystem MCP tooling.
 
 ## License
 
