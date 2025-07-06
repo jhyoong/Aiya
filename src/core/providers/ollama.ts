@@ -12,10 +12,12 @@ import {
 
 export class OllamaProvider extends LLMProvider {
   private client: Ollama;
+  private configuredMaxTokens: number | undefined;
 
-  constructor(model: string, baseUrl: string = 'http://localhost:11434') {
+  constructor(model: string, baseUrl: string = 'http://localhost:11434', maxTokens?: number) {
     super(model, baseUrl);
     this.client = new Ollama({ host: baseUrl });
+    this.configuredMaxTokens = maxTokens;
   }
 
   async chat(messages: Message[]): Promise<Response> {
@@ -26,7 +28,8 @@ export class OllamaProvider extends LLMProvider {
       const response = await this.client.chat({
         model: this.model,
         messages: ollamaMessages,
-        stream: false
+        stream: false,
+        ...this.buildOllamaOptions()
       });
 
       return {
@@ -56,7 +59,8 @@ export class OllamaProvider extends LLMProvider {
       const stream = await this.client.chat({
         model: this.model,
         messages: ollamaMessages,
-        stream: true
+        stream: true,
+        ...this.buildOllamaOptions()
       });
 
       for await (const chunk of stream) {
@@ -128,6 +132,11 @@ export class OllamaProvider extends LLMProvider {
   }
 
   private extractContextLength(modelInfo: any): number {
+    // If max_tokens is configured, use that as override
+    if (this.configuredMaxTokens !== undefined) {
+      return this.configuredMaxTokens;
+    }
+    
     const defaultContextLength = 4096;
     
     try {
@@ -146,6 +155,20 @@ export class OllamaProvider extends LLMProvider {
     } catch {
       return defaultContextLength;
     }
+  }
+
+  /**
+   * Build Ollama options including context window configuration
+   */
+  private buildOllamaOptions(): { options?: { num_ctx?: number } } {
+    if (this.configuredMaxTokens !== undefined) {
+      return {
+        options: {
+          num_ctx: this.configuredMaxTokens
+        }
+      };
+    }
+    return {};
   }
 
   /**

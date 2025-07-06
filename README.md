@@ -1,22 +1,28 @@
 # Aiya
 
-Artificial Intelligence: Your Assistant (AIYA). A simple terminal tool for code editing which connects to local models.
+Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-assisted development with reactive interface and context management.
 
-[![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/loccon)
+**Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
+
+[![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- Interactive chat sessions with AI models via Ollama
-- Secure file operations restricted to workspace boundaries
-- Fuzzy search for files in the workspace
-- Project-aware configuration management
-- Streaming responses for real-time interaction
+- **Modern? Terminal UI**: Built with React/Ink for clean, responsive terminal interface
+- **Reactive Interface**: Slash command suggestions with smart tab completion and autocomplete
+- **Interactive Chat Sessions**: AI conversations with streaming responses and thinking display
+- **Context Management**: Add files to conversation context with visual feedback
+- **Secure File Operations**: Workspace-restricted file access with configurable security
+- **Fuzzy File Search**: Quick file discovery within your workspace
+- **Project-aware Configuration**: YAML-based configuration with environment variable support
 
 ## Prerequisites
 
 - Node.js 18 or higher
-- Ollama running locally with a tool-compatible model (e.g., qwen3:8b)
+- Ollama running locally with a tool-compatible model (e.g., qwen2.5:8b, qwen3:8b)
+
+[!NOTE] Support for other endpoints is still a work in progress. Currently only supports Ollama.
 
 ## Installation
 
@@ -27,8 +33,8 @@ npm install -g aiya-cli
 Or run from source:
 
 ```bash
-git clone <repository>
-cd aiya
+git clone https://github.com/jhyoong/Aiya.git
+cd Aiya
 npm install
 npm run build
 ```
@@ -68,16 +74,42 @@ Options:
 - `--check-connection` - Verify connection to Ollama server
 
 ### `aiya chat`
-Start an interactive chat session with the AI.
+Start an interactive chat session with the AI featuring a modern terminal interface built with React/Ink.
 
+#### Terminal Interface Features
 
-Chat commands:
-- `/read <file>` - Read and display file content
-- `/search <pattern>` - Search for files
-- `/tokens` - Show token usage statistics
-- `help` - Show available commands
-- `clear` - Clear conversation history
-- `exit` or `quit` - End the session
+#### Chat Commands
+- **Command Suggestions**: Type `/` to see available commands with grey text hints. Press Tab to quickly select commands.
+- `/read <file>` - Read and display file content in the terminal
+- `/add <file>` - Add file content to context for the next prompt (silent)
+- `/search <pattern>` - Search for files matching the pattern
+- `/tokens` - Show token usage statistics for the current session
+- `/thinking` - Toggle thinking mode display (on/off/auto)
+- `help` - Show available commands and usage
+- `clear` - Clear conversation history and added file context
+- `exit` or `quit` - End the chat session
+
+#### Usage Examples
+```bash
+# Type '/' to see suggestions
+💬 You: /
+# Shows: /read <file_path> in grey text
+
+# Type '/r' and press Tab to complete
+💬 You: /r<Tab>
+# Completes to: /read
+
+# Add files to context silently
+💬 You: /add src/utils.ts
+Added src/utils.ts to context for the next prompt
+
+💬 You: /add package.json
+Added package.json to context for the next prompt
+
+💬 You: Can you help optimize this utility function?
+# AI receives both files plus your question
+```
+*Note: This depends on your context window size*
 
 ### `aiya search <query>`
 Fuzzy search for files in the workspace.
@@ -103,10 +135,10 @@ You can override configuration using environment variables:
 Example `.aiya.yaml`:
 ```yaml
 provider: ollama
-model: codellama:7b
+model: qwen3:8b
 endpoint: http://localhost:11434
 workspace: ./
-max_tokens: 4096
+max_tokens: 32768
 ```
 
 For advanced configuration, you can also use the nested format:
@@ -128,6 +160,7 @@ security:
 ui:
   streaming: true
   showTokens: true
+  thinking: 'auto'
 ```
 
 ## MCP Tool System
@@ -135,12 +168,24 @@ ui:
 Aiya includes a built-in Model Context Protocol (MCP) tool system that enables file operations:
 
 ### Available Tools
-- **File Operations**: Read, write, and edit files within the workspace
-- **Directory Listing**: Browse directory contents
-- **File Search**: Fuzzy search for files in the workspace
+
+#### Basic File Operations
+- **File I/O**: `read_file`, `write_file` - Read and write files within the workspace
+- **Directory Listing**: `list_directory` - Browse directory contents
+- **File Search**: `search_files` - Search for files using glob patterns
+
+#### Advanced File Manipulation
+- **Preview Changes**: `preview_diff` - Preview file changes before applying them
+- **Atomic Operations**: `atomic_write`, `atomic_edit` - Safe file operations with automatic backup
+- **Pattern Replacement**: `pattern_replace` - Regex-based content replacement with advanced options
+- **File Recovery**: `rollback_file` - Rollback files to previous backup versions
+
+#### Queue Management
+- **Batch Operations**: `queue_operation` - Queue multiple file operations for batch processing
+- **Queue Execution**: `execute_queue` - Execute all queued operations with optional preview
 
 ### Tool Usage
-The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access.
+The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, and batch processing for complex file manipulation tasks.
 
 ## Basic Security
 
@@ -167,12 +212,14 @@ npm run dev
 
 ## Architecture
 
-Aiya is built with a modular architecture:
+Aiya is built with a modular architecture designed for extensibility:
 
-- **Providers**: Abstraction layer for different LLM services (currently Ollama)
+- **Terminal UI**: React/Ink-based modern terminal interface with streaming support
+- **Providers**: Abstraction layer for different LLM services (currently Ollama, extensible to OpenAI/Anthropic)
 - **MCP Integration**: Model Context Protocol for secure file operations
+- **Context Management**: Session-based file context with automatic cleanup
 - **Basic Security Layer**: Workspace-restricted file access and validation
-- **CLI Interface**: Commander.js-based command structure with interactive features
+- **CLI Interface**: Commander.js-based command structure with global options
 
 ## License
 

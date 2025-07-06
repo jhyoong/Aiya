@@ -18,6 +18,7 @@ export interface AiyaConfig {
     streaming: boolean;
     showTokens: boolean;
     theme: 'auto' | 'light' | 'dark';
+    thinking: 'on' | 'brief' | 'off';
   };
   mcp: {
     servers: Array<{
@@ -27,6 +28,7 @@ export interface AiyaConfig {
       cwd?: string;
     }>;
   };
+  max_tokens?: number;
 }
 
 // Flat config format for project files
@@ -59,11 +61,13 @@ const DEFAULT_CONFIG: AiyaConfig = {
   ui: {
     streaming: true,
     showTokens: true,
-    theme: 'auto'
+    theme: 'auto',
+    thinking: 'on'
   },
   mcp: {
     servers: []
-  }
+  },
+  max_tokens: 4096
 };
 
 export class ConfigManager {
@@ -121,7 +125,7 @@ export class ConfigManager {
       model: model || DEFAULT_CONFIG.provider.model,
       endpoint: baseUrl || DEFAULT_CONFIG.provider.baseUrl,
       workspace: './',
-      max_tokens: 4096
+      max_tokens: 8192
     };
 
     const yamlContent = yaml.stringify(projectConfig, {
@@ -196,6 +200,13 @@ export class ConfigManager {
     if (process.env.AIYA_STREAMING) {
       this.config.ui.streaming = process.env.AIYA_STREAMING === 'true';
     }
+    
+    if (process.env.AIYA_THINKING) {
+      const thinkingMode = process.env.AIYA_THINKING.toLowerCase();
+      if (thinkingMode === 'on' || thinkingMode === 'brief' || thinkingMode === 'off') {
+        this.config.ui.thinking = thinkingMode as 'on' | 'brief' | 'off';
+      }
+    }
   }
 
   private validateConfig(): void {
@@ -230,6 +241,10 @@ export class ConfigManager {
       };
     }
     
+    if (flatConfig.max_tokens !== undefined) {
+      normalized.max_tokens = flatConfig.max_tokens;
+    }
+    
     return normalized;
   }
 
@@ -250,6 +265,10 @@ export class ConfigManager {
     
     if (override.mcp) {
       result.mcp = { ...result.mcp, ...override.mcp };
+    }
+    
+    if (override.max_tokens !== undefined) {
+      result.max_tokens = override.max_tokens;
     }
     
     return result;

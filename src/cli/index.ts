@@ -14,8 +14,8 @@ program
 
 // Add commands
 program.addCommand(initCommand);
-program.addCommand(chatCommand);
-program.addCommand(searchCommand);
+program.addCommand(chatCommand); // Ink-based chat interface
+program.addCommand(searchCommand); // Ink-based search interface
 
 // Global options
 program
