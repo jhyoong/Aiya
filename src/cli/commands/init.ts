@@ -43,7 +43,7 @@ export const initCommand = new Command('init')
 
 async function checkOllamaConnection(model: string, baseUrl: string): Promise<void> {
   try {
-    const provider = new OllamaProvider(model, baseUrl);
+    const provider = new OllamaProvider({ type: 'ollama', model, baseUrl });
     
     // Check if Ollama is healthy
     const isHealthy = await provider.isHealthy();

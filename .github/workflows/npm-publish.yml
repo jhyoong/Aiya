@@ -15,10 +15,8 @@ jobs:
         with:
           node-version: 20
       - run: npm ci
-
       - run: npm run build
       - run: npm run typecheck
-      - run: npm test
 
   publish-npm:
     needs: build

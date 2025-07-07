@@ -2,7 +2,8 @@ import { Command } from 'commander';
 import React from 'react';
 import { render } from 'ink';
 import { ConfigManager } from '../../core/config/manager.js';
-import { OllamaProvider } from '../../core/providers/ollama.js';
+import { ProviderFactory } from '../../core/providers/factory.js';
+import { LLMProvider } from '../../core/providers/base.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
 import { Message } from '../../core/providers/base.js';
@@ -27,7 +28,7 @@ export const chatCommand = new Command('chat')
       const configManager = new ConfigManager();
       const config = await configManager.load();
       
-      const provider = new OllamaProvider(config.provider.model, config.provider.baseUrl, config.max_tokens);
+      const provider = ProviderFactory.create(config.provider);
       const security = new WorkspaceSecurity(
         process.cwd(),
         config.security.allowedExtensions,
@@ -79,7 +80,7 @@ export const chatCommand = new Command('chat')
             unmount();
             process.exit(0);
           },
-          provider: 'Ollama',
+          provider: config.provider.type,
           model: config.provider.model,
           contextLength: modelInfo.contextLength,
         })
@@ -94,7 +95,7 @@ export const chatCommand = new Command('chat')
 async function* handleMessageStream(
   input: string,
   session: ChatSession,
-  provider: OllamaProvider,
+  provider: LLMProvider,
   mcpClient: EnhancedFilesystemMCPClient
 ): AsyncGenerator<{ content: string; thinking?: string; done: boolean }, void, unknown> {
   const trimmed = input.trim();
@@ -258,7 +259,7 @@ async function* handleMessageStream(
 async function handleMessage(
   input: string,
   session: ChatSession,
-  provider: OllamaProvider,
+  provider: LLMProvider,
   mcpClient: EnhancedFilesystemMCPClient,
   useStreaming: boolean
 ): Promise<string> {

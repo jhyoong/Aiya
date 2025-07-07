@@ -3,12 +3,39 @@ import * as path from 'path';
 import * as os from 'os';
 import * as yaml from 'yaml';
 
-export interface AiyaConfig {
-  provider: {
-    type: 'ollama';
-    baseUrl: string;
-    model: string;
+export interface ProviderCapabilities {
+  maxTokens: number;
+  supportsFunctionCalling: boolean;
+  supportsVision: boolean;
+  supportsStreaming: boolean;
+  supportsThinking: boolean;
+}
+
+export interface ExtendedProviderConfig {
+  type: 'ollama' | 'openai' | 'anthropic' | 'azure' | 'gemini';
+  baseUrl: string;
+  model: string;
+  apiKey?: string;
+  capabilities?: ProviderCapabilities;
+  costPerToken?: { input: number; output: number };
+  // Provider-specific configurations
+  azure?: {
+    deploymentName?: string;
+    apiVersion?: string;
   };
+  anthropic?: {
+    maxTokens?: number;
+    version?: string;
+  };
+  gemini?: {
+    projectId?: string;
+    location?: string;
+  };
+}
+
+export interface AiyaConfig {
+  provider: ExtendedProviderConfig;
+  providers?: Record<string, ExtendedProviderConfig>; // Named provider configurations
   security: {
     allowedExtensions: string[];
     restrictToWorkspace: boolean;
@@ -38,13 +65,26 @@ export interface FlatConfig {
   endpoint?: string;
   workspace?: string;
   max_tokens?: number;
+  apiKey?: string;
+  azure_deployment?: string;
+  azure_api_version?: string;
+  anthropic_version?: string;
+  gemini_project_id?: string;
+  gemini_location?: string;
 }
 
 const DEFAULT_CONFIG: AiyaConfig = {
   provider: {
     type: 'ollama',
     baseUrl: 'http://localhost:11434',
-    model: 'qwen2.5:8b'
+    model: 'qwen2.5:8b',
+    capabilities: {
+      maxTokens: 4096,
+      supportsFunctionCalling: true,
+      supportsVision: false,
+      supportsStreaming: true,
+      supportsThinking: false
+    }
   },
   security: {
     allowedExtensions: [
@@ -189,12 +229,39 @@ export class ConfigManager {
   }
 
   private applyEnvironmentOverrides(): void {
+    if (process.env.AIYA_PROVIDER) {
+      const providerType = process.env.AIYA_PROVIDER.toLowerCase();
+      if (['ollama', 'openai', 'anthropic', 'azure', 'gemini'].includes(providerType)) {
+        this.config.provider.type = providerType as ExtendedProviderConfig['type'];
+      }
+    }
+    
     if (process.env.AIYA_MODEL) {
       this.config.provider.model = process.env.AIYA_MODEL;
     }
     
     if (process.env.AIYA_BASE_URL) {
       this.config.provider.baseUrl = process.env.AIYA_BASE_URL;
+    }
+    
+    if (process.env.AIYA_API_KEY) {
+      this.config.provider.apiKey = process.env.AIYA_API_KEY;
+    }
+    
+    if (process.env.OPENAI_API_KEY && this.config.provider.type === 'openai') {
+      this.config.provider.apiKey = process.env.OPENAI_API_KEY;
+    }
+    
+    if (process.env.ANTHROPIC_API_KEY && this.config.provider.type === 'anthropic') {
+      this.config.provider.apiKey = process.env.ANTHROPIC_API_KEY;
+    }
+    
+    if (process.env.AZURE_OPENAI_API_KEY && this.config.provider.type === 'azure') {
+      this.config.provider.apiKey = process.env.AZURE_OPENAI_API_KEY;
+    }
+    
+    if (process.env.GEMINI_API_KEY && this.config.provider.type === 'gemini') {
+      this.config.provider.apiKey = process.env.GEMINI_API_KEY;
     }
     
     if (process.env.AIYA_STREAMING) {
@@ -234,11 +301,39 @@ export class ConfigManager {
     const normalized: Partial<AiyaConfig> = {};
     
     if (flatConfig.provider || flatConfig.model || flatConfig.endpoint) {
-      normalized.provider = {
-        type: 'ollama' as const,
+      const providerType = flatConfig.provider?.toLowerCase() as ExtendedProviderConfig['type'] || 'ollama';
+      const provider: ExtendedProviderConfig = {
+        type: providerType,
         baseUrl: flatConfig.endpoint || DEFAULT_CONFIG.provider.baseUrl,
         model: flatConfig.model || DEFAULT_CONFIG.provider.model
       };
+      
+      if (flatConfig.apiKey) {
+        provider.apiKey = flatConfig.apiKey;
+      }
+      
+      // Handle provider-specific configurations
+      if (providerType === 'azure' && (flatConfig.azure_deployment || flatConfig.azure_api_version)) {
+        provider.azure = {
+          ...(flatConfig.azure_deployment && { deploymentName: flatConfig.azure_deployment }),
+          ...(flatConfig.azure_api_version && { apiVersion: flatConfig.azure_api_version })
+        };
+      }
+      
+      if (providerType === 'anthropic' && flatConfig.anthropic_version) {
+        provider.anthropic = {
+          version: flatConfig.anthropic_version
+        };
+      }
+      
+      if (providerType === 'gemini' && (flatConfig.gemini_project_id || flatConfig.gemini_location)) {
+        provider.gemini = {
+          ...(flatConfig.gemini_project_id && { projectId: flatConfig.gemini_project_id }),
+          ...(flatConfig.gemini_location && { location: flatConfig.gemini_location })
+        };
+      }
+      
+      normalized.provider = provider;
     }
     
     if (flatConfig.max_tokens !== undefined) {
@@ -253,6 +348,24 @@ export class ConfigManager {
     
     if (override.provider) {
       result.provider = { ...result.provider, ...override.provider };
+      
+      // Merge provider-specific configurations
+      if (override.provider.azure) {
+        result.provider.azure = { ...result.provider.azure, ...override.provider.azure };
+      }
+      if (override.provider.anthropic) {
+        result.provider.anthropic = { ...result.provider.anthropic, ...override.provider.anthropic };
+      }
+      if (override.provider.gemini) {
+        result.provider.gemini = { ...result.provider.gemini, ...override.provider.gemini };
+      }
+      if (override.provider.capabilities) {
+        result.provider.capabilities = { ...result.provider.capabilities, ...override.provider.capabilities };
+      }
+    }
+    
+    if (override.providers) {
+      result.providers = { ...result.providers, ...override.providers };
     }
     
     if (override.security) {

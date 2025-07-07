@@ -35,15 +35,34 @@ export interface ModelInfo {
   name: string;
   contextLength: number;
   supportedFeatures: string[];
+  capabilities?: {
+    supportsVision: boolean;
+    supportsFunctionCalling: boolean;
+    supportsThinking: boolean;
+    costPerToken?: { input: number; output: number };
+  };
+}
+
+export interface ProviderConfig {
+  type: string;
+  model: string;
+  baseUrl: string;
+  apiKey?: string;
+  maxTokens?: number;
+  [key: string]: any; // Allow provider-specific config
 }
 
 export abstract class LLMProvider {
+  protected config: ProviderConfig;
   protected model: string;
-  protected baseUrl: string | undefined;
+  protected baseUrl: string;
+  protected apiKey: string | undefined;
 
-  constructor(model: string, baseUrl?: string) {
-    this.model = model;
-    this.baseUrl = baseUrl;
+  constructor(config: ProviderConfig) {
+    this.config = config;
+    this.model = config.model;
+    this.baseUrl = config.baseUrl;
+    this.apiKey = config.apiKey;
   }
 
   abstract chat(messages: Message[]): Promise<Response>;
@@ -61,6 +80,47 @@ export abstract class LLMProvider {
   abstract isHealthy(): Promise<boolean>;
   
   abstract listAvailableModels(): Promise<string[]>;
+  
+  /**
+   * Check if the provider is properly authenticated
+   */
+  abstract isAuthenticated(): Promise<boolean>;
+  
+  /**
+   * Get provider-specific capabilities
+   */
+  abstract getCapabilities(): Promise<{
+    supportsVision: boolean;
+    supportsFunctionCalling: boolean;
+    supportsThinking: boolean;
+    maxTokens: number;
+  }>;
+  
+  /**
+   * Get provider metadata
+   */
+  getProviderInfo(): { type: string; name: string; version?: string } {
+    const version = this.getProviderVersion();
+    return {
+      type: this.config.type,
+      name: this.config.type,
+      ...(version && { version })
+    };
+  }
+  
+  /**
+   * Get provider version (can be overridden)
+   */
+  protected getProviderVersion(): string | undefined {
+    return undefined;
+  }
+  
+  /**
+   * Validate API key format (can be overridden)
+   */
+  protected validateApiKey(apiKey?: string): boolean {
+    return apiKey !== undefined && apiKey.length > 0;
+  }
 }
 
 export class ProviderError extends Error {

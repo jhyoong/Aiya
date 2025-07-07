@@ -7,17 +7,18 @@ import {
   ModelInfo, 
   ConnectionError, 
   ModelNotFoundError,
-  ProviderError
+  ProviderError,
+  ProviderConfig
 } from './base.js';
 
 export class OllamaProvider extends LLMProvider {
   private client: Ollama;
   private configuredMaxTokens: number | undefined;
 
-  constructor(model: string, baseUrl: string = 'http://localhost:11434', maxTokens?: number) {
-    super(model, baseUrl);
-    this.client = new Ollama({ host: baseUrl });
-    this.configuredMaxTokens = maxTokens;
+  constructor(config: ProviderConfig) {
+    super(config);
+    this.client = new Ollama({ host: config.baseUrl });
+    this.configuredMaxTokens = config.maxTokens;
   }
 
   async chat(messages: Message[]): Promise<Response> {
@@ -129,6 +130,30 @@ export class OllamaProvider extends LLMProvider {
     } catch (error) {
       throw new ConnectionError('Failed to list available models', error as Error);
     }
+  }
+
+  async isAuthenticated(): Promise<boolean> {
+    // Ollama doesn't require authentication
+    return true;
+  }
+
+  async getCapabilities(): Promise<{
+    supportsVision: boolean;
+    supportsFunctionCalling: boolean;
+    supportsThinking: boolean;
+    maxTokens: number;
+  }> {
+    const modelInfo = await this.getModelInfo();
+    return {
+      supportsVision: false, // Ollama generally doesn't support vision
+      supportsFunctionCalling: true, // Most Ollama models support tool calling
+      supportsThinking: false, // Ollama doesn't have thinking tags
+      maxTokens: modelInfo.contextLength
+    };
+  }
+
+  protected override getProviderVersion(): string | undefined {
+    return '1.0'; // Could be enhanced to fetch actual Ollama version
   }
 
   private extractContextLength(modelInfo: any): number {
