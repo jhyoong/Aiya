@@ -2,7 +2,7 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern? terminal tool for AI-assisted development with reactive interface and context management.
 
-**Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
+**Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -223,7 +223,7 @@ Aiya is built with a modular architecture designed for extensibility:
 
 ## Changelog
 
-- **Version 1.1.0** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
+- **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 - **Version 1.0.0** - Basic terminal tool with Ollama support and filesystem MCP tooling.
 
 ## License
