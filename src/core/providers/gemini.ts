@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerationConfig, Part } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import { 
   LLMProvider, 
   Message, 
@@ -11,9 +11,22 @@ import {
   ProviderConfig
 } from './base.js';
 
+interface ThinkingConfig {
+  thinkingBudget?: number;
+  includeThoughts?: boolean;
+}
+
+interface GenerationConfig {
+  maxOutputTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+}
+
 export class GeminiProvider extends LLMProvider {
-  private client: GoogleGenerativeAI;
+  private client: GoogleGenAI;
   private generationConfig: GenerationConfig;
+  private thinkingConfig?: ThinkingConfig;
 
   constructor(config: ProviderConfig) {
     super(config);
@@ -22,7 +35,7 @@ export class GeminiProvider extends LLMProvider {
       throw new ProviderError('Google AI API key is required');
     }
     
-    this.client = new GoogleGenerativeAI(config.apiKey);
+    this.client = new GoogleGenAI({ apiKey: config.apiKey });
     
     this.generationConfig = {
       maxOutputTokens: config.maxTokens || config.gemini?.maxTokens || 8192,
@@ -30,40 +43,37 @@ export class GeminiProvider extends LLMProvider {
       topP: 0.8,
       topK: 40
     };
+
+    // Configure thinking mode for 2.5 models
+    if (this.model.includes('2.5')) {
+      this.thinkingConfig = {
+        thinkingBudget: config.gemini?.thinkingBudget || -1, // Dynamic thinking by default
+        includeThoughts: config.gemini?.includeThoughts || false
+      };
+    }
   }
 
   async chat(messages: Message[]): Promise<Response> {
     try {
-      const model = this.client.getGenerativeModel({ 
+      const { contents } = this.convertMessagesToGeminiFormat(messages);
+      
+      const config = {
+        ...this.generationConfig,
+        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig })
+      };
+      
+      const response = await this.client.models.generateContent({
         model: this.model,
-        generationConfig: this.generationConfig
+        contents: contents,
+        config: config
       });
       
-      const { history, prompt } = this.convertMessagesToGeminiFormat(messages);
-      
-      let chatSession;
-      if (history.length > 0) {
-        chatSession = model.startChat({ history });
-        const result = await chatSession.sendMessage(prompt);
-        const response = result.response;
-        
-        return {
-          content: response.text(),
-          ...(response.usageMetadata?.totalTokenCount && { 
-            tokensUsed: response.usageMetadata.totalTokenCount 
-          })
-        };
-      } else {
-        const result = await model.generateContent(prompt);
-        const response = result.response;
-        
-        return {
-          content: response.text(),
-          ...(response.usageMetadata?.totalTokenCount && { 
-            tokensUsed: response.usageMetadata.totalTokenCount 
-          })
-        };
-      }
+      return {
+        content: response.text || '',
+        ...(response.usageMetadata?.totalTokenCount && { 
+          tokensUsed: response.usageMetadata.totalTokenCount 
+        })
+      };
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes('model') && error.message.includes('not found')) {
@@ -83,26 +93,22 @@ export class GeminiProvider extends LLMProvider {
 
   async *stream(messages: Message[]): AsyncGenerator<StreamResponse> {
     try {
-      const model = this.client.getGenerativeModel({ 
+      const { contents } = this.convertMessagesToGeminiFormat(messages);
+      
+      const config = {
+        ...this.generationConfig,
+        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig })
+      };
+      
+      const response = await this.client.models.generateContentStream({
         model: this.model,
-        generationConfig: this.generationConfig
+        contents: contents,
+        config: config
       });
-      
-      const { history, prompt } = this.convertMessagesToGeminiFormat(messages);
-      
-      let stream;
-      if (history.length > 0) {
-        const chatSession = model.startChat({ history });
-        const result = await chatSession.sendMessageStream(prompt);
-        stream = result.stream;
-      } else {
-        const result = await model.generateContentStream(prompt);
-        stream = result.stream;
-      }
 
       let totalTokens = 0;
-      for await (const chunk of stream) {
-        const chunkText = chunk.text();
+      for await (const chunk of response) {
+        const chunkText = chunk.text;
         if (chunkText) {
           yield {
             content: chunkText,
@@ -140,9 +146,10 @@ export class GeminiProvider extends LLMProvider {
   }
 
   countTokens(text: string): number {
-    // Rough approximation for Gemini models
-    // Gemini uses a different tokenizer, this is an estimate
-    return Math.ceil(text.length / 3.8);
+    // Pre-request token estimation for planning and context management
+    // Based on Gemini documentation: "A token is equivalent to about 4 characters"
+    // Actual token counts are provided in API responses via usageMetadata
+    return Math.ceil(text.length / 4);
   }
 
   getModel(): string {
@@ -160,7 +167,7 @@ export class GeminiProvider extends LLMProvider {
         capabilities: {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
-          supportsThinking: false, // Gemini doesn't have thinking tags
+          supportsThinking: capabilities.supportsThinking,
           ...(capabilities.costPerToken && { costPerToken: capabilities.costPerToken })
         }
       };
@@ -175,8 +182,10 @@ export class GeminiProvider extends LLMProvider {
 
   async isHealthy(): Promise<boolean> {
     try {
-      const model = this.client.getGenerativeModel({ model: this.model });
-      await model.generateContent('Hi');
+      await this.client.models.generateContent({
+        model: this.model,
+        contents: 'Hi'
+      });
       return true;
     } catch {
       return false;
@@ -186,7 +195,9 @@ export class GeminiProvider extends LLMProvider {
   async listAvailableModels(): Promise<string[]> {
     // Google AI doesn't have a direct models endpoint, return known models
     return [
-      'gemini-2.0-flash-exp',
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.5-flash-lite-preview-06-17',
       'gemini-1.5-pro',
       'gemini-1.5-flash',
       'gemini-1.0-pro'
@@ -195,8 +206,10 @@ export class GeminiProvider extends LLMProvider {
 
   async isAuthenticated(): Promise<boolean> {
     try {
-      const model = this.client.getGenerativeModel({ model: this.model });
-      await model.generateContent('Hi');
+      await this.client.models.generateContent({
+        model: this.model,
+        contents: 'Hi'
+      });
       return true;
     } catch (error) {
       return false;
@@ -213,7 +226,7 @@ export class GeminiProvider extends LLMProvider {
     return {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
-      supportsThinking: false,
+      supportsThinking: capabilities.supportsThinking,
       maxTokens: capabilities.contextLength
     };
   }
@@ -223,82 +236,84 @@ export class GeminiProvider extends LLMProvider {
   }
 
   private convertMessagesToGeminiFormat(messages: Message[]): {
-    history: Array<{ role: 'user' | 'model'; parts: Part[] }>;
-    prompt: string;
+    contents: string;
   } {
-    const history: Array<{ role: 'user' | 'model'; parts: Part[] }> = [];
     let systemPrompt = '';
-    let lastMessage = '';
+    let conversationContent = '';
 
     // Process messages
-    for (let i = 0; i < messages.length; i++) {
-      const msg = messages[i];
+    for (const msg of messages) {
       if (!msg) continue;
       
       if (msg.role === 'system') {
         systemPrompt += (systemPrompt ? '\n\n' : '') + msg.content;
       } else if (msg.role === 'tool') {
-        // Convert tool messages to user messages
-        history.push({
-          role: 'user',
-          parts: [{ text: `Tool result: ${msg.content}` }]
-        });
+        // Convert tool messages to user context
+        conversationContent += `\n\nTool result: ${msg.content}`;
       } else if (msg.role === 'user') {
-        if (i === messages.length - 1) {
-          // This is the last message, use it as prompt
-          lastMessage = msg.content;
-        } else {
-          history.push({
-            role: 'user',
-            parts: [{ text: msg.content }]
-          });
-        }
+        conversationContent += `\n\nUser: ${msg.content}`;
       } else if (msg.role === 'assistant') {
-        history.push({
-          role: 'model',
-          parts: [{ text: msg.content }]
-        });
+        conversationContent += `\n\nAssistant: ${msg.content}`;
       }
     }
 
-    // Combine system prompt with the last user message
-    const prompt = systemPrompt 
-      ? `${systemPrompt}\n\nUser: ${lastMessage}`
-      : lastMessage;
+    // Combine system prompt with conversation
+    const contents = systemPrompt 
+      ? `${systemPrompt}${conversationContent}`
+      : conversationContent.trim();
 
-    return { history, prompt };
+    return { contents };
   }
 
   private getModelCapabilities(model: string): {
     contextLength: number;
     supportsVision: boolean;
     supportsFunctionCalling: boolean;
+    supportsThinking: boolean;
     costPerToken?: { input: number; output: number };
   } {
     // Known capabilities for Gemini models
     const capabilities: Record<string, any> = {
-      'gemini-2.0-flash-exp': {
+      'gemini-2.5-pro': {
+        contextLength: 1048576,
+        supportsVision: true,
+        supportsFunctionCalling: true,
+        supportsThinking: true,
+        costPerToken: { input: 0.00125, output: 0.005 }
+      },
+      'gemini-2.5-flash': {
+        contextLength: 1048576,
+        supportsVision: true,
+        supportsFunctionCalling: true,
+        supportsThinking: true,
+        costPerToken: { input: 0.000075, output: 0.0003 }
+      },
+      'gemini-2.5-flash-lite-preview-06-17': {
         contextLength: 1000000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.000015, output: 0.00006 }
+        supportsThinking: true,
+        costPerToken: { input: 0.0000375, output: 0.00015 }
       },
       'gemini-1.5-pro': {
         contextLength: 2097152,
         supportsVision: true,
         supportsFunctionCalling: true,
+        supportsThinking: false,
         costPerToken: { input: 0.00125, output: 0.005 }
       },
       'gemini-1.5-flash': {
         contextLength: 1048576,
         supportsVision: true,
         supportsFunctionCalling: true,
+        supportsThinking: false,
         costPerToken: { input: 0.000075, output: 0.0003 }
       },
       'gemini-1.0-pro': {
         contextLength: 32768,
         supportsVision: false,
         supportsFunctionCalling: true,
+        supportsThinking: false,
         costPerToken: { input: 0.0005, output: 0.0015 }
       }
     };
@@ -320,7 +335,8 @@ export class GeminiProvider extends LLMProvider {
     return {
       contextLength: this.config.maxTokens || 32768,
       supportsVision: true,
-      supportsFunctionCalling: true
+      supportsFunctionCalling: true,
+      supportsThinking: model.includes('2.5')
     };
   }
 }

@@ -30,6 +30,9 @@ export interface ExtendedProviderConfig {
   gemini?: {
     projectId?: string;
     location?: string;
+    maxTokens?: number;
+    thinkingBudget?: number;
+    includeThoughts?: boolean;
   };
 }
 
