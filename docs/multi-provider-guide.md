@@ -165,6 +165,31 @@ provider:
 - `gemini-1.5-flash` - Fast, efficient model
 - `gemini-1.0-pro` - Original Gemini model
 
+### AWS Bedrock Provider Configuration
+
+```yaml
+provider:
+  type: bedrock
+  model: anthropic.claude-3-sonnet-20240229-v1:0
+  baseUrl: https://bedrock-runtime.us-east-1.amazonaws.com
+  bedrock:
+    region: us-east-1
+    accessKeyId: AKIA...  # Optional - uses AWS credential chain if not provided
+    secretAccessKey: xxx  # Optional - uses AWS credential chain if not provided
+```
+
+**Environment Variables**:
+- `AWS_REGION` - AWS region for Bedrock
+- `AWS_ACCESS_KEY_ID` - AWS access key
+- `AWS_SECRET_ACCESS_KEY` - AWS secret key
+- `AWS_SESSION_TOKEN` - AWS session token (for temporary credentials)
+
+**Supported Models**:
+- Claude: `anthropic.claude-3-5-sonnet-20241022-v2:0`, `anthropic.claude-3-haiku-20240307-v1:0`, etc.
+- Titan: `amazon.titan-text-express-v1`, `amazon.titan-text-premier-v1:0`
+- Cohere: `cohere.command-text-v14`
+- AI21: `ai21.jamba-1-5-large-v1:0`
+
 ### Ollama Configuration (Local)
 
 ```yaml

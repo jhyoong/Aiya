@@ -12,7 +12,7 @@ export interface ProviderCapabilities {
 }
 
 export interface ExtendedProviderConfig {
-  type: 'ollama' | 'openai' | 'anthropic' | 'azure' | 'gemini';
+  type: 'ollama' | 'openai' | 'anthropic' | 'azure' | 'gemini' | 'bedrock';
   baseUrl: string;
   model: string;
   apiKey?: string;
@@ -33,6 +33,13 @@ export interface ExtendedProviderConfig {
     maxTokens?: number;
     thinkingBudget?: number;
     includeThoughts?: boolean;
+  };
+  bedrock?: {
+    region: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    sessionToken?: string;
+    modelId?: string;
   };
 }
 
@@ -74,6 +81,10 @@ export interface FlatConfig {
   anthropic_version?: string;
   gemini_project_id?: string;
   gemini_location?: string;
+  aws_region?: string;
+  aws_access_key_id?: string;
+  aws_secret_access_key?: string;
+  aws_session_token?: string;
 }
 
 const DEFAULT_CONFIG: AiyaConfig = {
@@ -234,7 +245,7 @@ export class ConfigManager {
   private applyEnvironmentOverrides(): void {
     if (process.env.AIYA_PROVIDER) {
       const providerType = process.env.AIYA_PROVIDER.toLowerCase();
-      if (['ollama', 'openai', 'anthropic', 'azure', 'gemini'].includes(providerType)) {
+      if (['ollama', 'openai', 'anthropic', 'azure', 'gemini', 'bedrock'].includes(providerType)) {
         this.config.provider.type = providerType as ExtendedProviderConfig['type'];
       }
     }
@@ -265,6 +276,40 @@ export class ConfigManager {
     
     if (process.env.GEMINI_API_KEY && this.config.provider.type === 'gemini') {
       this.config.provider.apiKey = process.env.GEMINI_API_KEY;
+    }
+    
+    // AWS Bedrock environment variables
+    if (this.config.provider.type === 'bedrock') {
+      if (process.env.AWS_REGION) {
+        this.config.provider.bedrock = {
+          region: process.env.AWS_REGION,
+          ...this.config.provider.bedrock
+        };
+      }
+      
+      if (process.env.AWS_ACCESS_KEY_ID) {
+        this.config.provider.bedrock = {
+          region: this.config.provider.bedrock?.region || 'us-east-1',
+          ...this.config.provider.bedrock,
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID
+        };
+      }
+      
+      if (process.env.AWS_SECRET_ACCESS_KEY) {
+        this.config.provider.bedrock = {
+          region: this.config.provider.bedrock?.region || 'us-east-1',
+          ...this.config.provider.bedrock,
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+        };
+      }
+      
+      if (process.env.AWS_SESSION_TOKEN) {
+        this.config.provider.bedrock = {
+          region: this.config.provider.bedrock?.region || 'us-east-1',
+          ...this.config.provider.bedrock,
+          sessionToken: process.env.AWS_SESSION_TOKEN
+        };
+      }
     }
     
     if (process.env.AIYA_STREAMING) {
@@ -336,6 +381,15 @@ export class ConfigManager {
         };
       }
       
+      if (providerType === 'bedrock' && (flatConfig.aws_region || flatConfig.aws_access_key_id || flatConfig.aws_secret_access_key)) {
+        provider.bedrock = {
+          region: flatConfig.aws_region || 'us-east-1',
+          ...(flatConfig.aws_access_key_id && { accessKeyId: flatConfig.aws_access_key_id }),
+          ...(flatConfig.aws_secret_access_key && { secretAccessKey: flatConfig.aws_secret_access_key }),
+          ...(flatConfig.aws_session_token && { sessionToken: flatConfig.aws_session_token })
+        };
+      }
+      
       normalized.provider = provider;
     }
     
@@ -361,6 +415,9 @@ export class ConfigManager {
       }
       if (override.provider.gemini) {
         result.provider.gemini = { ...result.provider.gemini, ...override.provider.gemini };
+      }
+      if (override.provider.bedrock) {
+        result.provider.bedrock = { ...result.provider.bedrock, ...override.provider.bedrock };
       }
       if (override.provider.capabilities) {
         result.provider.capabilities = { ...result.provider.capabilities, ...override.provider.capabilities };

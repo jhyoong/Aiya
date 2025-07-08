@@ -4,6 +4,7 @@ import { OpenAIProvider } from './openai.js';
 import { AnthropicProvider } from './anthropic.js';
 import { AzureOpenAIProvider } from './azure.js';
 import { GeminiProvider } from './gemini.js';
+import { BedrockProvider } from './bedrock.js';
 import { ExtendedProviderConfig } from '../config/manager.js';
 
 export class ProviderFactory {
@@ -31,7 +32,8 @@ export class ProviderFactory {
       // Include any additional provider-specific config
       ...(config.azure && { azure: config.azure }),
       ...(config.anthropic && { anthropic: config.anthropic }),
-      ...(config.gemini && { gemini: config.gemini })
+      ...(config.gemini && { gemini: config.gemini }),
+      ...(config.bedrock && { bedrock: config.bedrock })
     };
     
     return new ProviderClass(baseConfig);
@@ -52,3 +54,4 @@ ProviderFactory.register('openai', OpenAIProvider);
 ProviderFactory.register('anthropic', AnthropicProvider);
 ProviderFactory.register('azure', AzureOpenAIProvider);
 ProviderFactory.register('gemini', GeminiProvider);
+ProviderFactory.register('bedrock', BedrockProvider);

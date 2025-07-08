@@ -1,6 +1,6 @@
 {
   "name": "aiya-cli",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Simple terminal tool for custom model endpoints",
   "keywords": [
     "ai",
@@ -36,6 +36,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.842.0",
     "@google/genai": "^1.8.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
