@@ -66,12 +66,15 @@ Aiya is a terminal-based AI development assistant (version 1.2.0) built with Typ
 - UI: Streaming enabled, token display on
 
 ### Multi-Provider Support
-- **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5-turbo with vision and function calling
+- **Main Focus**
+- - **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5-turbo with vision and function calling
+- - **Ollama**: Local models with full backward compatibility
+- - **Google Gemini**: Gemini 1.5 Pro/Flash with vision and large context windows
+- **No need to fully support yet**:
 - **Anthropic**: Claude 3.5 Sonnet/Haiku with thinking tags and 200K context
 - **Azure OpenAI**: Enterprise deployments with custom deployment names
-- **Google Gemini**: Gemini 1.5 Pro/Flash with vision and large context windows
 - **AWS Bedrock**: Claude, Titan, Cohere models with AWS authentication
-- **Ollama**: Local models with full backward compatibility
+
 
 ## MCP Tool System
 
@@ -152,3 +155,4 @@ Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 ALWAYS check with the user before creating documentation files (*.md) or README files. Only edit documentation files if explicitly requested by the User.
+NEVER place time estimates in plans.

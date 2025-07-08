@@ -4,6 +4,5 @@ export { SearchResults } from './SearchResults.js';
 export { ToolExecution } from './ToolExecution.js';
 export { StatusBar } from './StatusBar.js';
 export { SimpleStatusBar } from './SimpleStatusBar.js';
-export { InputHandler } from './InputHandler.js';
-export { SimpleInput } from './SimpleInput.js';
 export { CommandInput } from './CommandInput.js';
+export { UnifiedInput } from './UnifiedInput.js';

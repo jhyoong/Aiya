@@ -1,6 +1,6 @@
 import { Command } from 'commander';
 import React from 'react';
-import { render } from 'ink';
+import { render, useStdin } from 'ink';
 import { ConfigManager } from '../../core/config/manager.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { LLMProvider } from '../../core/providers/base.js';
@@ -11,6 +11,9 @@ import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ChatInterface } from '../../ui/components/ChatInterface.js';
 import { ThinkingParser } from '../../utils/thinking-parser.js';
+import { useTextBuffer } from '../../ui/core/TextBuffer.js';
+import { useTerminalSize } from '../../ui/hooks/useTerminalSize.js';
+import * as fs from 'fs';
 
 interface ChatSession {
   messages: Message[];
@@ -21,14 +24,61 @@ interface ChatSession {
   thinkingMode: 'on' | 'brief' | 'off';
 }
 
+interface ChatWrapperProps {
+  onMessage: (message: string) => Promise<string>;
+  onMessageStream?: ((message: string) => AsyncGenerator<{ content: string; thinking?: string; done: boolean }, void, unknown>) | undefined;
+  onExit: () => void;
+  provider: string;
+  model: string;
+  contextLength: number;
+}
+
+const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
+  const { stdin, setRawMode } = useStdin();
+  const { columns: terminalWidth } = useTerminalSize();
+  
+  const isValidPath = React.useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const widthFraction = 0.9;
+  const inputWidth = Math.max(
+    20,
+    Math.floor(terminalWidth * widthFraction) - 3,
+  );
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive: false,
+  });
+
+  return React.createElement(ChatInterface, {
+    ...props,
+    buffer,
+    inputWidth,
+  });
+};
+
 export const chatCommand = new Command('chat')
   .description('Start an interactive chat session')
   .action(async () => {
     try {
+      console.log('🚀 Starting chat session...');
       const configManager = new ConfigManager();
       const config = await configManager.load();
+      console.log('✅ Configuration loaded successfully');
       
       const provider = ProviderFactory.create(config.provider);
+      console.log('✅ Provider created successfully');
+      
       const security = new WorkspaceSecurity(
         process.cwd(),
         config.security.allowedExtensions,
@@ -36,17 +86,22 @@ export const chatCommand = new Command('chat')
       );
       const mcpClient = new EnhancedFilesystemMCPClient(security);
       await mcpClient.connect();
+      console.log('✅ MCP client connected successfully');
       
       // Verify connection
+      console.log('🔍 Verifying provider health...');
       if (!(await provider.isHealthy())) {
-        throw new Error('Cannot connect to Ollama server');
+        throw new Error('Cannot connect to provider server');
       }
+      console.log('✅ Provider health check passed');
       
       // Initialize MCP tool service
       const toolService = new MCPToolService([mcpClient]);
       await toolService.initialize();
+      console.log('✅ MCP tool service initialized');
       
       const toolExecutor = new ToolExecutor(toolService, process.env.AIYA_VERBOSE === 'true');
+      console.log('✅ Tool executor created');
       
       const session: ChatSession = {
         messages: [],
@@ -56,6 +111,7 @@ export const chatCommand = new Command('chat')
         addedFiles: [],
         thinkingMode: config.ui.thinking
       };
+      console.log('✅ Chat session initialized');
       
       // Add system message with tool definitions
       const toolsSystemMessage = toolService.generateToolsSystemMessage();
@@ -68,17 +124,19 @@ export const chatCommand = new Command('chat')
       
       // Get model information for context length
       const modelInfo = await provider.getModelInfo();
+      console.log('✅ Model information retrieved');
       
       // Render the Ink-based chat interface
+      console.log('🎨 Starting chat interface...');
       const { unmount } = render(
-        React.createElement(ChatInterface, {
+        React.createElement(ChatWrapper, {
           onMessage: (message: string) => handleMessage(message, session, provider, mcpClient, config.ui.streaming),
           onMessageStream: config.ui.streaming ? 
             (message: string) => handleMessageStream(message, session, provider, mcpClient) : 
             undefined,
           onExit: () => {
             unmount();
-            process.exit(0);
+            // Don't call process.exit(0) immediately - let the process naturally exit
           },
           provider: config.provider.type,
           model: config.provider.model,
@@ -88,7 +146,7 @@ export const chatCommand = new Command('chat')
       
     } catch (error) {
       console.error('❌ Chat session failed:', error);
-      process.exit(1);
+      throw error; // Let the parent handle the error instead of force-exit
     }
   });
 
@@ -101,7 +159,9 @@ async function* handleMessageStream(
   const trimmed = input.trim();
   
   if (trimmed === 'exit' || trimmed === 'quit') {
-    process.exit(0);
+    yield { content: 'Goodbye!', done: true };
+    // Don't force exit - let the parent component handle it
+    return;
   }
   
   if (trimmed === 'help') {
@@ -266,7 +326,7 @@ async function handleMessage(
   const trimmed = input.trim();
   
   if (trimmed === 'exit' || trimmed === 'quit') {
-    process.exit(0);
+    return 'Goodbye!';
   }
   
   if (trimmed === 'help') {

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
-import { SimpleInput } from './SimpleInput.js';
+import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
+import { TextBuffer } from '../core/TextBuffer.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -19,6 +20,8 @@ interface ChatInterfaceProps {
   model?: string | undefined;
   onMessageStream?: ((message: string) => AsyncGenerator<{ content: string; thinking?: string; done: boolean }, void, unknown>) | undefined;
   contextLength?: number | undefined;
+  buffer: TextBuffer;
+  inputWidth: number;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -29,6 +32,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   model,
   onMessageStream,
   contextLength,
+  buffer,
+  inputWidth,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
@@ -90,6 +95,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setStatusMessage('Generating response...');
     setCurrentThinking('');
     setCurrentContent('');
+    
+    // Clear the input buffer after submission
+    buffer.setText('');
 
     try {
       if (onMessageStream) {
@@ -213,11 +221,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </Box>
 
       {status !== 'processing' ? (
-        <SimpleInput
+        <UnifiedInput
+          buffer={buffer}
+          inputWidth={inputWidth}
           onSubmit={handleMessage}
           onCancel={handleCancel}
+          onEscape={handleCancel}
           placeholder="Type your message... (ESC to exit)"
           suggestionEngine={suggestionEngine}
+          focus={true}
+          showSuggestions={true}
         />
       ) : (
         <Text color="yellow">Processing your message...</Text>

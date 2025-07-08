@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Box, Text, render } from 'ink';
+import React, { useState, useCallback } from 'react';
+import { Box, Text, render, useStdin } from 'ink';
 import { 
   ChatInterface, 
   SearchResults, 
@@ -8,6 +8,9 @@ import {
   CommandInput 
 } from './components/index.js';
 import { SuggestionEngine } from '../cli/suggestions.js';
+import { useTextBuffer } from './core/TextBuffer.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import * as fs from 'fs';
 
 interface AiyaAppProps {
   onMessage?: (message: string) => Promise<string>;
@@ -45,6 +48,33 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
     error?: string;
   } | null>(null);
   const [appStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
+
+  // Terminal size and TextBuffer setup
+  const { columns: terminalWidth } = useTerminalSize();
+  const { stdin, setRawMode } = useStdin();
+  
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const widthFraction = 0.9;
+  const inputWidth = Math.max(
+    20,
+    Math.floor(terminalWidth * widthFraction) - 3,
+  );
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive: false,
+  });
 
   const handleChatMessage = async (message: string) => {
     if (onMessage) {
@@ -89,6 +119,8 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
             onExit={handleExit}
             provider={provider}
             model={model}
+            buffer={buffer}
+            inputWidth={inputWidth}
           />
         );
       
@@ -122,6 +154,8 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
             onExit={handleExit}
             prompt="aiya> "
             suggestionEngine={new SuggestionEngine()}
+            buffer={buffer}
+            inputWidth={inputWidth}
           />
         );
     }
