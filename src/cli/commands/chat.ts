@@ -36,16 +36,34 @@ interface ChatWrapperProps {
   model: string;
   contextLength: number;
   tokenCounter: TokenCounter;
+  initialProviderName: string;
+  configManager: ConfigManager;
+  session: ChatSession;
 }
 
 const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
   const { stdin, setRawMode } = useStdin();
   const { columns: terminalWidth } = useTerminalSize();
   
+  // Use state to track current provider information
+  const [currentProvider, setCurrentProvider] = React.useState(() => {
+    const providerConfig = props.configManager.getProviderConfig(props.initialProviderName);
+    return {
+      name: props.initialProviderName,
+      type: providerConfig?.type || props.provider,
+      model: providerConfig?.model || props.model,
+    };
+  });
+  
+  // Use state to track context length dynamically
+  const [contextLength, setContextLength] = React.useState(() => {
+    return props.session.tokenCounter.getContextLength();
+  });
+  
   // Use state to track token usage and update it reactively
   const [tokenUsage, setTokenUsage] = React.useState(() => {
-    const usage = props.tokenCounter.getUsage();
-    const lastMessage = props.tokenCounter.getLastMessageUsage();
+    const usage = props.session.tokenCounter.getUsage();
+    const lastMessage = props.session.tokenCounter.getLastMessageUsage();
     return {
       sent: lastMessage?.sent || 0,
       sentTotal: usage.input,
@@ -57,8 +75,8 @@ const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
   // Update token usage when counter changes
   React.useEffect(() => {
     const updateTokenUsage = () => {
-      const usage = props.tokenCounter.getUsage();
-      const lastMessage = props.tokenCounter.getLastMessageUsage();
+      const usage = props.session.tokenCounter.getUsage();
+      const lastMessage = props.session.tokenCounter.getLastMessageUsage();
       setTokenUsage({
         sent: lastMessage?.sent || 0,
         sentTotal: usage.input,
@@ -67,10 +85,24 @@ const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
       });
     };
     
+    // Update immediately when counter changes
+    updateTokenUsage();
+    
+    // Also update context length
+    setContextLength(props.session.tokenCounter.getContextLength());
+    
     // Update every second to keep it reactive
     const interval = setInterval(updateTokenUsage, 1000);
     return () => clearInterval(interval);
-  }, [props.tokenCounter]);
+  }, [props.session.tokenCounter]);
+  
+  // Handle provider changes from ChatInterface
+  const handleProviderChange = React.useCallback((newProvider: { name: string; type: string; model: string }) => {
+    setCurrentProvider(newProvider);
+    
+    // The token counter state will be updated automatically by the useEffect that watches props.session.tokenCounter
+    // This ensures the UI immediately reflects the new session state
+  }, []);
   
   const isValidPath = React.useCallback((filePath: string): boolean => {
     try {
@@ -100,6 +132,11 @@ const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
     buffer,
     inputWidth,
     tokenUsage,
+    currentProvider,
+    onProviderChange: handleProviderChange,
+    provider: currentProvider.type,
+    model: currentProvider.model,
+    contextLength: contextLength,
   });
 };
 
@@ -188,6 +225,9 @@ export const chatCommand = new Command('chat')
           model: currentProviderConfig.model,
           contextLength: modelInfo.contextLength,
           tokenCounter: session.tokenCounter,
+          initialProviderName: currentProviderName,
+          configManager: configManager,
+          session: session,
         })
       );
       

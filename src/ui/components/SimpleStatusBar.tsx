@@ -13,6 +13,11 @@ interface SimpleStatusBarProps {
     received: number;
     receivedTotal: number;
   } | undefined;
+  currentProvider?: {
+    name: string;
+    type: string;
+    model: string;
+  } | undefined;
 }
 
 export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
@@ -22,6 +27,7 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
   model,
   contextLength,
   tokenUsage,
+  currentProvider,
 }) => {
   const getStatusIcon = () => {
     switch (status) {
@@ -41,8 +47,14 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
       <Text color="gray">
         {getStatusIcon()} {status.toUpperCase()}
         {message && ` | ${message}`}
-        {provider && ` | ${provider}`}
-        {model && `:${model}`}
+        {currentProvider ? (
+          ` | ${currentProvider.name}:${currentProvider.model}`
+        ) : (
+          <>
+            {provider && ` | ${provider}`}
+            {model && `:${model}`}
+          </>
+        )}
         {contextLength && ` | ${contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx`}
         {tokenUsage && ` | [Tokens: sent ${tokenUsage.sent} (${tokenUsage.sentTotal}), received ${tokenUsage.received} (${tokenUsage.receivedTotal})]`}
       </Text>

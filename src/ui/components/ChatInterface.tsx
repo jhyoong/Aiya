@@ -10,6 +10,11 @@ interface Message {
   content: string;
   timestamp: Date;
   thinking?: string; // Store thinking content separately
+  provider?: {
+    name: string;
+    type: string;
+    model: string;
+  };
 }
 
 interface ChatInterfaceProps {
@@ -28,6 +33,12 @@ interface ChatInterfaceProps {
     received: number;
     receivedTotal: number;
   } | undefined;
+  currentProvider?: {
+    name: string;
+    type: string;
+    model: string;
+  } | undefined;
+  onProviderChange?: ((provider: { name: string; type: string; model: string }) => void) | undefined;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -41,6 +52,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   buffer,
   inputWidth,
   tokenUsage,
+  currentProvider,
+  onProviderChange,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
@@ -82,11 +95,28 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return lines.map(line => `${prefix}${line}`).join('\n');
   };
 
+  const handleProviderSwitchResponse = (response: string) => {
+    // Parse the response to extract provider information
+    // Format: 'Switched to provider "provider_name" (provider_type - model_name)'
+    const switchMatch = response.match(/Switched to provider "([^"]+)" \(([^-]+) - ([^)]+)\)/);
+    if (switchMatch && onProviderChange) {
+      const [, name, type, model] = switchMatch;
+      if (name && type && model) {
+        onProviderChange({
+          name: name.trim(),
+          type: type.trim(),
+          model: model.trim(),
+        });
+      }
+    }
+  };
+
   useEffect(() => {
     if (initialMessage) {
       handleMessage(initialMessage);
     }
   }, [initialMessage]);
+
 
   const handleMessage = async (input: string) => {
     if (!input.trim()) return;
@@ -95,6 +125,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       role: 'user',
       content: input,
       timestamp: new Date(),
+      ...(currentProvider && { provider: currentProvider }),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -121,6 +152,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 role: 'assistant',
                 content: currentPhaseContent,
                 timestamp: new Date(),
+                ...(currentProvider && { provider: currentProvider }),
                 ...(currentPhaseThinking && { thinking: currentPhaseThinking }),
               };
               
@@ -150,8 +182,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 role: 'assistant',
                 content: currentPhaseContent,
                 timestamp: new Date(),
+                ...(currentProvider && { provider: currentProvider }),
                 ...(currentPhaseThinking && { thinking: currentPhaseThinking }),
               };
+              
+              // Check if this is a model switch response
+              if (currentPhaseContent.includes('Switched to provider')) {
+                handleProviderSwitchResponse(currentPhaseContent);
+              }
+              
               setMessages(prev => [...prev, finalMessage]);
             }
             
@@ -170,7 +209,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           role: 'assistant',
           content: response,
           timestamp: new Date(),
+          ...(currentProvider && { provider: currentProvider }),
         };
+
+        // Check if this is a model switch response
+        if (response.includes('Switched to provider')) {
+          handleProviderSwitchResponse(response);
+        }
 
         setMessages(prev => [...prev, assistantMessage]);
         setStatus('success');
@@ -193,11 +238,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <Box flexDirection="column" paddingY={1}>
         {messages.length > 0 && (
           <Box flexDirection="column" marginBottom={1}>
-            {messages.slice(-5).map((message: Message, index: number) => (
+            {messages.slice(-10).map((message: Message, index: number) => (
               <Box key={index} flexDirection="column" marginBottom={1}>
-                <Text color={message.role === 'user' ? 'blue' : 'green'}>
-                  {message.role === 'user' ? '>' : 'Aiya'}
-                </Text>
+                <Box flexDirection="row" gap={1}>
+                  <Text color={message.role === 'user' ? 'blue' : 'green'}>
+                    {message.role === 'user' ? '>' : 'Aiya'}
+                  </Text>
+                  {message.provider && (
+                    <Text color="gray" dimColor>
+                      [{message.provider.name}:{message.provider.model}]
+                    </Text>
+                  )}
+                </Box>
                 {message.thinking && (
                   <Box marginBottom={1}>
                     <Text color="gray" dimColor>{formatThinkingContent(message.thinking)}</Text>
@@ -220,7 +272,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         
         {currentContent && (
           <Box marginBottom={1}>
-            <Text color="green">Aiya</Text>
+            <Box flexDirection="row" gap={1}>
+              <Text color="green">Aiya</Text>
+              {currentProvider && (
+                <Text color="gray" dimColor>
+                  [{currentProvider.name}:{currentProvider.model}]
+                </Text>
+              )}
+            </Box>
             <Text>{currentContent}</Text>
             <Text color="gray" dimColor>streaming...</Text>
           </Box>
@@ -250,6 +309,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         model={model}
         contextLength={contextLength}
         tokenUsage={tokenUsage}
+        currentProvider={currentProvider}
       />
     </Box>
   );

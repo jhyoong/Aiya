@@ -213,26 +213,28 @@ export class ConfigManager {
   getAvailableProviders(): string[] {
     const providers: string[] = [];
     
-    // Add single provider if exists
-    if (this.config.provider) {
-      providers.push('default');
-    }
-    
-    // Add named providers
+    // Add named providers first
     if (this.config.providers) {
       providers.push(...Object.keys(this.config.providers));
+    }
+    
+    // Only add 'default' if no named providers exist (backward compatibility)
+    if (this.config.provider && !this.config.providers) {
+      providers.push('default');
     }
     
     return providers;
   }
 
   getProviderConfig(name: string): ExtendedProviderConfig | null {
-    if (name === 'default' && this.config.provider) {
-      return this.config.provider;
-    }
-    
+    // In multi-provider mode, use named providers only
     if (this.config.providers && this.config.providers[name]) {
       return this.config.providers[name];
+    }
+    
+    // Only use 'default' if no named providers exist (backward compatibility)
+    if (name === 'default' && this.config.provider && !this.config.providers) {
+      return this.config.provider;
     }
     
     return null;
@@ -246,7 +248,7 @@ export class ConfigManager {
     }
     
     // Update current provider
-    if (providerName === 'default') {
+    if (providerName === 'default' && !this.config.providers) {
       // Using single provider, clear current_provider
       delete this.config.current_provider;
     } else {
@@ -403,13 +405,21 @@ export class ConfigManager {
       throw new Error('Provider model is required');
     }
     
-    if (!currentProvider.baseUrl) {
-      throw new Error('Provider baseUrl is required');
+    // Only validate baseUrl for providers that require it
+    if (this.requiresBaseUrl(currentProvider.type) && !currentProvider.baseUrl) {
+      throw new Error(`Provider baseUrl is required for ${currentProvider.type}`);
     }
     
     if (this.config.security.maxFileSize <= 0) {
       throw new Error('Max file size must be positive');
     }
+  }
+
+  private requiresBaseUrl(providerType: string): boolean {
+    // Ollama always requires baseUrl (host URL)
+    // OpenAI requires baseUrl for custom endpoints (but has default)
+    // Gemini, Anthropic, Azure, Bedrock don't need baseUrl
+    return providerType === 'ollama';
   }
 
   private normalizeConfig(rawConfig: any): Partial<AiyaConfig> {

@@ -108,6 +108,10 @@ export class TokenCounter {
     return this.messageHistory.length > 0 ? this.messageHistory[this.messageHistory.length - 1] || null : null;
   }
 
+  getContextLength(): number {
+    return this.getContextLimit();
+  }
+
   formatTokenDisplay(): string {
     const lastMessage = this.getLastMessageUsage();
     if (!lastMessage) {

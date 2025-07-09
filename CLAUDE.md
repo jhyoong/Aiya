@@ -52,6 +52,14 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 - ✅ Fixed slash command input handling
 - ✅ Eliminated immediate exit on startup
 
+**Recent Model Switching Bug Fixes**:
+- ✅ **Configuration Validation**: Fixed unnecessary baseUrl validation for non-Ollama providers
+- ✅ **Token Counter State Sync**: Fixed token counter not resetting after model switches
+- ✅ **Context Length Updates**: Fixed context length not updating when switching providers
+- ✅ **Chat History Preservation**: Fixed chat messages being lost during model switches
+- ✅ **Status Bar Accuracy**: Fixed status bar showing stale provider/token information
+- ✅ **Provider Display Logic**: Fixed incorrect default provider display in multi-provider mode
+
 ### Core Components
 
 **CLI Layer** (`src/cli/`)
@@ -96,14 +104,20 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 - UI: Streaming enabled, token display on
 
 ### Multi-Provider Support
-- **Fully Supported**:
+- **Fully Supported and Tested**:
   - **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5-turbo with vision and function calling
   - **Ollama**: Local models with full backward compatibility
   - **Google Gemini**: Gemini 1.5 Pro/Flash with vision and large context windows
-- **Added support but not tested and not in priority**:
+- **Added support but not extensively tested**:
   - **Anthropic**: Claude 3.5 Sonnet/Haiku with thinking tags and 200K context
   - **Azure OpenAI**: Enterprise deployments with custom deployment names
   - **AWS Bedrock**: Claude, Titan, Cohere models with AWS authentication
+
+### Configuration Validation
+- **Provider-Specific Requirements**: Only validates required fields for each provider type
+- **Ollama**: Requires `baseUrl` (host URL)
+- **OpenAI**: `baseUrl` optional (defaults to OpenAI API)
+- **Gemini/Anthropic/Azure/Bedrock**: No `baseUrl` validation (use provider APIs directly)
 
 
 ## MCP Tool System
@@ -121,6 +135,35 @@ Built-in tools for file operations:
 - Path sanitization prevents directory traversal
 - Automatic backup creation for modifications
 
+## Model Switching System
+
+### Runtime Provider Switching
+The `/model-switch` slash command enables seamless switching between configured AI providers during a chat session without restarting the application.
+
+### Key Features
+- **Session Persistence**: Chat history is preserved across model switches
+- **Provider Attribution**: Each message displays which provider/model generated it
+- **Token Counter Reset**: Token usage resets automatically for new provider sessions
+- **Status Bar Updates**: Real-time updates of current provider, model, and context length
+- **Configuration Validation**: Only switches to valid, configured providers
+
+### Usage
+```
+/model-switch                    # List available providers
+/model-switch <provider-name>    # Switch to specific provider
+```
+
+### Chat Interface Enhancements
+- **Message Attribution**: Messages show `[provider_name:model_name]` format
+- **History Preservation**: Up to 10 recent messages displayed regardless of provider switches
+- **Dynamic Status Bar**: Shows current provider, context length, and accurate token counts
+
+### Implementation Details
+- **Session-Based Switching**: Provider changes affect only the current chat session
+- **No Persistent Config Changes**: Runtime switches don't modify configuration files
+- **Token Counter Recreation**: New TokenCounter instance created for each provider switch
+- **Provider Validation**: Strict validation before allowing switches
+
 ## Token Counting System
 
 ### Architecture
@@ -129,13 +172,15 @@ Built-in tools for file operations:
 
 ### Features
 - **Accurate Token Tracking**: Provider-specific token extraction for maximum precision
-- **Session Management**: Unique session IDs for each chat session
+- **Session Management**: Unique session IDs for each chat session with model switching support
 - **Persistent Logging**: All token usage logged to `~/.aiya/logs/tokens.log`
-- **Real-time Display**: Status bar shows current and total token usage
+- **Real-time Display**: Status bar shows current and total token usage with dynamic updates
+- **Provider Switching**: Token counters reset automatically when switching providers
 - **Provider Support**:
   - **OpenAI**: Uses `prompt_tokens` and `completion_tokens` from API responses
   - **Gemini**: Uses `promptTokenCount` and `candidatesTokenCount` from usage metadata  
   - **Ollama**: Estimation via `countTokens()` method (marked as estimated)
+- **Dynamic Context Length**: Context window size updates automatically with provider changes
 
 ### Display Format
 ```
@@ -148,8 +193,12 @@ Built-in tools for file operations:
 ```
 [2024-07-09T10:30:15.123Z] [session-uuid] ollama:qwen3:8b sent: 42, received: 156 [estimated]
 [2024-07-09T10:30:15.124Z] [session-uuid] SESSION_START ollama:qwen3:8b
+[2024-07-09T10:30:30.456Z] [session-uuid] SESSION_CHANGE gemini:gemini-2.5-flash
 [2024-07-09T10:30:45.567Z] [session-uuid] SESSION_END ollama:qwen3:8b
 ```
+- `SESSION_START`: Initial chat session start
+- `SESSION_CHANGE`: Provider/model switch within same chat session  
+- `SESSION_END`: Chat session termination
 
 ## Version 1.2.0 - Multi-Provider Support ✅
 
@@ -191,18 +240,25 @@ interface ExtendedProviderConfig {
 - ✅ **Provider-Specific Token Extraction**: Accurate token counting for OpenAI and Gemini, estimation for Ollama
 - ✅ **Updated Token Display**: New format showing `[Tokens: sent X (total), received Y (total)]`
 - ✅ **Status Bar Integration**: Real-time token usage display in terminal UI
+- ✅ **Model Switching via Slash Commands**: `/model-switch` command for runtime provider switching
+- ✅ **Chat History Preservation**: Chat messages persist across model switches with provider attribution
+- ✅ **Dynamic Status Bar Updates**: Status bar immediately reflects current provider and token state
+- ✅ **Provider-Specific Configuration Validation**: Only validate baseUrl for providers that require it
+- ✅ **Token Counter State Synchronization**: Token usage resets properly when switching providers
 
 **TODO next in this patch**:
-- Switching of models via slash commands.
-- - init function to also be updated, with step by step guide on setting up base provider.
-- - config slash command to be added to allow users to add supported model providers.
-- - Testing of all 3 model providers.
+- ✅ ~~Switching of models via slash commands~~ - COMPLETED: `/model-switch` command implemented
 - ✅ ~~slash commands a little buggy when backspacing, to investigate~~ - FIXED: Implemented proper useKeypress hook for raw stdin access
-- `exit` and `quit` and `/exit` and `/quit` to gracefully exit the app.
-- Multi-line pastes to be handled properly and not trigger the chat input until the user presses enter.
-- `aiya init` to default to a guided setup. init command should guide the user with a simple flow.
-- - Asks for main provider between Ollama, OpenAI, or Gemini -> Asks for API key (optional for Ollama and OpenAI) -> Asks for custom endpoint only for Ollama and OpenAI, optional as well -> If Ollama or custom OpenAI, ask for context window size from 4k to 64k. Once done, ask again if any more providers to add.
-- `aiya chat` to prompt user to init if no config file found.
+- Init function to be updated, with step by step guide on setting up base provider
+- Config slash command to be added to allow users to add supported model providers
+- Testing of all 3 model providers
+- `exit` and `quit` and `/exit` and `/quit` to gracefully exit the app. Current `ESC` to quit should be a double `ESC`.
+- Multi-line pastes to be handled properly and not trigger the chat input until the user presses enter
+- `aiya init` to default to a guided setup. init command should guide the user with a simple flow:
+  - Asks for main provider between Ollama, OpenAI, or Gemini -> Asks for API key (optional for Ollama and OpenAI) -> Asks for custom endpoint only for Ollama and OpenAI, optional as well -> If Ollama or custom OpenAI, ask for context window size from 4k to 64k. Once done, ask again if any more providers to add
+- `aiya chat` to prompt user to init if no config file found
+- **Chat History Scrolling**: Implement proper scrolling for chat history beyond terminal window size (significant effort required)
+- **Session Change Logging**: Update TokenLogger to log `SESSION_CHANGE` when switching models, reserve `SESSION_START` for initial chat start only
 
 ## Version Planning
 
