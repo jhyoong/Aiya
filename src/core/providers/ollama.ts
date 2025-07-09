@@ -147,9 +147,29 @@ export class OllamaProvider extends LLMProvider {
     return {
       supportsVision: false, // Ollama generally doesn't support vision
       supportsFunctionCalling: true, // Most Ollama models support tool calling
-      supportsThinking: false, // Ollama doesn't have thinking tags
+      supportsThinking: this.detectThinkingSupport(), // Detect based on model
       maxTokens: modelInfo.contextLength
     };
+  }
+
+  private detectThinkingSupport(): boolean {
+    // Models that are known to support thinking/reasoning
+    const thinkingModels = [
+      'qwen2.5-coder',
+      'qwen3',
+      'qwen2.5',
+      'llama3.1',
+      'llama3.2',
+      'deepseek-r1',
+      'marco-o1',
+      'r1',
+      'o1'
+    ];
+    
+    const modelName = this.model.toLowerCase();
+    return thinkingModels.some(thinkingModel => 
+      modelName.includes(thinkingModel)
+    );
   }
 
   protected override getProviderVersion(): string | undefined {

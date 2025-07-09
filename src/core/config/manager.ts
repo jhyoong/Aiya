@@ -44,8 +44,9 @@ export interface ExtendedProviderConfig {
 }
 
 export interface AiyaConfig {
-  provider: ExtendedProviderConfig;
+  provider?: ExtendedProviderConfig; // Single provider config (for backward compatibility)
   providers?: Record<string, ExtendedProviderConfig>; // Named provider configurations
+  current_provider?: string; // Active provider name when using multiple providers
   security: {
     allowedExtensions: string[];
     restrictToWorkspace: boolean;
@@ -87,19 +88,21 @@ export interface FlatConfig {
   aws_session_token?: string;
 }
 
+const DEFAULT_PROVIDER: ExtendedProviderConfig = {
+  type: 'ollama',
+  baseUrl: 'http://localhost:11434',
+  model: 'qwen3:8b',
+  capabilities: {
+    maxTokens: 4096,
+    supportsFunctionCalling: true,
+    supportsVision: false,
+    supportsStreaming: true,
+    supportsThinking: false
+  }
+};
+
 const DEFAULT_CONFIG: AiyaConfig = {
-  provider: {
-    type: 'ollama',
-    baseUrl: 'http://localhost:11434',
-    model: 'qwen2.5:8b',
-    capabilities: {
-      maxTokens: 4096,
-      supportsFunctionCalling: true,
-      supportsVision: false,
-      supportsStreaming: true,
-      supportsThinking: false
-    }
-  },
+  provider: DEFAULT_PROVIDER,
   security: {
     allowedExtensions: [
       '.ts', '.js', '.tsx', '.jsx',
@@ -163,7 +166,7 @@ export class ConfigManager {
   async init(model?: string, baseUrl?: string): Promise<void> {
     const initConfig: Partial<AiyaConfig> = {
       provider: {
-        ...DEFAULT_CONFIG.provider,
+        ...DEFAULT_PROVIDER,
         ...(model && { model }),
         ...(baseUrl && { baseUrl })
       }
@@ -176,8 +179,8 @@ export class ConfigManager {
     // Create simplified flat config format for project file
     const projectConfig = {
       provider: 'ollama',
-      model: model || DEFAULT_CONFIG.provider.model,
-      endpoint: baseUrl || DEFAULT_CONFIG.provider.baseUrl,
+      model: model || DEFAULT_PROVIDER.model,
+      endpoint: baseUrl || DEFAULT_PROVIDER.baseUrl,
       workspace: './',
       max_tokens: 8192
     };
@@ -192,6 +195,70 @@ export class ConfigManager {
 
   getConfig(): AiyaConfig {
     return { ...this.config };
+  }
+
+  getCurrentProvider(): ExtendedProviderConfig {
+    // If using multiple providers, get the current one
+    if (this.config.providers && this.config.current_provider) {
+      const provider = this.config.providers[this.config.current_provider];
+      if (provider) {
+        return provider;
+      }
+    }
+    
+    // Fallback to single provider or default
+    return this.config.provider || DEFAULT_PROVIDER;
+  }
+
+  getAvailableProviders(): string[] {
+    const providers: string[] = [];
+    
+    // Add single provider if exists
+    if (this.config.provider) {
+      providers.push('default');
+    }
+    
+    // Add named providers
+    if (this.config.providers) {
+      providers.push(...Object.keys(this.config.providers));
+    }
+    
+    return providers;
+  }
+
+  getProviderConfig(name: string): ExtendedProviderConfig | null {
+    if (name === 'default' && this.config.provider) {
+      return this.config.provider;
+    }
+    
+    if (this.config.providers && this.config.providers[name]) {
+      return this.config.providers[name];
+    }
+    
+    return null;
+  }
+
+  async switchProvider(providerName: string): Promise<boolean> {
+    // Validate provider exists
+    const providerConfig = this.getProviderConfig(providerName);
+    if (!providerConfig) {
+      return false;
+    }
+    
+    // Update current provider
+    if (providerName === 'default') {
+      // Using single provider, clear current_provider
+      delete this.config.current_provider;
+    } else {
+      // Using named provider
+      this.config.current_provider = providerName;
+    }
+    
+    return true;
+  }
+
+  validateProvider(name: string): boolean {
+    return this.getProviderConfig(name) !== null;
   }
 
   private async detectProjectConfig(): Promise<void> {
@@ -243,6 +310,11 @@ export class ConfigManager {
   }
 
   private applyEnvironmentOverrides(): void {
+    // Ensure we have a provider to override
+    if (!this.config.provider) {
+      this.config.provider = { ...DEFAULT_PROVIDER };
+    }
+    
     if (process.env.AIYA_PROVIDER) {
       const providerType = process.env.AIYA_PROVIDER.toLowerCase();
       if (['ollama', 'openai', 'anthropic', 'azure', 'gemini', 'bedrock'].includes(providerType)) {
@@ -325,11 +397,13 @@ export class ConfigManager {
   }
 
   private validateConfig(): void {
-    if (!this.config.provider.model) {
+    const currentProvider = this.getCurrentProvider();
+    
+    if (!currentProvider.model) {
       throw new Error('Provider model is required');
     }
     
-    if (!this.config.provider.baseUrl) {
+    if (!currentProvider.baseUrl) {
       throw new Error('Provider baseUrl is required');
     }
     
@@ -339,8 +413,8 @@ export class ConfigManager {
   }
 
   private normalizeConfig(rawConfig: any): Partial<AiyaConfig> {
-    // If it's already in the nested format, return as-is
-    if (rawConfig.provider && typeof rawConfig.provider === 'object') {
+    // If it's already in the nested format (has provider object or providers object), return as-is
+    if ((rawConfig.provider && typeof rawConfig.provider === 'object') || rawConfig.providers) {
       return rawConfig as Partial<AiyaConfig>;
     }
     
@@ -352,8 +426,8 @@ export class ConfigManager {
       const providerType = flatConfig.provider?.toLowerCase() as ExtendedProviderConfig['type'] || 'ollama';
       const provider: ExtendedProviderConfig = {
         type: providerType,
-        baseUrl: flatConfig.endpoint || DEFAULT_CONFIG.provider.baseUrl,
-        model: flatConfig.model || DEFAULT_CONFIG.provider.model
+        baseUrl: flatConfig.endpoint || DEFAULT_PROVIDER.baseUrl,
+        model: flatConfig.model || DEFAULT_PROVIDER.model
       };
       
       if (flatConfig.apiKey) {
@@ -426,6 +500,10 @@ export class ConfigManager {
     
     if (override.providers) {
       result.providers = { ...result.providers, ...override.providers };
+    }
+    
+    if (override.current_provider !== undefined) {
+      result.current_provider = override.current_provider;
     }
     
     if (override.security) {

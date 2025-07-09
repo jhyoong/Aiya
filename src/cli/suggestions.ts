@@ -40,6 +40,12 @@ export const SLASH_COMMANDS: SlashCommand[] = [
     usage: '/thinking [mode]',
     description: 'Set thinking display mode (on/brief/off)',
     parameters: ['[mode]']
+  },
+  {
+    name: 'model-switch',
+    usage: '/model-switch [provider]',
+    description: 'Switch between configured AI providers/models',
+    parameters: ['[provider]']
   }
 ];
 

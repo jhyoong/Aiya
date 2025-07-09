@@ -91,7 +91,7 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 
 ### Default Settings
 - Provider: Ollama (http://localhost:11434)
-- Model: qwen2.5:8b
+- Model: qwen3:8b
 - Security: Workspace-restricted with file extension allow-list
 - UI: Streaming enabled, token display on
 
@@ -146,9 +146,9 @@ Built-in tools for file operations:
 
 ### Log Format
 ```
-[2024-07-09T10:30:15.123Z] [session-uuid] ollama:qwen2.5:8b sent: 42, received: 156 [estimated]
-[2024-07-09T10:30:15.124Z] [session-uuid] SESSION_START ollama:qwen2.5:8b
-[2024-07-09T10:30:45.567Z] [session-uuid] SESSION_END ollama:qwen2.5:8b
+[2024-07-09T10:30:15.123Z] [session-uuid] ollama:qwen3:8b sent: 42, received: 156 [estimated]
+[2024-07-09T10:30:15.124Z] [session-uuid] SESSION_START ollama:qwen3:8b
+[2024-07-09T10:30:45.567Z] [session-uuid] SESSION_END ollama:qwen3:8b
 ```
 
 ## Version 1.2.0 - Multi-Provider Support ✅
@@ -196,7 +196,7 @@ interface ExtendedProviderConfig {
 - Switching of models via slash commands.
 - - init function to also be updated, with step by step guide on setting up base provider.
 - - config slash command to be added to allow users to add supported model providers.
-- - Testing of all model providers.
+- - Testing of all 3 model providers.
 - ✅ ~~slash commands a little buggy when backspacing, to investigate~~ - FIXED: Implemented proper useKeypress hook for raw stdin access
 - `exit` and `quit` and `/exit` and `/quit` to gracefully exit the app.
 - Multi-line pastes to be handled properly and not trigger the chat input until the user presses enter.

@@ -23,6 +23,9 @@ interface ChatSession {
   toolExecutor?: ToolExecutor;
   addedFiles: string[];
   thinkingMode: 'on' | 'brief' | 'off';
+  configManager: ConfigManager;
+  provider: LLMProvider;
+  currentProviderName: string;
 }
 
 interface ChatWrapperProps {
@@ -109,7 +112,10 @@ export const chatCommand = new Command('chat')
       const config = await configManager.load();
       console.log('✅ Configuration loaded successfully');
       
-      const provider = ProviderFactory.create(config.provider);
+      const currentProvider = configManager.getCurrentProvider();
+      console.log(`🔧 Current provider: ${currentProvider.type} - ${currentProvider.model} @ ${currentProvider.baseUrl || 'default'}`);
+      
+      const provider = ProviderFactory.create(currentProvider);
       console.log('✅ Provider created successfully');
       
       const security = new WorkspaceSecurity(
@@ -140,13 +146,19 @@ export const chatCommand = new Command('chat')
       const modelInfo = await provider.getModelInfo();
       console.log('✅ Model information retrieved');
       
+      const currentProviderConfig = configManager.getCurrentProvider();
+      const currentProviderName = config.current_provider || 'default';
+      
       const session: ChatSession = {
         messages: [],
-        tokenCounter: new TokenCounter(provider, config.provider.type, config.provider.model, modelInfo.contextLength),
+        tokenCounter: new TokenCounter(provider, currentProviderConfig.type, currentProviderConfig.model, modelInfo.contextLength),
         toolService,
         toolExecutor,
         addedFiles: [],
-        thinkingMode: config.ui.thinking
+        thinkingMode: config.ui.thinking,
+        configManager,
+        provider,
+        currentProviderName
       };
       console.log('✅ Chat session initialized');
       
@@ -163,17 +175,17 @@ export const chatCommand = new Command('chat')
       console.log('🎨 Starting chat interface...');
       const { unmount } = render(
         React.createElement(ChatWrapper, {
-          onMessage: (message: string) => handleMessage(message, session, provider, mcpClient, config.ui.streaming),
+          onMessage: (message: string) => handleMessage(message, session, mcpClient, config.ui.streaming),
           onMessageStream: config.ui.streaming ? 
-            (message: string) => handleMessageStream(message, session, provider, mcpClient) : 
+            (message: string) => handleMessageStream(message, session, mcpClient) : 
             undefined,
           onExit: () => {
             session.tokenCounter.endSession();
             unmount();
             // Don't call process.exit(0) immediately - let the process naturally exit
           },
-          provider: config.provider.type,
-          model: config.provider.model,
+          provider: currentProviderConfig.type,
+          model: currentProviderConfig.model,
           contextLength: modelInfo.contextLength,
           tokenCounter: session.tokenCounter,
         })
@@ -188,7 +200,6 @@ export const chatCommand = new Command('chat')
 async function* handleMessageStream(
   input: string,
   session: ChatSession,
-  provider: LLMProvider,
   mcpClient: EnhancedFilesystemMCPClient
 ): AsyncGenerator<{ content: string; thinking?: string; done: boolean }, void, unknown> {
   const trimmed = input.trim();
@@ -244,7 +255,7 @@ async function* handleMessageStream(
     const thinkingParser = new ThinkingParser(session.thinkingMode, true); // Enable incremental mode
     let streamResponse: any = null;
     
-    for await (const chunk of provider.stream(session.messages)) {
+    for await (const chunk of session.provider.stream(session.messages)) {
       const results = thinkingParser.processChunk(chunk.content);
       
       for (const result of results) {
@@ -294,7 +305,7 @@ async function* handleMessageStream(
         let followUpResponse = '';
         const followUpParser = new ThinkingParser(session.thinkingMode, true);
         
-        for await (const chunk of provider.stream(session.messages)) {
+        for await (const chunk of session.provider.stream(session.messages)) {
           const results = followUpParser.processChunk(chunk.content);
           
           for (const result of results) {
@@ -357,7 +368,6 @@ async function* handleMessageStream(
 async function handleMessage(
   input: string,
   session: ChatSession,
-  provider: LLMProvider,
   mcpClient: EnhancedFilesystemMCPClient,
   useStreaming: boolean
 ): Promise<string> {
@@ -410,7 +420,7 @@ async function handleMessage(
       let response = '';
       const thinkingParser = new ThinkingParser(session.thinkingMode);
       
-      for await (const chunk of provider.stream(session.messages)) {
+      for await (const chunk of session.provider.stream(session.messages)) {
         const results = thinkingParser.processChunk(chunk.content);
         
         for (const result of results) {
@@ -430,7 +440,7 @@ async function handleMessage(
         content: response
       };
     } else {
-      const response = await provider.chat(session.messages);
+      const response = await session.provider.chat(session.messages);
       assistantMessage = {
         role: 'assistant',
         content: response.content
@@ -445,7 +455,7 @@ async function handleMessage(
       
       if (hasToolCalls) {
         session.messages.push(...toolResults);
-        const followUpResponse = await provider.chat(session.messages);
+        const followUpResponse = await session.provider.chat(session.messages);
         session.messages.push({
           role: 'assistant',
           content: followUpResponse.content
@@ -542,11 +552,82 @@ async function handleSlashCommand(
           return `Invalid thinking mode: ${mode || 'undefined'}\nAvailable modes: on, brief, off`;
         }
         
+      case 'model-switch':
+        return await handleModelSwitch(args, session);
+        
       default:
-        return `Unknown command: /${cmd}\nAvailable commands: /read, /add, /search, /tokens, /thinking`;
+        return `Unknown command: /${cmd}\nAvailable commands: /read, /add, /search, /tokens, /thinking, /model-switch`;
     }
   } catch (error) {
     return `Command error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+  }
+}
+
+async function handleModelSwitch(args: string[], session: ChatSession): Promise<string> {
+  try {
+    const availableProviders = session.configManager.getAvailableProviders();
+    
+    // No arguments - list available providers
+    if (args.length === 0) {
+      if (availableProviders.length === 0) {
+        return 'No providers configured. Please add provider configurations to your .aiya.yaml file.';
+      }
+      
+      if (availableProviders.length === 1) {
+        return 'Only one provider configured. Please add more provider configurations to enable switching.';
+      }
+      
+      const providerList = availableProviders.map(name => {
+        const config = session.configManager.getProviderConfig(name);
+        const current = name === session.currentProviderName ? ' (current)' : '';
+        return `  ${name}: ${config?.type || 'unknown'} - ${config?.model || 'unknown'}${current}`;
+      }).join('\n');
+      
+      return `Available providers:\n${providerList}\n\nUsage: /model-switch <provider-name>`;
+    }
+    
+    // Provider name specified
+    const targetProvider = args[0];
+    if (!targetProvider) {
+      return 'Provider name is required. Usage: /model-switch <provider-name>';
+    }
+    
+    if (!session.configManager.validateProvider(targetProvider)) {
+      return `Provider "${targetProvider}" not found. Available providers: ${availableProviders.join(', ')}`;
+    }
+    
+    // If switching to the same provider, just return current status
+    if (targetProvider === session.currentProviderName) {
+      const config = session.configManager.getProviderConfig(targetProvider);
+      return `Already using provider "${targetProvider}" (${config?.type || 'unknown'} - ${config?.model || 'unknown'})`;
+    }
+    
+    // Switch to new provider
+    const success = await session.configManager.switchProvider(targetProvider);
+    if (!success) {
+      return `Failed to switch to provider "${targetProvider}"`;
+    }
+    
+    // Create new provider instance
+    const newProviderConfig = session.configManager.getProviderConfig(targetProvider);
+    if (!newProviderConfig) {
+      return `Failed to get configuration for provider "${targetProvider}"`;
+    }
+    
+    const newProvider = ProviderFactory.create(newProviderConfig);
+    
+    // Update session
+    session.provider = newProvider;
+    session.currentProviderName = targetProvider;
+    
+    // Update token counter with new provider
+    const modelInfo = await newProvider.getModelInfo();
+    session.tokenCounter = new TokenCounter(newProvider, newProviderConfig.type, newProviderConfig.model, modelInfo.contextLength);
+    
+    return `Switched to provider "${targetProvider}" (${newProviderConfig.type} - ${newProviderConfig.model})`;
+    
+  } catch (error) {
+    return `Error switching provider: ${error instanceof Error ? error.message : 'Unknown error'}`;
   }
 }
 
@@ -559,5 +640,6 @@ function getHelpText(): string {
   /add <file>    - Add file content to context for next prompt
   /search <pat>  - Search for files
   /tokens        - Show token usage
-  /thinking [mode] - Set thinking display mode (on/brief/off)`;
+  /thinking [mode] - Set thinking display mode (on/brief/off)
+  /model-switch [provider] - Switch between configured AI providers`;
 }
