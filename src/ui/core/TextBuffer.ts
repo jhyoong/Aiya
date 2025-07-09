@@ -1,5 +1,5 @@
 /**
- * TextBuffer implementation based on Google Gemini CLI text-buffer.ts
+ * TextBuffer implementation referenced from on Google Gemini CLI text-buffer.ts
  * This provides a robust text editing experience with proper Unicode handling,
  * visual line wrapping, and cursor management without raw mode dependencies.
  */
@@ -61,8 +61,6 @@ export interface Viewport {
 function clamp(v: number, min: number, max: number): number {
   return v < min ? min : v > max ? max : v;
 }
-
-/* ────────────────────────────────────────────────────────────────────────── */
 
 interface UseTextBufferProps {
   initialText?: string;
@@ -289,22 +287,19 @@ function calculateVisualLayout(
         visualLines.push(currentChunk);
 
         // Cursor mapping logic
-        // Note: currentPosInLogLine here is the start of the currentChunk within the logical line.
         if (logIndex === logicalCursor[0]) {
-          const cursorLogCol = logicalCursor[1]; // This is a code point index
+          const cursorLogCol = logicalCursor[1];
           if (
             cursorLogCol >= currentPosInLogLine &&
-            cursorLogCol < currentPosInLogLine + numCodePointsInChunk // Cursor is within this chunk
+            cursorLogCol < currentPosInLogLine + numCodePointsInChunk
           ) {
             currentVisualCursor = [
               visualLines.length - 1,
-              cursorLogCol - currentPosInLogLine, // Visual col is also code point index within visual line
+              cursorLogCol - currentPosInLogLine,
             ];
           } else if (
-            cursorLogCol === currentPosInLogLine + numCodePointsInChunk &&
-            numCodePointsInChunk > 0
+            cursorLogCol === currentPosInLogLine + numCodePointsInChunk
           ) {
-            // Cursor is exactly at the end of this non-empty chunk
             currentVisualCursor = [
               visualLines.length - 1,
               numCodePointsInChunk,
@@ -483,7 +478,7 @@ export function textBufferReducer(
       const after = cpSlice(lineContent, newCursorCol);
 
       if (parts.length > 1) {
-        newLines[newCursorRow] = before + parts[0];
+        newLines[newCursorRow] = before + (parts[0] || '');
         const remainingParts = parts.slice(1);
         const lastPartOriginal = remainingParts.pop() ?? '';
         newLines.splice(newCursorRow + 1, 0, ...remainingParts);
@@ -496,7 +491,7 @@ export function textBufferReducer(
         newCursorCol = cpLen(lastPartOriginal);
       } else {
         newLines[newCursorRow] = before + (parts[0] || '') + after;
-        newCursorCol = cpLen(before) + cpLen(parts[0] || '');
+        newCursorCol += cpLen(parts[0] || '');
       }
 
       return {
@@ -1180,22 +1175,26 @@ export function useTextBuffer({
         newline();
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
       else if (key.ctrl && key.name === 'b') move('left');
+      else if (key.ctrl && key.name === 'left') move('left');
       else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
       else if (key.ctrl && key.name === 'f') move('right');
       else if (key.name === 'up') move('up');
       else if (key.name === 'down') move('down');
       else if ((key.ctrl || key.meta) && key.name === 'left') move('wordLeft');
       else if (key.meta && key.name === 'b') move('wordLeft');
-      else if ((key.ctrl || key.meta) && key.name === 'right')
+      else if (key.meta && key.name === 'left') move('wordLeft');
+      else if ((key.meta || key.ctrl) && key.name === 'right')
         move('wordRight');
       else if (key.meta && key.name === 'f') move('wordRight');
+      else if (key.meta && key.name === 'right') move('wordRight');
+      else if (key.meta && key.name === 'd') deleteWordRight();
       else if (key.name === 'home') move('home');
       else if (key.ctrl && key.name === 'a') move('home');
       else if (key.name === 'end') move('end');
       else if (key.ctrl && key.name === 'e') move('end');
       else if (key.ctrl && key.name === 'w') deleteWordLeft();
       else if (
-        (key.meta || key.ctrl) &&
+        (key.meta) &&
         (key.name === 'backspace' ||
           (input === '\x7f' && key.name !== 'delete'))
       )
@@ -1205,10 +1204,11 @@ export function useTextBuffer({
       else if (
         key.name === 'backspace' ||
         (input === '\x7f' && key.name !== 'delete') ||
-        (key.ctrl && key.name === 'h')
+        (key.ctrl && key.name === 'h') ||
+        (key.ctrl && key.name === 'backspace')
       )
         backspace();
-      else if (key.name === 'delete' || (key.ctrl && key.name === 'd')) del();
+      else if (key.name === 'delete') del();
       else if (input && !key.ctrl && !key.meta) {
         insert(input);
       }

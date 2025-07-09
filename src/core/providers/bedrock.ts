@@ -1,3 +1,4 @@
+/** This has not yet been fully tested. */
 import { 
   BedrockRuntimeClient, 
   InvokeModelCommand, 

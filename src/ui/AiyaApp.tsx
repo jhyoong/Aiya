@@ -11,6 +11,7 @@ import { SuggestionEngine } from '../cli/suggestions.js';
 import { useTextBuffer } from './core/TextBuffer.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import * as fs from 'fs';
+import { unescapePath } from './utils/textUtils.js';
 
 interface AiyaAppProps {
   onMessage?: (message: string) => Promise<string>;
@@ -55,7 +56,8 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
   
   const isValidPath = useCallback((filePath: string): boolean => {
     try {
-      return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
+      const unescapedPath = unescapePath(filePath);
+      return fs.existsSync(unescapedPath) && fs.statSync(unescapedPath).isFile();
     } catch (_e) {
       return false;
     }

@@ -25,8 +25,10 @@ export function cpSlice(str: string, start: number, end?: number): string {
 }
 
 /**
- * Escape a path string for safe file system operations
+ * Unescape a path string that may contain backslash-escaped spaces.
+ * This is a simplified version and may need to be expanded for more complex cases.
  */
 export function unescapePath(path: string): string {
+  // Replace "\\ " with " "
   return path.replace(/\\ /g, ' ');
 }

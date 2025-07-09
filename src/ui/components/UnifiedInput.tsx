@@ -1,8 +1,9 @@
 import React, { useCallback } from 'react';
-import { Box, Text, useInput } from 'ink';
+import { Box, Text } from 'ink';
 import { TextBuffer } from '../core/TextBuffer.js';
 import { SuggestionEngine, SuggestionResult } from '../../cli/suggestions.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
+import { useKeypress } from '../hooks/useKeypress.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 
@@ -61,145 +62,49 @@ export function UnifiedInput({
     }
   }, [currentSuggestion, buffer, onTab]);
 
-  // Handle keyboard input
-  const handleInput = useCallback((input: string, key: any) => {
+  // Handle keyboard input using useKeypress hook
+  const handleKeypress = useCallback((key: any) => {
     if (!focus) {
       return;
     }
 
-    // Handle special keys
-    if (key.return) {
+    // Handle component-level keys before passing to TextBuffer
+    if (key.name === 'return') {
       if (onSubmit) {
         onSubmit(buffer.text);
       }
       return;
     }
 
-    if (key.escape) {
+    if (key.name === 'escape') {
       if (onEscape) {
         onEscape();
       }
       return;
     }
 
-    if (key.tab) {
+    if (key.name === 'tab') {
       handleTabCompletion();
       return;
     }
 
-    if (key.ctrl && key.name === 'c') {
+    if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
       if (onCancel) {
         onCancel();
       }
       return;
     }
 
-    // Navigation keys
-    if (key.leftArrow) {
-      try {
-        buffer.move('left');
-      } catch (error) {
-        console.error('Error moving left:', error);
-      }
-      return;
-    }
-
-    if (key.rightArrow) {
-      try {
-        buffer.move('right');
-      } catch (error) {
-        console.error('Error moving right:', error);
-      }
-      return;
-    }
-
-    if (key.upArrow) {
-      try {
-        buffer.move('up');
-      } catch (error) {
-        console.error('Error moving up:', error);
-      }
-      return;
-    }
-
-    if (key.downArrow) {
-      try {
-        buffer.move('down');
-      } catch (error) {
-        console.error('Error moving down:', error);
-      }
-      return;
-    }
-
-    if (key.home) {
-      try {
-        buffer.move('home');
-      } catch (error) {
-        console.error('Error moving home:', error);
-      }
-      return;
-    }
-
-    if (key.end) {
-      try {
-        buffer.move('end');
-      } catch (error) {
-        console.error('Error moving end:', error);
-      }
-      return;
-    }
-
-    // Word navigation
-    if (key.ctrl && key.leftArrow) {
-      try {
-        buffer.move('wordLeft');
-      } catch (error) {
-        console.error('Error moving word left:', error);
-      }
-      return;
-    }
-
-    if (key.ctrl && key.rightArrow) {
-      try {
-        buffer.move('wordRight');
-      } catch (error) {
-        console.error('Error moving word right:', error);
-      }
-      return;
-    }
-
-    // Editing keys
-    if (key.backspace) {
-      try {
-        buffer.backspace();
-      } catch (error) {
-        console.error('Error backspacing:', error);
-      }
-      return;
-    }
-
-    if (key.delete) {
-      try {
-        buffer.del();
-      } catch (error) {
-        console.error('Error deleting:', error);
-      }
-      return;
-    }
-
-    // Regular character input
-    if (input && !key.ctrl && !key.meta) {
-      try {
-        buffer.insert(input);
-      } catch (error) {
-        console.error('Error inserting text:', error);
-      }
-      return;
+    // Pass all other keys directly to TextBuffer - no adaptation needed!
+    try {
+      buffer.handleInput(key);
+    } catch (error) {
+      console.error('Error handling input in TextBuffer:', error, { key });
     }
   }, [focus, buffer, onSubmit, onEscape, onCancel, handleTabCompletion]);
 
-  // Set up input handling
-  useInput(handleInput, { isActive: focus });
+  // Set up input handling with useKeypress
+  useKeypress(handleKeypress, { isActive: focus });
 
   // Update suggestions when text changes
   React.useEffect(() => {

@@ -107,6 +107,7 @@ export class GeminiProvider extends LLMProvider {
       });
 
       let totalTokens = 0;
+      let usageMetadata: any = null;
       for await (const chunk of response) {
         const chunkText = chunk.text;
         if (chunkText) {
@@ -119,13 +120,15 @@ export class GeminiProvider extends LLMProvider {
         // Update token count if available
         if (chunk.usageMetadata?.totalTokenCount) {
           totalTokens = chunk.usageMetadata.totalTokenCount;
+          usageMetadata = chunk.usageMetadata;
         }
       }
 
       yield {
         content: '',
         done: true,
-        tokensUsed: totalTokens
+        tokensUsed: totalTokens,
+        usageMetadata: usageMetadata // Include full usage metadata
       };
 
     } catch (error) {

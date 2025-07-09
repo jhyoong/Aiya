@@ -13,11 +13,12 @@ import { ChatInterface } from '../../ui/components/ChatInterface.js';
 import { ThinkingParser } from '../../utils/thinking-parser.js';
 import { useTextBuffer } from '../../ui/core/TextBuffer.js';
 import { useTerminalSize } from '../../ui/hooks/useTerminalSize.js';
+import { TokenCounter } from '../../core/tokens/counter.js';
 import * as fs from 'fs';
 
 interface ChatSession {
   messages: Message[];
-  tokenCount: number;
+  tokenCounter: TokenCounter;
   toolService?: MCPToolService;
   toolExecutor?: ToolExecutor;
   addedFiles: string[];
@@ -31,11 +32,42 @@ interface ChatWrapperProps {
   provider: string;
   model: string;
   contextLength: number;
+  tokenCounter: TokenCounter;
 }
 
 const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
   const { stdin, setRawMode } = useStdin();
   const { columns: terminalWidth } = useTerminalSize();
+  
+  // Use state to track token usage and update it reactively
+  const [tokenUsage, setTokenUsage] = React.useState(() => {
+    const usage = props.tokenCounter.getUsage();
+    const lastMessage = props.tokenCounter.getLastMessageUsage();
+    return {
+      sent: lastMessage?.sent || 0,
+      sentTotal: usage.input,
+      received: lastMessage?.received || 0,
+      receivedTotal: usage.output,
+    };
+  });
+  
+  // Update token usage when counter changes
+  React.useEffect(() => {
+    const updateTokenUsage = () => {
+      const usage = props.tokenCounter.getUsage();
+      const lastMessage = props.tokenCounter.getLastMessageUsage();
+      setTokenUsage({
+        sent: lastMessage?.sent || 0,
+        sentTotal: usage.input,
+        received: lastMessage?.received || 0,
+        receivedTotal: usage.output,
+      });
+    };
+    
+    // Update every second to keep it reactive
+    const interval = setInterval(updateTokenUsage, 1000);
+    return () => clearInterval(interval);
+  }, [props.tokenCounter]);
   
   const isValidPath = React.useCallback((filePath: string): boolean => {
     try {
@@ -64,6 +96,7 @@ const ChatWrapper: React.FC<ChatWrapperProps> = (props) => {
     ...props,
     buffer,
     inputWidth,
+    tokenUsage,
   });
 };
 
@@ -103,9 +136,13 @@ export const chatCommand = new Command('chat')
       const toolExecutor = new ToolExecutor(toolService, process.env.AIYA_VERBOSE === 'true');
       console.log('✅ Tool executor created');
       
+      // Get model information for context length
+      const modelInfo = await provider.getModelInfo();
+      console.log('✅ Model information retrieved');
+      
       const session: ChatSession = {
         messages: [],
-        tokenCount: 0,
+        tokenCounter: new TokenCounter(provider, config.provider.type, config.provider.model, modelInfo.contextLength),
         toolService,
         toolExecutor,
         addedFiles: [],
@@ -122,10 +159,6 @@ export const chatCommand = new Command('chat')
         });
       }
       
-      // Get model information for context length
-      const modelInfo = await provider.getModelInfo();
-      console.log('✅ Model information retrieved');
-      
       // Render the Ink-based chat interface
       console.log('🎨 Starting chat interface...');
       const { unmount } = render(
@@ -135,12 +168,14 @@ export const chatCommand = new Command('chat')
             (message: string) => handleMessageStream(message, session, provider, mcpClient) : 
             undefined,
           onExit: () => {
+            session.tokenCounter.endSession();
             unmount();
             // Don't call process.exit(0) immediately - let the process naturally exit
           },
           provider: config.provider.type,
           model: config.provider.model,
           contextLength: modelInfo.contextLength,
+          tokenCounter: session.tokenCounter,
         })
       );
       
@@ -171,7 +206,7 @@ async function* handleMessageStream(
   
   if (trimmed === 'clear') {
     session.messages = [];
-    session.tokenCount = 0;
+    session.tokenCounter.resetSession();
     session.addedFiles = [];
     yield { content: '🧹 Session cleared', done: true };
     return;
@@ -205,10 +240,9 @@ async function* handleMessageStream(
   });
   
   try {
-    const tokensBeforePrompt = session.tokenCount;
-    
     let response = '';
     const thinkingParser = new ThinkingParser(session.thinkingMode, true); // Enable incremental mode
+    let streamResponse: any = null;
     
     for await (const chunk of provider.stream(session.messages)) {
       const results = thinkingParser.processChunk(chunk.content);
@@ -225,7 +259,7 @@ async function* handleMessageStream(
       }
       
       if (chunk.done) {
-        session.tokenCount += chunk.tokensUsed || 0;
+        streamResponse = chunk;
         break;
       }
     }
@@ -275,7 +309,6 @@ async function* handleMessageStream(
           }
           
           if (chunk.done) {
-            session.tokenCount += chunk.tokensUsed || 0;
             break;
           }
         }
@@ -308,8 +341,13 @@ async function* handleMessageStream(
       session.messages.push(assistantMessage);
     }
     
-    const promptTokens = session.tokenCount - tokensBeforePrompt;
-    yield { content: `\n\n[Tokens: ${promptTokens} (${session.tokenCount})]`, done: true };
+    // Track token usage for the main response
+    if (streamResponse) {
+      const tokenUsage = session.tokenCounter.extractTokenUsage(streamResponse, userContent);
+      session.tokenCounter.trackTokenUsage(tokenUsage.input, tokenUsage.output, tokenUsage.estimated);
+    }
+    
+    yield { content: `\n\n${session.tokenCounter.formatTokenDisplay()}`, done: true };
     
   } catch (error) {
     throw new Error(`Chat error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -335,7 +373,7 @@ async function handleMessage(
   
   if (trimmed === 'clear') {
     session.messages = [];
-    session.tokenCount = 0;
+    session.tokenCounter.resetSession();
     session.addedFiles = [];
     return '🧹 Session cleared';
   }
@@ -365,9 +403,8 @@ async function handleMessage(
   });
   
   try {
-    const tokensBeforePrompt = session.tokenCount;
-    
     let assistantMessage: Message;
+    let providerResponse: any = null;
     
     if (useStreaming) {
       let response = '';
@@ -383,7 +420,7 @@ async function handleMessage(
         }
         
         if (chunk.done) {
-          session.tokenCount += chunk.tokensUsed || 0;
+          providerResponse = chunk;
           break;
         }
       }
@@ -398,7 +435,7 @@ async function handleMessage(
         role: 'assistant',
         content: response.content
       };
-      session.tokenCount += response.tokensUsed || 0;
+      providerResponse = response;
     }
     
     // Process tool calls if available
@@ -413,7 +450,12 @@ async function handleMessage(
           role: 'assistant',
           content: followUpResponse.content
         });
-        session.tokenCount += followUpResponse.tokensUsed || 0;
+        
+        // Track token usage for follow-up response
+        if (followUpResponse) {
+          const tokenUsage = session.tokenCounter.extractTokenUsage(followUpResponse, userContent);
+          session.tokenCounter.trackTokenUsage(tokenUsage.input, tokenUsage.output, tokenUsage.estimated);
+        }
         
         return `${updatedMessage.content}\n\n${followUpResponse.content}`;
       }
@@ -421,8 +463,13 @@ async function handleMessage(
       session.messages.push(assistantMessage);
     }
     
-    const promptTokens = session.tokenCount - tokensBeforePrompt;
-    return `${assistantMessage.content}\n\n[Tokens: ${promptTokens} (${session.tokenCount})]`;
+    // Track token usage for the main response
+    if (providerResponse) {
+      const tokenUsage = session.tokenCounter.extractTokenUsage(providerResponse, userContent);
+      session.tokenCounter.trackTokenUsage(tokenUsage.input, tokenUsage.output, tokenUsage.estimated);
+    }
+    
+    return `${assistantMessage.content}\n\n${session.tokenCounter.formatTokenDisplay()}`;
     
   } catch (error) {
     throw new Error(`Chat error: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -478,7 +525,9 @@ async function handleSlashCommand(
         }
         
       case 'tokens':
-        return `Session tokens: ${session.tokenCount}\nMessages: ${session.messages.length}`;
+        const usage = session.tokenCounter.getUsage();
+        const stats = session.tokenCounter.getSessionStats();
+        return `Session ID: ${session.tokenCounter.getSessionId()}\nTotal tokens: ${usage.total} (sent: ${usage.input}, received: ${usage.output})\nMessages: ${session.messages.length}\nAverage tokens per message: ${stats.averageTokensPerMessage}`;
         
       case 'thinking':
         if (args.length === 0) {

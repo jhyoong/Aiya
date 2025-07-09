@@ -29,6 +29,8 @@ export interface StreamResponse {
   done: boolean;
   tokensUsed?: number;
   toolCalls?: ToolCall[];
+  usage?: any; // OpenAI usage metadata
+  usageMetadata?: any; // Gemini usage metadata
 }
 
 export interface ModelInfo {

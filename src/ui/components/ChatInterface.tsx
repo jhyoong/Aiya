@@ -22,6 +22,12 @@ interface ChatInterfaceProps {
   contextLength?: number | undefined;
   buffer: TextBuffer;
   inputWidth: number;
+  tokenUsage?: {
+    sent: number;
+    sentTotal: number;
+    received: number;
+    receivedTotal: number;
+  } | undefined;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -34,6 +40,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   contextLength,
   buffer,
   inputWidth,
+  tokenUsage,
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [status, setStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
@@ -242,6 +249,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         provider={provider}
         model={model}
         contextLength={contextLength}
+        tokenUsage={tokenUsage}
       />
     </Box>
   );

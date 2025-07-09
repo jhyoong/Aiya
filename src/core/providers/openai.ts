@@ -104,7 +104,8 @@ export class OpenAIProvider extends LLMProvider {
           yield {
             content: '',
             done: true,
-            tokensUsed: totalTokens
+            tokensUsed: totalTokens,
+            usage: chunk.usage // Include full usage metadata
           };
           break;
         }
