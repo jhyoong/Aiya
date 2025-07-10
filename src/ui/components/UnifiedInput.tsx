@@ -88,6 +88,18 @@ export function UnifiedInput({
     }
 
     // Handle component-level keys before passing to TextBuffer
+    
+    // Handle Shift+Enter: let TextBuffer handle it for newline insertion
+    if (key.name === 'shift+return' && !key.paste && !isPotentialPaste) {
+      try {
+        buffer.handleInput(key);
+      } catch (error) {
+        console.error('Error handling Shift+Enter in TextBuffer:', error, { key });
+      }
+      return;
+    }
+    
+    // Handle regular Enter: submit the message
     if (key.name === 'return' && !key.paste && !isPotentialPaste) {
       // Clear any existing submit timeout to prevent double submission
       if (submitTimeoutRef.current) {

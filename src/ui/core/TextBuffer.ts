@@ -1183,13 +1183,20 @@ export function useTextBuffer({
 
       const { sequence: input } = key;
 
-      if (
+      // Handle Shift+Enter as newline insertion (not submission)
+      if (key.name === 'shift+return' || input === '\\\r') {
+        newline();
+      }
+      // Handle regular Enter (for submission - will be handled by parent component)
+      else if (
         key.name === 'return' ||
         input === '\r' ||
-        input === '\n' ||
-        input === '\\\r' // VSCode terminal represents shift + enter this way
-      )
-        newline();
+        input === '\n'
+      ) {
+        // Don't insert newline for regular enter - let parent handle submission
+        // This allows UnifiedInput to distinguish between Shift+Enter (newline) and Enter (submit)
+        return;
+      }
       else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
       else if (key.ctrl && key.name === 'b') move('left');
       else if (key.ctrl && key.name === 'left') move('left');

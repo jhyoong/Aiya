@@ -11,6 +11,7 @@ import {
   ProviderConfig
 } from './base.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
+import { OpenAIErrorMapper, ErrorContext } from '../errors/index.js';
 
 export class OpenAIProvider extends LLMProvider {
   private client: OpenAI;
@@ -26,6 +27,36 @@ export class OpenAIProvider extends LLMProvider {
       apiKey: config.apiKey,
       baseURL: config.baseUrl === 'https://api.openai.com/v1' ? undefined : config.baseUrl
     });
+  }
+
+  /**
+   * Handle errors using the standardized error mapper
+   */
+  private handleError(error: any, operation: string): never {
+    const context: ErrorContext = {
+      provider: 'openai',
+      operation,
+      model: this.model,
+      endpoint: this.baseUrl
+    };
+
+    const result = OpenAIErrorMapper.handleOpenAIError(error, context);
+    
+    // Convert standardized error to provider-specific error type
+    if (result.success) {
+      throw new ProviderError('Unknown error occurred');
+    }
+
+    switch (result.errorType) {
+      case 'model_not_found':
+        throw new ModelNotFoundError(this.model);
+      case 'authentication_failed':
+        throw new ProviderError(result.error, error);
+      case 'connection_failed':
+        throw new ConnectionError(result.error, error);
+      default:
+        throw new ProviderError(result.error, error);
+    }
   }
 
   async chat(messages: Message[]): Promise<Response> {
@@ -59,19 +90,7 @@ export class OpenAIProvider extends LLMProvider {
       
       return result;
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('does not exist')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('API key')) {
-          throw new ProviderError('Invalid OpenAI API key', error);
-        }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to OpenAI API', error);
-        }
-        throw new ProviderError(`OpenAI chat failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during chat');
+      this.handleError(error, 'chat');
     }
   }
 
@@ -112,19 +131,7 @@ export class OpenAIProvider extends LLMProvider {
         }
       }
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('does not exist')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('API key')) {
-          throw new ProviderError('Invalid OpenAI API key', error);
-        }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to OpenAI API', error);
-        }
-        throw new ProviderError(`OpenAI streaming failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during streaming');
+      this.handleError(error, 'stream');
     }
   }
 

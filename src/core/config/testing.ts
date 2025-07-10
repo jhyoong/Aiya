@@ -1,8 +1,32 @@
 import { ExtendedProviderConfig } from './manager.js';
 import { ConnectionTestResult } from './collectors/base.js';
+import { 
+  OllamaErrorMapper, 
+  OpenAIErrorMapper, 
+  GeminiErrorMapper, 
+  BaseProviderErrorHandler,
+  ProviderResult,
+  ErrorContext,
+  ProviderErrorType
+} from '../errors/index.js';
 
 export class ConnectionTester {
   private static readonly TIMEOUT_MS = 10000; // 10 seconds
+
+  /**
+   * Convert ProviderResult to ConnectionTestResult for backward compatibility
+   */
+  private static convertToConnectionTestResult(result: ProviderResult): ConnectionTestResult {
+    if (result.success) {
+      return { success: true };
+    }
+    
+    return {
+      success: false,
+      error: result.error,
+      suggestions: result.suggestions
+    };
+  }
 
   /**
    * Test connection to Ollama provider
@@ -29,53 +53,34 @@ export class ConnectionTester {
       const modelExists = data.models?.some((m: any) => m.name === config.model);
       
       if (!modelExists) {
-        return {
-          success: false,
-          error: `Model ${config.model} not found`,
-          suggestions: [
-            `Run: ollama pull ${config.model}`,
-            'Check available models with: ollama list',
-            'Verify the model name is correct'
-          ]
+        const context: ErrorContext = {
+          provider: 'ollama',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: config.baseUrl
         };
+        
+        const result = OllamaErrorMapper.createOllamaError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          `Model ${config.model} not found`,
+          context
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       return { success: true };
       
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: 'Connection timeout',
-          suggestions: [
-            'Check if Ollama is running: ollama serve',
-            'Verify the endpoint URL is correct',
-            'Check network connectivity'
-          ]
-        };
-      }
-      
-      if (error.message.includes('ECONNREFUSED')) {
-        return {
-          success: false,
-          error: 'Connection refused',
-          suggestions: [
-            'Start Ollama: ollama serve',
-            'Check if port 11434 is available',
-            'Verify Ollama installation'
-          ]
-        };
-      }
-      
-      return {
-        success: false,
-        error: error.message,
-        suggestions: [
-          'Check if Ollama is running',
-          'Verify the endpoint URL',
-          'Check firewall settings'
-        ]
+      const context: ErrorContext = {
+        provider: 'ollama',
+        operation: 'connection_test',
+        model: config.model,
+        endpoint: config.baseUrl
       };
+      
+      const result = OllamaErrorMapper.handleOllamaError(error, context);
+      return ConnectionTester.convertToConnectionTestResult(result);
     }
   }
 
@@ -85,15 +90,20 @@ export class ConnectionTester {
   async testOpenAI(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
     try {
       if (!config.apiKey) {
-        return {
-          success: false,
-          error: 'API key is required',
-          suggestions: [
-            'Set OPENAI_API_KEY environment variable',
-            'Add apiKey to configuration',
-            'Get API key from https://platform.openai.com/api-keys'
-          ]
+        const context: ErrorContext = {
+          provider: 'openai',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: config.baseUrl
         };
+        
+        const result = OpenAIErrorMapper.createOpenAIError(
+          ProviderErrorType.AUTHENTICATION_FAILED,
+          'API key is required',
+          context
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       // Test with minimal models endpoint call
@@ -112,19 +122,17 @@ export class ConnectionTester {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        if (response.status === 401) {
-          return {
-            success: false,
-            error: 'Invalid API key',
-            suggestions: [
-              'Check if the API key is correct',
-              'Verify API key starts with "sk-"',
-              'Check OpenAI account billing status'
-            ]
-          };
-        }
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const context: ErrorContext = {
+          provider: 'openai',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: baseUrl,
+          statusCode: response.status
+        };
         
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const result = OpenAIErrorMapper.handleOpenAIError(error, context);
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       const data = await response.json();
@@ -133,41 +141,34 @@ export class ConnectionTester {
       const modelExists = data.data?.some((m: any) => m.id === config.model);
       
       if (!modelExists) {
-        return {
-          success: false,
-          error: `Model ${config.model} not found`,
-          suggestions: [
-            'Check available models in OpenAI dashboard',
-            'Verify the model name is correct',
-            'Use standard models like "gpt-4" or "gpt-3.5-turbo"'
-          ]
+        const context: ErrorContext = {
+          provider: 'openai',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: baseUrl
         };
+        
+        const result = OpenAIErrorMapper.createOpenAIError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          `Model ${config.model} not found`,
+          context
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       return { success: true };
       
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: 'Connection timeout',
-          suggestions: [
-            'Check internet connectivity',
-            'Verify the API endpoint URL',
-            'Try again later'
-          ]
-        };
-      }
-      
-      return {
-        success: false,
-        error: error.message,
-        suggestions: [
-          'Check API key validity',
-          'Verify endpoint URL',
-          'Check network connectivity'
-        ]
+      const context: ErrorContext = {
+        provider: 'openai',
+        operation: 'connection_test',
+        model: config.model,
+        endpoint: config.baseUrl
       };
+      
+      const result = OpenAIErrorMapper.handleOpenAIError(error, context);
+      return ConnectionTester.convertToConnectionTestResult(result);
     }
   }
 
@@ -177,15 +178,20 @@ export class ConnectionTester {
   async testGemini(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
     try {
       if (!config.apiKey) {
-        return {
-          success: false,
-          error: 'API key is required',
-          suggestions: [
-            'Set GEMINI_API_KEY environment variable',
-            'Add apiKey to configuration',
-            'Get API key from Google AI Studio'
-          ]
+        const context: ErrorContext = {
+          provider: 'gemini',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: 'https://generativelanguage.googleapis.com/v1'
         };
+        
+        const result = GeminiErrorMapper.createGeminiError(
+          ProviderErrorType.AUTHENTICATION_FAILED,
+          'API key is required',
+          context
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       // Test with models endpoint
@@ -199,19 +205,17 @@ export class ConnectionTester {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        if (response.status === 400 || response.status === 401) {
-          return {
-            success: false,
-            error: 'Invalid API key',
-            suggestions: [
-              'Check if the API key is correct',
-              'Verify API key permissions',
-              'Check if Gemini API is enabled'
-            ]
-          };
-        }
+        const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const context: ErrorContext = {
+          provider: 'gemini',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: 'https://generativelanguage.googleapis.com/v1',
+          statusCode: response.status
+        };
         
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const result = GeminiErrorMapper.handleGeminiError(error, context);
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       const data = await response.json();
@@ -222,40 +226,34 @@ export class ConnectionTester {
       );
       
       if (!modelExists) {
-        return {
-          success: false,
-          error: `Model ${config.model} not found`,
-          suggestions: [
-            'Check available models in Google AI Studio',
-            'Verify the model name is correct',
-            'Use standard models like "gemini-1.5-pro" or "gemini-1.5-flash"'
-          ]
+        const context: ErrorContext = {
+          provider: 'gemini',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: 'https://generativelanguage.googleapis.com/v1'
         };
+        
+        const result = GeminiErrorMapper.createGeminiError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          `Model ${config.model} not found`,
+          context
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       return { success: true };
       
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: 'Connection timeout',
-          suggestions: [
-            'Check internet connectivity',
-            'Try again later'
-          ]
-        };
-      }
-      
-      return {
-        success: false,
-        error: error.message,
-        suggestions: [
-          'Check API key validity',
-          'Verify Gemini API is enabled',
-          'Check network connectivity'
-        ]
+      const context: ErrorContext = {
+        provider: 'gemini',
+        operation: 'connection_test',
+        model: config.model,
+        endpoint: 'https://generativelanguage.googleapis.com/v1'
       };
+      
+      const result = GeminiErrorMapper.handleGeminiError(error, context);
+      return ConnectionTester.convertToConnectionTestResult(result);
     }
   }
 
@@ -265,15 +263,25 @@ export class ConnectionTester {
   async testAnthropic(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
     try {
       if (!config.apiKey) {
-        return {
-          success: false,
-          error: 'API key is required',
-          suggestions: [
+        const context: ErrorContext = {
+          provider: 'anthropic',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: 'https://api.anthropic.com/v1'
+        };
+        
+        const result = BaseProviderErrorHandler.createError(
+          ProviderErrorType.AUTHENTICATION_FAILED,
+          'API key is required',
+          context,
+          [
             'Set ANTHROPIC_API_KEY environment variable',
             'Add apiKey to configuration',
             'Get API key from Anthropic Console'
           ]
-        };
+        );
+        
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       // Test with a minimal message
@@ -298,59 +306,48 @@ export class ConnectionTester {
       clearTimeout(timeoutId);
       
       if (!response.ok) {
-        if (response.status === 401) {
-          return {
-            success: false,
-            error: 'Invalid API key',
-            suggestions: [
-              'Check if the API key is correct',
-              'Verify API key permissions',
-              'Check Anthropic account billing'
-            ]
-          };
-        }
+        let errorType = ProviderErrorType.UNKNOWN;
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
-        if (response.status === 400) {
-          const errorData = await response.json();
-          if (errorData.error?.message?.includes('model')) {
-            return {
-              success: false,
-              error: `Model ${config.model} not available`,
-              suggestions: [
-                'Use standard models like "claude-3-5-sonnet-20241022"',
-                'Check available models in Anthropic Console',
-                'Verify the model name is correct'
-              ]
-            };
+        if (response.status === 401) {
+          errorType = ProviderErrorType.AUTHENTICATION_FAILED;
+          errorMessage = 'Invalid API key';
+        } else if (response.status === 400) {
+          try {
+            const errorData = await response.json();
+            if (errorData.error?.message?.includes('model')) {
+              errorType = ProviderErrorType.MODEL_NOT_FOUND;
+              errorMessage = `Model ${config.model} not available`;
+            }
+          } catch {
+            // Ignore JSON parsing errors
           }
         }
         
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const context: ErrorContext = {
+          provider: 'anthropic',
+          operation: 'connection_test',
+          model: config.model,
+          endpoint: 'https://api.anthropic.com/v1',
+          statusCode: response.status
+        };
+        
+        const result = BaseProviderErrorHandler.createError(errorType, errorMessage, context);
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
       
       return { success: true };
       
     } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return {
-          success: false,
-          error: 'Connection timeout',
-          suggestions: [
-            'Check internet connectivity',
-            'Try again later'
-          ]
-        };
-      }
-      
-      return {
-        success: false,
-        error: error.message,
-        suggestions: [
-          'Check API key validity',
-          'Verify model availability',
-          'Check network connectivity'
-        ]
+      const context: ErrorContext = {
+        provider: 'anthropic',
+        operation: 'connection_test',
+        model: config.model,
+        endpoint: 'https://api.anthropic.com/v1'
       };
+      
+      const result = BaseProviderErrorHandler.standardizeError(error, context);
+      return ConnectionTester.convertToConnectionTestResult(result);
     }
   }
 

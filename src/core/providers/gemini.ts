@@ -11,6 +11,7 @@ import {
   ProviderConfig
 } from './base.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
+import { GeminiErrorMapper, ErrorContext } from '../errors/index.js';
 
 interface ThinkingConfig {
   thinkingBudget?: number;
@@ -54,6 +55,36 @@ export class GeminiProvider extends LLMProvider {
     }
   }
 
+  /**
+   * Handle errors using the standardized error mapper
+   */
+  private handleError(error: any, operation: string): never {
+    const context: ErrorContext = {
+      provider: 'gemini',
+      operation,
+      model: this.model,
+      endpoint: 'https://generativelanguage.googleapis.com/v1'
+    };
+
+    const result = GeminiErrorMapper.handleGeminiError(error, context);
+    
+    // Convert standardized error to provider-specific error type
+    if (result.success) {
+      throw new ProviderError('Unknown error occurred');
+    }
+
+    switch (result.errorType) {
+      case 'model_not_found':
+        throw new ModelNotFoundError(this.model);
+      case 'authentication_failed':
+        throw new ProviderError(result.error, error);
+      case 'connection_failed':
+        throw new ConnectionError(result.error, error);
+      default:
+        throw new ProviderError(result.error, error);
+    }
+  }
+
   async chat(messages: Message[]): Promise<Response> {
     try {
       const { contents } = this.convertMessagesToGeminiFormat(messages);
@@ -76,19 +107,7 @@ export class GeminiProvider extends LLMProvider {
         })
       };
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('API_KEY') || error.message.includes('authentication')) {
-          throw new ProviderError('Invalid Google AI API key', error);
-        }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to Google AI API', error);
-        }
-        throw new ProviderError(`Gemini chat failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during chat');
+      this.handleError(error, 'chat');
     }
   }
 
@@ -133,19 +152,7 @@ export class GeminiProvider extends LLMProvider {
       };
 
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('API_KEY') || error.message.includes('authentication')) {
-          throw new ProviderError('Invalid Google AI API key', error);
-        }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to Google AI API', error);
-        }
-        throw new ProviderError(`Gemini streaming failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during streaming');
+      this.handleError(error, 'stream');
     }
   }
 

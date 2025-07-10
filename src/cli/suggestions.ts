@@ -1,8 +1,10 @@
+import { CommandRegistry, CommandDefinition } from './CommandRegistry.js';
+
 export interface SlashCommand {
   name: string;
   usage: string;
   description: string;
-  parameters?: string[];
+  parameters?: string[] | undefined;
 }
 
 export interface SuggestionResult {
@@ -10,50 +12,27 @@ export interface SuggestionResult {
   completionText: string;
 }
 
-export const SLASH_COMMANDS: SlashCommand[] = [
-  {
-    name: 'read',
-    usage: '/read <file_path>',
-    description: 'Read and display file content',
-    parameters: ['<file_path>']
-  },
-  {
-    name: 'add',
-    usage: '/add <file_path>',
-    description: 'Add file content to context for next prompt',
-    parameters: ['<file_path>']
-  },
-  {
-    name: 'search',
-    usage: '/search <pattern>',
-    description: 'Search for files matching pattern',
-    parameters: ['<pattern>']
-  },
-  {
-    name: 'tokens',
-    usage: '/tokens',
-    description: 'Show token usage statistics',
-    parameters: []
-  },
-  {
-    name: 'thinking',
-    usage: '/thinking [mode]',
-    description: 'Set thinking display mode (on/brief/off)',
-    parameters: ['[mode]']
-  },
-  {
-    name: 'model-switch',
-    usage: '/model-switch [provider]',
-    description: 'Switch between configured AI providers/models',
-    parameters: ['[provider]']
-  }
-];
-
 export class SuggestionEngine {
-  private commands: SlashCommand[];
 
-  constructor(commands: SlashCommand[] = SLASH_COMMANDS) {
-    this.commands = commands;
+  /**
+   * Convert CommandDefinition to SlashCommand for backward compatibility
+   */
+  private static convertToSlashCommand(command: CommandDefinition): SlashCommand {
+    return {
+      name: command.name,
+      usage: command.usage,
+      description: command.description,
+      ...(command.parameters && { parameters: command.parameters })
+    };
+  }
+
+  /**
+   * Get all commands from the CommandRegistry
+   */
+  private getCommands(): SlashCommand[] {
+    return CommandRegistry.getAllCommands().map(cmd => 
+      SuggestionEngine.convertToSlashCommand(cmd)
+    );
   }
 
   getSuggestion(input: string): SuggestionResult | null {
@@ -64,7 +43,8 @@ export class SuggestionEngine {
 
     // If input is just '/', show the first command
     if (input === '/') {
-      const firstCommand = this.commands[0];
+      const commands = this.getCommands();
+      const firstCommand = commands[0];
       return firstCommand ? {
         displayText: firstCommand.usage,
         completionText: `/${firstCommand.name}`
@@ -73,8 +53,8 @@ export class SuggestionEngine {
 
     const commandPart = input.slice(1); // Remove the '/'
     
-    // Find exact matches first
-    const exactMatch = this.commands.find(cmd => cmd.name === commandPart);
+    // Use CommandRegistry for exact match
+    const exactMatch = CommandRegistry.getCommand(commandPart);
     if (exactMatch) {
       return {
         displayText: exactMatch.usage,
@@ -82,26 +62,28 @@ export class SuggestionEngine {
       };
     }
 
-    // Find partial matches
-    const partialMatches = this.commands.filter(cmd => 
-      cmd.name.startsWith(commandPart.toLowerCase())
-    );
-
+    // Use CommandRegistry for partial matches
+    const partialMatches = CommandRegistry.findCommands(commandPart);
+    
     if (partialMatches.length === 1) {
       const match = partialMatches[0];
-      return match ? {
-        displayText: match.usage,
-        completionText: `/${match.name}`
-      } : null;
+      if (match) {
+        return {
+          displayText: match.usage,
+          completionText: `/${match.name}`
+        };
+      }
     }
 
     // If multiple matches, return the first one
     if (partialMatches.length > 1) {
       const firstMatch = partialMatches[0];
-      return firstMatch ? {
-        displayText: firstMatch.usage,
-        completionText: `/${firstMatch.name}`
-      } : null;
+      if (firstMatch) {
+        return {
+          displayText: firstMatch.usage,
+          completionText: `/${firstMatch.name}`
+        };
+      }
     }
 
     return null;
@@ -113,13 +95,12 @@ export class SuggestionEngine {
     }
 
     if (input === '/') {
-      return this.commands;
+      return this.getCommands();
     }
 
-    const commandPart = input.slice(1).toLowerCase();
-    return this.commands.filter(cmd => 
-      cmd.name.toLowerCase().startsWith(commandPart)
-    );
+    const commandPart = input.slice(1);
+    const matches = CommandRegistry.findCommands(commandPart);
+    return matches.map(cmd => SuggestionEngine.convertToSlashCommand(cmd));
   }
 
   isValidCommand(input: string): boolean {
@@ -128,11 +109,11 @@ export class SuggestionEngine {
     }
 
     const commandPart = input.slice(1).split(' ')[0];
-    return this.commands.some(cmd => cmd.name === commandPart);
+    return commandPart ? CommandRegistry.hasCommand(commandPart) : false;
   }
 
   getCommandHelp(commandName: string): SlashCommand | null {
-    const command = this.commands.find(cmd => cmd.name === commandName);
-    return command || null;
+    const command = CommandRegistry.getCommand(commandName);
+    return command ? SuggestionEngine.convertToSlashCommand(command) : null;
   }
 }

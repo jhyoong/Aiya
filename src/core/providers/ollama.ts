@@ -11,6 +11,7 @@ import {
   ProviderConfig
 } from './base.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
+import { OllamaErrorMapper, ErrorContext } from '../errors/index.js';
 
 export class OllamaProvider extends LLMProvider {
   private client: Ollama;
@@ -20,6 +21,34 @@ export class OllamaProvider extends LLMProvider {
     super(config);
     this.client = new Ollama({ host: config.baseUrl });
     this.configuredMaxTokens = config.maxTokens;
+  }
+
+  /**
+   * Handle errors using the standardized error mapper
+   */
+  private handleError(error: any, operation: string): never {
+    const context: ErrorContext = {
+      provider: 'ollama',
+      operation,
+      model: this.model,
+      endpoint: this.baseUrl
+    };
+
+    const result = OllamaErrorMapper.handleOllamaError(error, context);
+    
+    // Convert standardized error to provider-specific error type
+    if (result.success) {
+      throw new ProviderError('Unknown error occurred');
+    }
+
+    switch (result.errorType) {
+      case 'model_not_found':
+        throw new ModelNotFoundError(this.model);
+      case 'connection_failed':
+        throw new ConnectionError(result.error, error);
+      default:
+        throw new ProviderError(result.error, error);
+    }
   }
 
   async chat(messages: Message[]): Promise<Response> {
@@ -40,16 +69,7 @@ export class OllamaProvider extends LLMProvider {
         ...(response.done && { finishReason: 'stop' as const })
       };
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
-          throw new ConnectionError('Failed to connect to Ollama server', error);
-        }
-        throw new ProviderError(`Ollama chat failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during chat');
+      this.handleError(error, 'chat');
     }
   }
 
@@ -73,16 +93,7 @@ export class OllamaProvider extends LLMProvider {
         };
       }
     } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
-          throw new ModelNotFoundError(this.model);
-        }
-        if (error.message.includes('connection') || error.message.includes('ECONNREFUSED')) {
-          throw new ConnectionError('Failed to connect to Ollama server', error);
-        }
-        throw new ProviderError(`Ollama streaming failed: ${error.message}`, error);
-      }
-      throw new ProviderError('Unknown error occurred during streaming');
+      this.handleError(error, 'stream');
     }
   }
 

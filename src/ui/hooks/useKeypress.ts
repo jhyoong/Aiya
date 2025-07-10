@@ -80,6 +80,15 @@ export function useKeypress(
           if (key.name === 'return' && key.sequence === '\x1B\r') {
             key.meta = true;
           }
+          
+          // Detect Shift+Enter combination
+          // Shift+Enter typically sends sequence '\r' with shift: true
+          // or can be detected by sequence comparison
+          if (key.name === 'return' && key.shift) {
+            // This is Shift+Enter
+            key.name = 'shift+return';
+          }
+          
           onKeypressRef.current({ ...key, paste: isPaste });
         }
       }

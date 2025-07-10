@@ -14,6 +14,7 @@ import { ThinkingParser } from '../../utils/thinking-parser.js';
 import { useTextBuffer } from '../../ui/core/TextBuffer.js';
 import { useTerminalSize } from '../../ui/hooks/useTerminalSize.js';
 import { TokenCounter } from '../../core/tokens/counter.js';
+import { initializeCommandSystem } from '../commands/index.js';
 import * as fs from 'fs';
 
 interface ChatSession {
@@ -145,6 +146,9 @@ export const chatCommand = new Command('chat')
   .action(async () => {
     try {
       console.log('🚀 Starting chat session...');
+      
+      // Initialize command system for slash commands
+      initializeCommandSystem();
       
       // Check if configuration exists
       const configExists = await checkConfiguration();

@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as os from 'os';
 import * as yaml from 'yaml';
+import { ConfigurationGenerator } from './generation.js';
 
 export interface ProviderCapabilities {
   maxTokens: number;
@@ -44,7 +45,7 @@ export interface ExtendedProviderConfig {
 }
 
 export interface AiyaConfig {
-  provider?: ExtendedProviderConfig; // Single provider config (for backward compatibility)
+  provider?: ExtendedProviderConfig; // Single provider config
   providers?: Record<string, ExtendedProviderConfig>; // Named provider configurations
   current_provider?: string; // Active provider name when using multiple providers
   security: {
@@ -69,24 +70,6 @@ export interface AiyaConfig {
   max_tokens?: number;
 }
 
-// Flat config format for project files
-export interface FlatConfig {
-  provider?: string;
-  model?: string;
-  endpoint?: string;
-  workspace?: string;
-  max_tokens?: number;
-  apiKey?: string;
-  azure_deployment?: string;
-  azure_api_version?: string;
-  anthropic_version?: string;
-  gemini_project_id?: string;
-  gemini_location?: string;
-  aws_region?: string;
-  aws_access_key_id?: string;
-  aws_secret_access_key?: string;
-  aws_session_token?: string;
-}
 
 const DEFAULT_PROVIDER: ExtendedProviderConfig = {
   type: 'ollama',
@@ -176,20 +159,20 @@ export class ConfigManager {
     
     const projectConfigPath = path.join(process.cwd(), '.aiya.yaml');
     
-    // Create simplified flat config format for project file
-    const projectConfig = {
-      provider: 'ollama',
-      model: model || DEFAULT_PROVIDER.model,
-      endpoint: baseUrl || DEFAULT_PROVIDER.baseUrl,
-      workspace: './',
-      max_tokens: 8192
+    // Use ConfigurationGenerator for consistent format
+    const configGenerator = new ConfigurationGenerator();
+    const session = {
+      primaryProvider: {
+        ...DEFAULT_PROVIDER,
+        ...(model && { model }),
+        ...(baseUrl && { baseUrl })
+      },
+      additionalProviders: [],
+      skipValidation: false,
+      projectPath: process.cwd()
     };
 
-    const yamlContent = yaml.stringify(projectConfig, {
-      indent: 2,
-      lineWidth: 80
-    });
-
+    const yamlContent = configGenerator.generateYAML(session);
     await fs.writeFile(projectConfigPath, yamlContent, 'utf8');
   }
 
@@ -218,7 +201,7 @@ export class ConfigManager {
       providers.push(...Object.keys(this.config.providers));
     }
     
-    // Only add 'default' if no named providers exist (backward compatibility)
+    // Only add 'default' if no named providers exist
     if (this.config.provider && !this.config.providers) {
       providers.push('default');
     }
@@ -232,7 +215,7 @@ export class ConfigManager {
       return this.config.providers[name];
     }
     
-    // Only use 'default' if no named providers exist (backward compatibility)
+    // Only use 'default' if no named providers exist
     if (name === 'default' && this.config.provider && !this.config.providers) {
       return this.config.provider;
     }
@@ -303,8 +286,8 @@ export class ConfigManager {
       const content = await fs.readFile(this.projectConfigPath, 'utf8');
       const rawConfig = yaml.parse(content);
       
-      // Handle both flat and nested config formats
-      const projectConfig = this.normalizeConfig(rawConfig);
+      // Parse as nested config format only
+      const projectConfig = rawConfig as Partial<AiyaConfig>;
       this.config = this.mergeConfigs(this.config, projectConfig);
     } catch (error) {
       console.warn(`Failed to load project config from ${this.projectConfigPath}: ${error}`);
@@ -422,67 +405,6 @@ export class ConfigManager {
     return providerType === 'ollama';
   }
 
-  private normalizeConfig(rawConfig: any): Partial<AiyaConfig> {
-    // If it's already in the nested format (has provider object or providers object), return as-is
-    if ((rawConfig.provider && typeof rawConfig.provider === 'object') || rawConfig.providers) {
-      return rawConfig as Partial<AiyaConfig>;
-    }
-    
-    // Handle flat format
-    const flatConfig = rawConfig as FlatConfig;
-    const normalized: Partial<AiyaConfig> = {};
-    
-    if (flatConfig.provider || flatConfig.model || flatConfig.endpoint) {
-      const providerType = flatConfig.provider?.toLowerCase() as ExtendedProviderConfig['type'] || 'ollama';
-      const provider: ExtendedProviderConfig = {
-        type: providerType,
-        baseUrl: flatConfig.endpoint || DEFAULT_PROVIDER.baseUrl,
-        model: flatConfig.model || DEFAULT_PROVIDER.model
-      };
-      
-      if (flatConfig.apiKey) {
-        provider.apiKey = flatConfig.apiKey;
-      }
-      
-      // Handle provider-specific configurations
-      if (providerType === 'azure' && (flatConfig.azure_deployment || flatConfig.azure_api_version)) {
-        provider.azure = {
-          ...(flatConfig.azure_deployment && { deploymentName: flatConfig.azure_deployment }),
-          ...(flatConfig.azure_api_version && { apiVersion: flatConfig.azure_api_version })
-        };
-      }
-      
-      if (providerType === 'anthropic' && flatConfig.anthropic_version) {
-        provider.anthropic = {
-          version: flatConfig.anthropic_version
-        };
-      }
-      
-      if (providerType === 'gemini' && (flatConfig.gemini_project_id || flatConfig.gemini_location)) {
-        provider.gemini = {
-          ...(flatConfig.gemini_project_id && { projectId: flatConfig.gemini_project_id }),
-          ...(flatConfig.gemini_location && { location: flatConfig.gemini_location })
-        };
-      }
-      
-      if (providerType === 'bedrock' && (flatConfig.aws_region || flatConfig.aws_access_key_id || flatConfig.aws_secret_access_key)) {
-        provider.bedrock = {
-          region: flatConfig.aws_region || 'us-east-1',
-          ...(flatConfig.aws_access_key_id && { accessKeyId: flatConfig.aws_access_key_id }),
-          ...(flatConfig.aws_secret_access_key && { secretAccessKey: flatConfig.aws_secret_access_key }),
-          ...(flatConfig.aws_session_token && { sessionToken: flatConfig.aws_session_token })
-        };
-      }
-      
-      normalized.provider = provider;
-    }
-    
-    if (flatConfig.max_tokens !== undefined) {
-      normalized.max_tokens = flatConfig.max_tokens;
-    }
-    
-    return normalized;
-  }
 
   private mergeConfigs(base: AiyaConfig, override: Partial<AiyaConfig>): AiyaConfig {
     const result = { ...base };
