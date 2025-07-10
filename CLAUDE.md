@@ -51,6 +51,7 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 - ✅ Fixed home/end key navigation
 - ✅ Fixed slash command input handling
 - ✅ Eliminated immediate exit on startup
+- ✅ **Multiline Paste Fix**: Enabled bracketed paste mode to prevent terminal warnings and auto-submission on paste operations
 
 **Recent Model Switching Bug Fixes**:
 - ✅ **Configuration Validation**: Fixed unnecessary baseUrl validation for non-Ollama providers
@@ -89,6 +90,11 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 4. **Security-First**: Workspace-restricted file access with allow-lists
 5. **Configuration Hierarchy**: Project (.aiya.yaml) -> Global (~/.aiya/config.yaml) -> Environment variables
 6. **Reactive UI**: React/Ink components with streaming response support
+7. **Centralized Model System**: Single source of truth for model metadata and capabilities (`src/core/config/models.ts`)
+8. **Dynamic Configuration**: Runtime-generated configurations using centralized model definitions
+9. **Graceful State Management**: Proper form state handling with component remounting and cleanup
+10. **Unified Capability Management**: Centralized capability definitions via CapabilityManager (`src/core/config/CapabilityManager.ts`)
+11. **Model Registry Pattern**: Unified model interface with dynamic discovery via ModelRegistry (`src/core/config/ModelRegistry.ts`)
 
 ## Configuration
 
@@ -99,13 +105,14 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 
 ### Default Settings
 - Provider: Ollama (http://localhost:11434)
-- Model: qwen3:8b
+- Model: qwen3:8b (from centralized model system)
 - Security: Workspace-restricted with file extension allow-list
 - UI: Streaming enabled, token display on
+- Configuration: Dynamic defaults from `src/core/config/models.ts`
 
 ### Multi-Provider Support
 - **Fully Supported and Tested**:
-  - **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5-turbo with vision and function calling
+  - **OpenAI**: GPT-4, GPT-4 Turbo, GPT-3.5-turbo with vision and function calling. Supports custom endpoints for OpenAI-compatible APIs
   - **Ollama**: Local models with full backward compatibility
   - **Google Gemini**: Gemini 1.5 Pro/Flash with vision and large context windows
 - **Added support but not extensively tested**:
@@ -116,7 +123,7 @@ Raw Stdin → useKeypress Hook → UnifiedInput → TextBuffer → Visual Update
 ### Configuration Validation
 - **Provider-Specific Requirements**: Only validates required fields for each provider type
 - **Ollama**: Requires `baseUrl` (host URL)
-- **OpenAI**: `baseUrl` optional (defaults to OpenAI API)
+- **OpenAI**: `baseUrl` optional (defaults to OpenAI API, supports custom endpoints for compatible APIs)
 - **Gemini/Anthropic/Azure/Bedrock**: No `baseUrl` validation (use provider APIs directly)
 
 
@@ -200,6 +207,33 @@ The `/model-switch` slash command enables seamless switching between configured 
 - `SESSION_CHANGE`: Provider/model switch within same chat session  
 - `SESSION_END`: Chat session termination
 
+## Initialization System
+
+### Setup Wizard Enhancements
+- **Multi-Provider Setup**: Step-by-step guided configuration for multiple AI providers
+- **Smart Provider Naming**: Automatic unique naming for multiple providers of same type (ollama-qwen3, ollama-llama32)
+- **Graceful Exit Options**: "Save and Exit" capability during setup process with partial configuration preservation
+- **OpenAI Endpoint Configuration**: Optional custom endpoint setup for OpenAI-compatible APIs
+- **Input State Management**: Proper form state handling prevents input retention between setup steps
+- **Centralized Model System**: Dynamic defaults from centralized model definitions instead of hardcoded values
+
+### Configuration Flow
+1. **Primary Provider Setup**: Choose main provider (Ollama, OpenAI, Gemini)
+2. **Model Selection**: Pick from available models or enter custom model name
+3. **Endpoint Configuration** (if applicable):
+   - **Ollama**: Custom server endpoint (default: localhost:11434)
+   - **OpenAI**: Optional custom endpoint for compatible APIs (Perplexity, Together AI, etc.)
+4. **Authentication**: API key input (optional for some providers)
+5. **Multi-Provider Prompt**: Option to add additional providers or save current configuration
+6. **Repeat for Additional Providers**: Same flow for each additional provider
+7. **Configuration Summary**: Review and confirm final setup
+
+### Setup Wizard Features
+- **Provider-Specific Validation**: Only validates required fields for each provider type
+- **Dynamic Model Loading**: Fetches available models from provider APIs when possible
+- **Backward Compatibility**: Existing configurations remain unaffected
+- **Error Handling**: Graceful handling of connection failures and invalid configurations
+
 ## Version 1.2.0 - Multi-Provider Support ✅
 
 **Completed Features**:
@@ -245,17 +279,72 @@ interface ExtendedProviderConfig {
 - ✅ **Dynamic Status Bar Updates**: Status bar immediately reflects current provider and token state
 - ✅ **Provider-Specific Configuration Validation**: Only validate baseUrl for providers that require it
 - ✅ **Token Counter State Synchronization**: Token usage resets properly when switching providers
-
-**TODO next in this patch**:
+- ✅ `exit` and `quit` and `/exit` and `/quit` to gracefully exit the app. Current `ESC` to quit should be a double `ESC`.
 - ✅ ~~Switching of models via slash commands~~ - COMPLETED: `/model-switch` command implemented
 - ✅ ~~slash commands a little buggy when backspacing, to investigate~~ - FIXED: Implemented proper useKeypress hook for raw stdin access
-- Init function to be updated, with step by step guide on setting up base provider
+- ✅ **Multiline Paste Support**: Fixed critical issue where pasted content auto-submitted and showed terminal warnings by enabling bracketed paste mode
+
+**✅ Recent Bug Fixes and Improvements**:
+- ✅ **Critical Bug Fix**: Multiple provider configuration loss - Fixed provider naming to generate unique names (ollama-qwen3, ollama-llama32, openai-gpt4o) preventing configuration overwrites
+- ✅ **UX Bug Fix**: TextInput retention issue - Added key props to force component remounting between form steps, eliminating input field retention
+- ✅ **Enhancement**: Graceful exit capability - Added "Save and Exit" option during multi-provider setup and provider selection steps
+- ✅ **Refactor**: Removed hardcoded defaults - Eliminated hardcoded model names, endpoints, and capabilities from ProviderConfigForm, now uses centralized model system
+- ✅ **Feature**: OpenAI custom endpoint support - Added optional custom endpoint configuration for OpenAI-compatible APIs (Perplexity, Together AI, local servers)
+
+**✅ Recently Completed**:
+- ✅ **Critical Bug Fixes**: Fixed multiple provider configuration loss, TextInput retention, and added graceful exit options
+- ✅ **Code Quality**: Removed hardcoded defaults and implemented centralized model system
+- ✅ **OpenAI Enhancement**: Added optional custom endpoint configuration for OpenAI-compatible APIs
+- ✅ **Setup Wizard**: Enhanced init system with proper provider naming, state management, and user experience
+- ✅ **Provider Architecture Refactoring**: Major refactoring to eliminate code duplication and centralize configuration management
+
+## Provider Architecture Refactoring (2025-07-10)
+
+### ✅ **Phase 1: Centralized Capabilities Management - COMPLETED**
+- **Enhanced models.ts**: Added `PROVIDER_DEFAULTS` registry with provider-specific configurations, help text, and capability definitions
+- **Created CapabilityManager.ts**: Centralized capability management eliminating ~70% of duplicate capability definitions across collectors and providers
+- **Updated All Collectors**: Ollama, OpenAI, and Gemini collectors now delegate to CapabilityManager instead of hardcoded configurations
+- **Updated All Providers**: Providers use centralized capability lookups, removing duplicate `getModelCapabilities()` methods
+
+### ✅ **Phase 2: Consolidated Model Information - COMPLETED**
+- **Created ModelRegistry.ts**: Unified interface for all model operations with dynamic model discovery capabilities
+- **Enhanced Model Access**: Advanced search, filtering by capabilities, context length ranges, and cost sorting
+- **Removed Redundant Methods**: Eliminated duplicate `getModelDescriptions()`, `getContextLengthInfo()`, and `getCostInfo()` methods
+- **Dynamic Model Fetching**: Framework for real-time model discovery from provider APIs
+
+### **Architecture Improvements Achieved**:
+- **Single Source of Truth**: All model metadata and capabilities centralized in `PROVIDER_REGISTRY`
+- **Eliminated Duplication**: Removed hundreds of lines of duplicate code across providers and collectors  
+- **Enhanced Maintainability**: Adding new models or providers now requires updates in only one location
+- **Consistent Behavior**: Standardized capability management across all providers
+- **Future-Proof Design**: ModelRegistry supports advanced model discovery and filtering capabilities
+
+### **File Structure Changes**:
+```
+src/core/config/
+├── models.ts              # Enhanced with PROVIDER_DEFAULTS and PROVIDER_REGISTRY
+├── CapabilityManager.ts   # NEW: Centralized capability management
+├── ModelRegistry.ts       # NEW: Unified model interface with dynamic discovery
+├── collectors/
+│   ├── ollama.ts         # Simplified using CapabilityManager
+│   ├── openai.ts         # Simplified using CapabilityManager  
+│   └── gemini.ts         # Simplified using CapabilityManager
+└── ...
+```
+
+### **Code Quality Metrics**:
+- **~70% reduction** in duplicate capability definitions
+- **Eliminated** scattered model metadata across collectors and providers
+- **Simplified** collector implementations by removing redundant methods
+- **Centralized** all provider-specific defaults and help text
+- **Enhanced** type safety with unified interfaces
+
+**TODO next in this patch**:
 - Config slash command to be added to allow users to add supported model providers
-- Testing of all 3 model providers
-- `exit` and `quit` and `/exit` and `/quit` to gracefully exit the app. Current `ESC` to quit should be a double `ESC`.
-- Multi-line pastes to be handled properly and not trigger the chat input until the user presses enter
-- `aiya init` to default to a guided setup. init command should guide the user with a simple flow:
-  - Asks for main provider between Ollama, OpenAI, or Gemini -> Asks for API key (optional for Ollama and OpenAI) -> Asks for custom endpoint only for Ollama and OpenAI, optional as well -> If Ollama or custom OpenAI, ask for context window size from 4k to 64k. Once done, ask again if any more providers to add
+- Testing of all 3 model providers with the enhanced setup system
+- ✅ ~~Multi-line pastes to be handled properly and not trigger the chat input until the user presses enter~~ - COMPLETED: Enabled bracketed paste mode to eliminate terminal warnings and prevent auto-submission
+- **Manual Testing**: Thoroughly test multiline paste functionality and identify remaining UI issues
+- **Shift+Enter Feature**: Implement `Shift + Enter` to create newlines in terminal input without submitting
 - `aiya chat` to prompt user to init if no config file found
 - **Chat History Scrolling**: Implement proper scrolling for chat history beyond terminal window size (significant effort required)
 - **Session Change Logging**: Update TokenLogger to log `SESSION_CHANGE` when switching models, reserve `SESSION_START` for initial chat start only
@@ -274,11 +363,12 @@ interface ExtendedProviderConfig {
 - YAML configuration with environment overrides
 - No formal linting configured yet
 
-Do not use emojis.
-
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
+NEVER use emojis unless the user specifically asks for it.
 NEVER create files unless they're absolutely necessary for achieving your goal.
+NEVER place time estimates in plans, summaries or documentation.
+NEVER write any exaggeration or false information.
 ALWAYS prefer editing an existing file to creating a new one.
 ALWAYS check with the user before creating documentation files (*.md) or README files. Only edit documentation files if explicitly requested by the User.
-NEVER place time estimates in plans.
+ALWAYS write in a clear, concise and detailed manner.

@@ -1024,14 +1024,14 @@ export function useTextBuffer({
   }, [visualCursor, visualScrollRow, viewport]);
 
   const insert = useCallback(
-    (ch: string): void => {
+    (ch: string, isPasteOperation = false): void => {
       if (/[\n\r]/.test(ch)) {
         dispatch({ type: 'insert', payload: ch });
         return;
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive) {
+      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive && !isPasteOperation) {
         let potentialPath = ch;
         if (
           potentialPath.length > 2 &&
@@ -1164,6 +1164,23 @@ export function useTextBuffer({
       paste: boolean;
       sequence: string;
     }): void => {
+      // Handle paste events first - insert entire content atomically
+      if (key.paste) {
+        insert(key.sequence, true);
+        return;
+      }
+
+      // Detect potential paste operations (fallback for terminals without bracketed paste)
+      const isPotentialPaste = key.sequence && 
+        key.sequence.length > 50 && 
+        key.sequence.includes('\n') && 
+        !key.name;
+
+      if (isPotentialPaste) {
+        insert(key.sequence, true);
+        return;
+      }
+
       const { sequence: input } = key;
 
       if (

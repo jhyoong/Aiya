@@ -121,6 +121,14 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const handleMessage = async (input: string) => {
     if (!input.trim()) return;
 
+    // Check for exit commands before processing
+    const trimmed = input.trim().toLowerCase();
+    if (trimmed === 'exit' || trimmed === 'quit' || trimmed === '/exit' || trimmed === '/quit') {
+      // Call onExit directly for exit commands
+      onExit?.();
+      return;
+    }
+
     const userMessage: Message = {
       role: 'user',
       content: input,
@@ -293,7 +301,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           onSubmit={handleMessage}
           onCancel={handleCancel}
           onEscape={handleCancel}
-          placeholder="Type your message... (ESC to exit)"
+          placeholder="Type your message... (double ESC to exit, or type 'exit')"
           suggestionEngine={suggestionEngine}
           focus={true}
           showSuggestions={true}

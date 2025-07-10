@@ -10,6 +10,7 @@ import {
   ProviderError,
   ProviderConfig
 } from './base.js';
+import { CapabilityManager } from '../config/CapabilityManager.js';
 
 interface ThinkingConfig {
   thinkingBudget?: number;
@@ -161,17 +162,16 @@ export class GeminiProvider extends LLMProvider {
 
   async getModelInfo(): Promise<ModelInfo> {
     try {
-      const capabilities = this.getModelCapabilities(this.model);
+      const capabilities = CapabilityManager.getCapabilities('gemini', this.model);
       
       return {
         name: this.model,
-        contextLength: capabilities.contextLength,
+        contextLength: capabilities.maxTokens,
         supportedFeatures: ['chat', 'streaming', 'vision'],
         capabilities: {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
-          supportsThinking: capabilities.supportsThinking,
-          ...(capabilities.costPerToken && { costPerToken: capabilities.costPerToken })
+          supportsThinking: capabilities.supportsThinking
         }
       };
     } catch (error) {
@@ -197,14 +197,7 @@ export class GeminiProvider extends LLMProvider {
 
   async listAvailableModels(): Promise<string[]> {
     // Google AI doesn't have a direct models endpoint, return known models
-    return [
-      'gemini-2.5-pro',
-      'gemini-2.5-flash',
-      'gemini-2.5-flash-lite-preview-06-17',
-      'gemini-1.5-pro',
-      'gemini-1.5-flash',
-      'gemini-1.0-pro'
-    ];
+    return CapabilityManager.getAvailableModels('gemini');
   }
 
   async isAuthenticated(): Promise<boolean> {
@@ -225,12 +218,12 @@ export class GeminiProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const capabilities = this.getModelCapabilities(this.model);
+    const capabilities = CapabilityManager.getCapabilities('gemini', this.model);
     return {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
       supportsThinking: capabilities.supportsThinking,
-      maxTokens: capabilities.contextLength
+      maxTokens: capabilities.maxTokens
     };
   }
 
@@ -268,78 +261,4 @@ export class GeminiProvider extends LLMProvider {
     return { contents };
   }
 
-  private getModelCapabilities(model: string): {
-    contextLength: number;
-    supportsVision: boolean;
-    supportsFunctionCalling: boolean;
-    supportsThinking: boolean;
-    costPerToken?: { input: number; output: number };
-  } {
-    // Known capabilities for Gemini models
-    const capabilities: Record<string, any> = {
-      'gemini-2.5-pro': {
-        contextLength: 1048576,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        supportsThinking: true,
-        costPerToken: { input: 0.00125, output: 0.005 }
-      },
-      'gemini-2.5-flash': {
-        contextLength: 1048576,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        supportsThinking: true,
-        costPerToken: { input: 0.000075, output: 0.0003 }
-      },
-      'gemini-2.5-flash-lite-preview-06-17': {
-        contextLength: 1000000,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        supportsThinking: true,
-        costPerToken: { input: 0.0000375, output: 0.00015 }
-      },
-      'gemini-1.5-pro': {
-        contextLength: 2097152,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        supportsThinking: false,
-        costPerToken: { input: 0.00125, output: 0.005 }
-      },
-      'gemini-1.5-flash': {
-        contextLength: 1048576,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        supportsThinking: false,
-        costPerToken: { input: 0.000075, output: 0.0003 }
-      },
-      'gemini-1.0-pro': {
-        contextLength: 32768,
-        supportsVision: false,
-        supportsFunctionCalling: true,
-        supportsThinking: false,
-        costPerToken: { input: 0.0005, output: 0.0015 }
-      }
-    };
-
-    // Find exact match or partial match
-    const exactMatch = capabilities[model];
-    if (exactMatch) {
-      return exactMatch;
-    }
-
-    // Fallback for unknown models
-    for (const [knownModel, config] of Object.entries(capabilities)) {
-      if (model.includes(knownModel.replace('gemini-', ''))) {
-        return config;
-      }
-    }
-
-    // Default fallback
-    return {
-      contextLength: this.config.maxTokens || 32768,
-      supportsVision: true,
-      supportsFunctionCalling: true,
-      supportsThinking: model.includes('2.5')
-    };
-  }
 }

@@ -47,6 +47,9 @@ export function UnifiedInput({
   focus = true,
 }: UnifiedInputProps) {
   const [currentSuggestion, setCurrentSuggestion] = React.useState<SuggestionResult | null>(null);
+  const [escapeCount, setEscapeCount] = React.useState(0);
+  const escapeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+  const submitTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
 
   // Handle tab completion
   const handleTabCompletion = useCallback(() => {
@@ -68,17 +71,59 @@ export function UnifiedInput({
       return;
     }
 
-    // Handle component-level keys before passing to TextBuffer
-    if (key.name === 'return') {
-      if (onSubmit) {
-        onSubmit(buffer.text);
+    // Detect potential paste operations (fallback for terminals without bracketed paste)
+    const isPotentialPaste = key.sequence && 
+      key.sequence.length > 50 && 
+      key.sequence.includes('\n') && 
+      !key.name;
+
+    // Handle paste events - don't submit, just insert
+    if (key.paste || isPotentialPaste) {
+      try {
+        buffer.handleInput(key);
+      } catch (error) {
+        console.error('Error handling paste input in TextBuffer:', error, { key });
       }
       return;
     }
 
+    // Handle component-level keys before passing to TextBuffer
+    if (key.name === 'return' && !key.paste && !isPotentialPaste) {
+      // Clear any existing submit timeout to prevent double submission
+      if (submitTimeoutRef.current) {
+        clearTimeout(submitTimeoutRef.current);
+        submitTimeoutRef.current = null;
+      }
+
+      // Add small debounce to prevent rapid multiple submissions
+      submitTimeoutRef.current = setTimeout(() => {
+        if (onSubmit) {
+          onSubmit(buffer.text);
+        }
+        submitTimeoutRef.current = null;
+      }, 10); // Very small delay to catch rapid events
+      return;
+    }
+
     if (key.name === 'escape') {
-      if (onEscape) {
-        onEscape();
+      if (escapeTimeoutRef.current) {
+        clearTimeout(escapeTimeoutRef.current);
+      }
+      
+      const newEscapeCount = escapeCount + 1;
+      setEscapeCount(newEscapeCount);
+      
+      if (newEscapeCount >= 2) {
+        // Second ESC press - exit
+        if (onEscape) {
+          onEscape();
+        }
+        setEscapeCount(0);
+      } else {
+        // First ESC press - set timeout to reset counter
+        escapeTimeoutRef.current = setTimeout(() => {
+          setEscapeCount(0);
+        }, 1000); // Reset after 1 second
       }
       return;
     }
@@ -95,13 +140,34 @@ export function UnifiedInput({
       return;
     }
 
+    // Reset escape count on other key presses
+    if (escapeCount > 0) {
+      setEscapeCount(0);
+      if (escapeTimeoutRef.current) {
+        clearTimeout(escapeTimeoutRef.current);
+        escapeTimeoutRef.current = null;
+      }
+    }
+
     // Pass all other keys directly to TextBuffer - no adaptation needed!
     try {
       buffer.handleInput(key);
     } catch (error) {
       console.error('Error handling input in TextBuffer:', error, { key });
     }
-  }, [focus, buffer, onSubmit, onEscape, onCancel, handleTabCompletion]);
+  }, [focus, buffer, onSubmit, onEscape, onCancel, handleTabCompletion, escapeCount]);
+
+  // Cleanup timeouts on unmount
+  React.useEffect(() => {
+    return () => {
+      if (escapeTimeoutRef.current) {
+        clearTimeout(escapeTimeoutRef.current);
+      }
+      if (submitTimeoutRef.current) {
+        clearTimeout(submitTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Set up input handling with useKeypress
   useKeypress(handleKeypress, { isActive: focus });

@@ -10,6 +10,7 @@ import {
   ProviderError,
   ProviderConfig
 } from './base.js';
+import { CapabilityManager } from '../config/CapabilityManager.js';
 
 export class OllamaProvider extends LLMProvider {
   private client: Ollama;
@@ -143,34 +144,15 @@ export class OllamaProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const modelInfo = await this.getModelInfo();
+    const capabilities = CapabilityManager.getCapabilities('ollama', this.model);
     return {
-      supportsVision: false, // Ollama generally doesn't support vision
-      supportsFunctionCalling: true, // Most Ollama models support tool calling
-      supportsThinking: this.detectThinkingSupport(), // Detect based on model
-      maxTokens: modelInfo.contextLength
+      supportsVision: capabilities.supportsVision,
+      supportsFunctionCalling: capabilities.supportsFunctionCalling,
+      supportsThinking: capabilities.supportsThinking,
+      maxTokens: capabilities.maxTokens
     };
   }
 
-  private detectThinkingSupport(): boolean {
-    // Models that are known to support thinking/reasoning
-    const thinkingModels = [
-      'qwen2.5-coder',
-      'qwen3',
-      'qwen2.5',
-      'llama3.1',
-      'llama3.2',
-      'deepseek-r1',
-      'marco-o1',
-      'r1',
-      'o1'
-    ];
-    
-    const modelName = this.model.toLowerCase();
-    return thinkingModels.some(thinkingModel => 
-      modelName.includes(thinkingModel)
-    );
-  }
 
   protected override getProviderVersion(): string | undefined {
     return '1.0'; // Could be enhanced to fetch actual Ollama version

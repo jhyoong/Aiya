@@ -34,13 +34,32 @@ export function useKeypress(
     }
 
     setRawMode(true);
+    
+    // Enable bracketed paste mode
+    process.stdout.write('\x1b[?2004h');
 
     const rl = readline.createInterface({ input: stdin });
     let isPaste = false;
     let pasteBuffer = Buffer.alloc(0);
 
     const handleKeypress = (_: unknown, key: Key) => {
-      if (key.name === 'paste-start') {
+      // Detect bracketed paste sequences by their escape codes
+      if (key.sequence === '\x1b[200~') {
+        key.name = 'paste-start';
+        isPaste = true;
+      } else if (key.sequence === '\x1b[201~') {
+        key.name = 'paste-end';
+        isPaste = false;
+        onKeypressRef.current({
+          name: '',
+          ctrl: false,
+          meta: false,
+          shift: false,
+          paste: true,
+          sequence: pasteBuffer.toString(),
+        });
+        pasteBuffer = Buffer.alloc(0);
+      } else if (key.name === 'paste-start') {
         isPaste = true;
       } else if (key.name === 'paste-end') {
         isPaste = false;
@@ -70,6 +89,9 @@ export function useKeypress(
     stdin.on('keypress', handleKeypress);
 
     return () => {
+      // Disable bracketed paste mode before cleanup
+      process.stdout.write('\x1b[?2004l');
+      
       stdin.removeListener('keypress', handleKeypress);
       rl.close();
       setRawMode(false);

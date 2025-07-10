@@ -10,6 +10,7 @@ import {
   ProviderError,
   ProviderConfig
 } from './base.js';
+import { CapabilityManager } from '../config/CapabilityManager.js';
 
 export class OpenAIProvider extends LLMProvider {
   private client: OpenAI;
@@ -139,19 +140,17 @@ export class OpenAIProvider extends LLMProvider {
 
   async getModelInfo(): Promise<ModelInfo> {
     try {
-      // Get model information - OpenAI doesn't have a direct API for this
-      // so we'll use known model capabilities
-      const capabilities = this.getModelCapabilities(this.model);
+      // Get model information using centralized capabilities
+      const capabilities = CapabilityManager.getCapabilities('openai', this.model);
       
       return {
         name: this.model,
-        contextLength: capabilities.contextLength,
+        contextLength: capabilities.maxTokens,
         supportedFeatures: ['chat', 'streaming', 'function-calling'],
         capabilities: {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
-          supportsThinking: false, // OpenAI doesn't have thinking tags like Claude
-          ...(capabilities.costPerToken && { costPerToken: capabilities.costPerToken })
+          supportsThinking: capabilities.supportsThinking
         }
       };
     } catch (error) {
@@ -200,12 +199,12 @@ export class OpenAIProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const capabilities = this.getModelCapabilities(this.model);
+    const capabilities = CapabilityManager.getCapabilities('openai', this.model);
     return {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
-      supportsThinking: false,
-      maxTokens: capabilities.contextLength
+      supportsThinking: capabilities.supportsThinking,
+      maxTokens: capabilities.maxTokens
     };
   }
 
@@ -245,64 +244,4 @@ export class OpenAIProvider extends LLMProvider {
     }
   }
 
-  private getModelCapabilities(model: string): {
-    contextLength: number;
-    supportsVision: boolean;
-    supportsFunctionCalling: boolean;
-    costPerToken?: { input: number; output: number };
-  } {
-    // Known capabilities for popular OpenAI models
-    const capabilities: Record<string, any> = {
-      'gpt-4o': {
-        contextLength: 128000,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        costPerToken: { input: 0.0025, output: 0.01 }
-      },
-      'gpt-4o-mini': {
-        contextLength: 128000,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        costPerToken: { input: 0.00015, output: 0.0006 }
-      },
-      'gpt-4-turbo': {
-        contextLength: 128000,
-        supportsVision: true,
-        supportsFunctionCalling: true,
-        costPerToken: { input: 0.01, output: 0.03 }
-      },
-      'gpt-4': {
-        contextLength: 8192,
-        supportsVision: false,
-        supportsFunctionCalling: true,
-        costPerToken: { input: 0.03, output: 0.06 }
-      },
-      'gpt-3.5-turbo': {
-        contextLength: 16385,
-        supportsVision: false,
-        supportsFunctionCalling: true,
-        costPerToken: { input: 0.0015, output: 0.002 }
-      }
-    };
-
-    // Find exact match or partial match
-    const exactMatch = capabilities[model];
-    if (exactMatch) {
-      return exactMatch;
-    }
-
-    // Fallback for unknown models
-    for (const [knownModel, config] of Object.entries(capabilities)) {
-      if (model.includes(knownModel)) {
-        return config;
-      }
-    }
-
-    // Default fallback
-    return {
-      contextLength: this.config.maxTokens || 4096,
-      supportsVision: false,
-      supportsFunctionCalling: true
-    };
-  }
 }

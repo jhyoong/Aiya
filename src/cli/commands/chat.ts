@@ -145,6 +145,13 @@ export const chatCommand = new Command('chat')
   .action(async () => {
     try {
       console.log('🚀 Starting chat session...');
+      
+      // Check if configuration exists
+      const configExists = await checkConfiguration();
+      if (!configExists) {
+        return; // Exit gracefully - user was prompted to run init
+      }
+      
       const configManager = new ConfigManager();
       const config = await configManager.load();
       console.log('✅ Configuration loaded successfully');
@@ -595,8 +602,12 @@ async function handleSlashCommand(
       case 'model-switch':
         return await handleModelSwitch(args, session);
         
+      case 'exit':
+      case 'quit':
+        return 'Goodbye!';
+        
       default:
-        return `Unknown command: /${cmd}\nAvailable commands: /read, /add, /search, /tokens, /thinking, /model-switch`;
+        return `Unknown command: /${cmd}\nAvailable commands: /read, /add, /search, /tokens, /thinking, /model-switch, /exit, /quit`;
     }
   } catch (error) {
     return `Command error: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -671,9 +682,32 @@ async function handleModelSwitch(args: string[], session: ChatSession): Promise<
   }
 }
 
+async function checkConfiguration(): Promise<boolean> {
+  const configPath = '.aiya.yaml';
+  
+  try {
+    await fs.promises.access(configPath, fs.constants.F_OK);
+    return true; // Configuration file exists
+  } catch {
+    // Configuration file doesn't exist
+    console.log('\n❌ No configuration found');
+    console.log('Aiya needs to be initialized before you can start chatting.');
+    console.log('\n🚀 To get started, run:');
+    console.log('   aiya init');
+    console.log('\nThis will guide you through setting up your AI provider (Ollama, OpenAI, or Gemini).');
+    console.log('\n💡 After setup, you can:');
+    console.log('   • Run "aiya chat" to start chatting');
+    console.log('   • Run "aiya search <pattern>" to search files');
+    console.log('   • Edit .aiya.yaml to customize settings');
+    console.log('\nFor help, visit: https://github.com/jhyoong/Aiya\n');
+    
+    return false;
+  }
+}
+
 function getHelpText(): string {
   return `Aiya Chat Commands:
-  exit, quit     - Exit chat session
+  exit, quit, /exit, /quit - Exit chat session
   clear          - Clear conversation history
   help           - Show this help
   /read <file>   - Read and display file
