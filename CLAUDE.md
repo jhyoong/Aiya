@@ -21,6 +21,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Linting
 - `npm run lint` - Currently returns "Linting not configured yet"
 
+## Known Issues & Fixes
+
+### Shift+Enter Terminal Compatibility
+Some terminals send Shift+Enter as two separate key events (backslash + return) instead of a single event with shift flag. The application includes detection logic in `useKeypress.ts` to handle this by implementing a state machine that combines these events into a proper `shift+return` event for multi-line input.
+
 ## Architecture
 
 ### High-Level Structure

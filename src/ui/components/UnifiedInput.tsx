@@ -73,6 +73,7 @@ export function UnifiedInput({
         return;
       }
 
+
       // Detect potential paste operations (fallback for terminals without bracketed paste)
       const isPotentialPaste =
         key.sequence &&

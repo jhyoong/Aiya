@@ -1200,6 +1200,7 @@ export function useTextBuffer({
       // Handle Shift+Enter as newline insertion (not submission)
       if (key.name === 'shift+return' || input === '\\\r') {
         newline();
+        return; // CRITICAL: Return here to prevent fallthrough to regular Enter handling
       }
       // Handle regular Enter (for submission - will be handled by parent component)
       else if (key.name === 'return' || input === '\r' || input === '\n') {
