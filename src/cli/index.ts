@@ -32,7 +32,7 @@ program
   });
 
 // Error handling
-program.exitOverride();
+// program.exitOverride(); // Removed: causes help command to throw errors
 
 process.on('SIGINT', () => {
   console.log('\nGracefully shutting down...');
