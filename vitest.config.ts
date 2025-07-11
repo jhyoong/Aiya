@@ -7,7 +7,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./tests/utils/test-setup.ts'],
     coverage: {
-      provider: 'c8',
+      provider: 'v8',
       reporter: ['text', 'json', 'html'],
       exclude: [
         'node_modules/',

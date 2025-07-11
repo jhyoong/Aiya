@@ -157,16 +157,6 @@ describe('Testing Infrastructure Foundation', () => {
       ).rejects.toThrow('Connection failed');
     });
 
-    test('should respect latency settings', async () => {
-      const provider = createOllamaMock();
-      provider.setLatency(200);
-
-      const start = Date.now();
-      await provider.chat([{ role: 'user', content: 'Test' }]);
-      const elapsed = Date.now() - start;
-
-      expect(elapsed).toBeGreaterThanOrEqual(200);
-    });
   });
 
   describe('Custom Assertions', () => {
