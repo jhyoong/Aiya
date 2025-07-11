@@ -1,29 +1,24 @@
 # Aiya
 
-Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-assisted development with multi-provider support, reactive interface and comprehensive testing infrastructure.
+Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-**Version 1.2.0** - Multi-provider support with comprehensive testing infrastructure and enhanced capabilities.
+**Version 1.2.0** - Multi-provider support and init function flow added.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- **Multi-Provider Support**: Seamless integration with Ollama, OpenAI, and Google Gemini
-- **Runtime Provider Switching**: Switch between AI providers mid-conversation with `/model-switch`
-- **Modern Terminal UI**: Built with React/Ink for clean, responsive terminal interface
-- **Unified Command System**: Consistent slash command handling through CommandRegistry architecture
+- **Multi-Provider Support**: Ideally, seamless integration with Ollama, OpenAI, and Google Gemini
 - **Reactive Interface**: Slash command suggestions with smart tab completion and autocomplete
 - **Interactive Chat Sessions**: AI conversations with streaming responses and thinking display
 - **Context Management**: Add files to conversation context with visual feedback
 - **Secure File Operations**: Workspace-restricted file access with configurable security
-- **Fuzzy File Search**: Quick file discovery within your workspace
-- **Comprehensive Testing**: 203+ automated tests ensuring reliability across all providers
-- **Project-aware Configuration**: YAML-based configuration with environment variable support
+- **Simple Model Configuration**: YAML-based configuration with environment variable support
 
 ## Prerequisites
 
-- Node.js 18 or higher
+- Node.js 20 or higher
 - At least one AI provider:
   - **Ollama**: Local models (qwen2.5-coder:7b, qwen3:8b, etc.)
   - **OpenAI**: API key for GPT-4, GPT-4 Turbo, etc.
@@ -53,20 +48,14 @@ npm run build
 aiya init
 ```
 
-Or with specific provider:
-```bash
-aiya init --model qwen3:8b              # Ollama
-aiya init --provider openai --model gpt-4o-mini  # OpenAI
-```
-
 2. Start an interactive chat session:
 ```bash
 aiya chat
 ```
 
-3. Search for files:
+3. Search for files (will probably remove this):
 ```bash
-aiya search chat
+aiya search something
 aiya search config
 ```
 
@@ -129,9 +118,12 @@ Available providers: ollama-qwen3, openai-gpt4o, gemini-flash
 💬 You: /model-switch openai-gpt4o
 Switched to OpenAI GPT-4o-mini
 ```
-*Note: This depends on your context window size*
+> [!NOTE]
+> Performance depends on your config settings and for local models, context window size
 
 ### `aiya search <query>`
+> [!NOTE]
+> Will probably remove this next - to be integrated into slash command instead.
 Fuzzy search for files in the workspace.
 
 The search uses simple fuzzy matching - it finds files where the query characters appear in order within the filename. Exact matches are ranked higher than partial matches.
@@ -221,9 +213,7 @@ The AI model can automatically call these tools when needed during chat sessions
 ## Basic Security
 
 - All file operations are restricted to the current workspace directory
-- Configurable file extension allow-lists prevent access to sensitive files
-- Path sanitization prevents directory traversal attacks
-- Automatic backup creation for file modifications
+- Automatic backup creation for file modifications (needs refining)
 
 ## Development
 
@@ -254,40 +244,9 @@ npm run format            # Format code with Prettier
 npm run format:check      # Check code formatting
 ```
 
-## Testing
-
-Aiya includes a comprehensive test suite with **203+ automated tests**:
-
-- **Unit Tests (113 tests)**: Provider functionality, authentication, streaming, error handling
-- **Integration Tests (90 tests)**: Multi-provider scenarios, runtime switching, capability routing
-- **Mock Infrastructure**: Realistic provider behavior simulation for reliable testing
-- **Test Coverage**: >90% method coverage across all core functionality
-
-### Test Categories
-- Provider configuration and authentication
-- Chat functionality and streaming responses
-- Multi-provider capability detection and routing
-- Runtime provider switching and session management
-- Error handling and recovery scenarios
-- Token counting and usage tracking
-
-## Architecture
-
-Aiya is built with a modular architecture designed for extensibility:
-
-- **Terminal UI**: React/Ink-based modern terminal interface with streaming support
-- **Multi-Provider System**: Full support for Ollama, OpenAI, and Google Gemini with runtime switching
-- **Unified Command System**: CommandRegistry-based architecture for consistent slash command handling
-- **MCP Integration**: Model Context Protocol for secure file operations
-- **Context Management**: Session-based file context with automatic cleanup
-- **Testing Infrastructure**: Comprehensive test suite with mock providers and realistic behavior simulation
-- **Security Layer**: Workspace-restricted file access and validation
-- **CLI Interface**: Commander.js-based command structure with global options
-- **Development Quality**: ESLint and Prettier integration for consistent code quality
-
 ## Changelog
 
-- **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), comprehensive testing infrastructure (203+ tests), and improved setup wizard.
+- **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), vitest setup, and improved setup wizard.
 - **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 - **Version 1.0.0** - Basic terminal tool with Ollama support and filesystem MCP tooling.
 

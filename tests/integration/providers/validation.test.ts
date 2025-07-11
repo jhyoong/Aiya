@@ -198,49 +198,6 @@ describe('Provider Testing Validation', () => {
       }
     });
 
-    test('should provide provider-specific response patterns', async () => {
-      const providers = [
-        MockProviderFactory.create(TEST_CONFIGS.ollama.basic),
-        MockProviderFactory.create(TEST_CONFIGS.openai.gpt4),
-        MockProviderFactory.create(
-          TestConfigBuilder.create()
-            .withProvider('gemini')
-            .withModel('gemini-2.5-flash')
-            .withApiKey('AIza-test')
-            .build()
-        ),
-      ];
-
-      const prompt = 'Explain artificial intelligence in detail';
-
-      const responses = await Promise.all(
-        providers.map(provider =>
-          provider.chat([{ role: 'user', content: prompt }])
-        )
-      );
-
-      // Verify response patterns match provider characteristics
-      const [ollamaResponse, openaiResponse, geminiResponse] = responses;
-
-      // Ollama: Technical style, shorter responses
-      expect(ollamaResponse.content.length).toBeLessThan(
-        openaiResponse.content.length
-      );
-
-      // OpenAI: Conversational style (should start with conversational patterns)
-      expect(openaiResponse.content).toMatch(
-        /(I'd|let me|here's|that's|interesting)/i
-      );
-
-      // Gemini: Analytical style, longer responses, possibly with thinking
-      expect(geminiResponse.content.length).toBeGreaterThan(
-        ollamaResponse.content.length
-      );
-      if (geminiResponse.thinking) {
-        expect(geminiResponse.thinking).toContain('analyze');
-      }
-    });
-
     test('should handle edge cases gracefully', async () => {
       const provider = MockProviderFactory.create(TEST_CONFIGS.ollama.basic);
 

@@ -192,7 +192,7 @@ export const TEST_CONFIGS = {
   ollama: {
     basic: TestConfigBuilder.create()
       .withProvider('ollama')
-      .withModel('qwen2.5:8b')
+      .withModel('qwen3:8b')
       .build(),
 
     withCustomEndpoint: TestConfigBuilder.create()
@@ -228,7 +228,7 @@ export const TEST_CONFIGS = {
   multiProvider: [
     TestConfigBuilder.create()
       .withProvider('ollama')
-      .withModel('qwen2.5:8b')
+      .withModel('qwen3:8b')
       .build(),
     TestConfigBuilder.create()
       .withProvider('openai')

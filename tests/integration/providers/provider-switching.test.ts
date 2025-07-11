@@ -53,7 +53,7 @@ describe('Provider Switching Integration Tests', () => {
         { role: 'assistant' as const, content: response.content }
       );
 
-      expect(response.model).toBe('qwen2.5:8b');
+      expect(response.model).toBe('qwen3:8b');
       assertValidProviderResponse(response);
 
       // Phase 2: Switch to OpenAI
@@ -176,7 +176,7 @@ describe('Provider Switching Integration Tests', () => {
       // Failover to backup provider
       response = await fallbackProvider.chat(message);
       assertValidProviderResponse(response);
-      expect(response.model).toBe('qwen2.5:8b');
+      expect(response.model).toBe('qwen3:8b');
     });
 
     test('should handle authentication failure with provider switch', async () => {

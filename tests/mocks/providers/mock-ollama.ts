@@ -13,7 +13,7 @@ import type { ExtendedProviderConfig } from '@/core/config/manager';
 export class MockOllamaProvider extends BaseMockProvider {
   private static readonly OLLAMA_MODELS: MockModel[] = [
     {
-      id: 'qwen2.5:8b',
+      id: 'qwen3:8b',
       name: 'Qwen 2.5 8B',
       contextLength: 32768,
       capabilities: {
@@ -31,17 +31,7 @@ export class MockOllamaProvider extends BaseMockProvider {
         functionCalling: true,
         thinking: false,
       },
-    },
-    {
-      id: 'codellama:7b',
-      name: 'Code Llama 7B',
-      contextLength: 16384,
-      capabilities: {
-        vision: false,
-        functionCalling: true,
-        thinking: false,
-      },
-    },
+    }
   ];
 
   constructor(config: ExtendedProviderConfig) {
@@ -160,7 +150,7 @@ export function createMockOllamaProvider(
 ): MockOllamaProvider {
   const defaultConfig: ExtendedProviderConfig = {
     type: 'ollama',
-    model: 'qwen2.5:8b',
+    model: 'qwen3:8b',
     baseUrl: 'http://localhost:11434',
     capabilities: {
       maxTokens: 32768,

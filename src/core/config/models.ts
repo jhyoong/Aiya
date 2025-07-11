@@ -393,14 +393,14 @@ export const PROVIDER_DEFAULTS: Record<keyof ProviderModels, ProviderDefaults> =
       ],
       helpText: `Ollama Configuration Help:
 
-• Model: The name of the model to use (e.g., qwen2.5:8b, llama3.1:8b)
+• Model: The name of the model to use (e.g., qwen3:8b, llama3.1:8b)
 • Base URL: The Ollama server endpoint (default: http://localhost:11434)
 • Context Length: Maximum number of tokens for context window
 
 Prerequisites:
 1. Install Ollama: https://ollama.ai/
 2. Start Ollama server: ollama serve
-3. Pull a model: ollama pull qwen2.5:8b
+3. Pull a model: ollama pull qwen3:8b
 
 Popular models:
 • qwen3:8b - Balanced performance and speed

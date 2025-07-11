@@ -93,7 +93,7 @@ class OllamaTestSuite extends ProviderTestSuite {
 
         // Should support different model formats typical of Ollama
         const modelFormats = models.map(m => m.id.split(':')[0]);
-        expect(modelFormats).toContain('qwen2.5');
+        expect(modelFormats).toContain('qwen3');
         expect(modelFormats).toContain('llama3.2');
       });
 

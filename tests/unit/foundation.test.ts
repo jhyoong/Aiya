@@ -22,12 +22,12 @@ describe('Testing Infrastructure Foundation', () => {
     test('should create valid Ollama configuration', () => {
       const config = TestConfigBuilder.create()
         .withProvider('ollama')
-        .withModel('qwen2.5:8b')
+        .withModel('qwen3:8b')
         .build();
 
       assertValidConfig(config);
       expect(config.type).toBe('ollama');
-      expect(config.model).toBe('qwen2.5:8b');
+      expect(config.model).toBe('qwen3:8b');
       expect(config.baseUrl).toBe('http://localhost:11434');
     });
 
@@ -53,7 +53,7 @@ describe('Testing Infrastructure Foundation', () => {
       const ollamaConfig = TEST_CONFIGS.ollama.basic;
       assertValidConfig(ollamaConfig);
       expect(ollamaConfig.type).toBe('ollama');
-      expect(ollamaConfig.model).toBe('qwen2.5:8b');
+      expect(ollamaConfig.model).toBe('qwen3:8b');
     });
 
     test('should throw error for missing required fields', () => {
@@ -231,7 +231,7 @@ describe('Testing Infrastructure Integration', () => {
     // Create configuration
     const config = TestConfigBuilder.create()
       .withProvider('ollama')
-      .withModel('qwen2.5:8b')
+      .withModel('qwen3:8b')
       .build();
 
     // Create provider
