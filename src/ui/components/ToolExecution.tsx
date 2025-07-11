@@ -69,39 +69,44 @@ export const ToolExecution: React.FC<ToolExecutionProps> = ({
 
     return (
       <Box>
-        <Text color="gray">[</Text>
-        <Text color="green">{'█'.repeat(filled)}</Text>
-        <Text color="gray">{'░'.repeat(empty)}</Text>
-        <Text color="gray">] {progress}%</Text>
+        <Text color='gray'>[</Text>
+        <Text color='green'>{'█'.repeat(filled)}</Text>
+        <Text color='gray'>{'░'.repeat(empty)}</Text>
+        <Text color='gray'>] {progress}%</Text>
       </Box>
     );
   };
 
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1}>
+    <Box
+      flexDirection='column'
+      borderStyle='round'
+      borderColor='gray'
+      paddingX={1}
+    >
       <Box>
         <Text color={getStatusColor()}>
           {getStatusIcon()} {toolName}
         </Text>
-        <Text color="gray"> - {status}</Text>
+        <Text color='gray'> - {status}</Text>
       </Box>
-      
+
       {renderProgressBar()}
-      
+
       {output.length > 0 && (
-        <Box flexDirection="column" marginTop={1}>
-          <Text color="gray">Output:</Text>
+        <Box flexDirection='column' marginTop={1}>
+          <Text color='gray'>Output:</Text>
           {output.slice(-5).map((line: string, index: number) => (
-            <Text key={index} color="white">
+            <Text key={index} color='white'>
               {line}
             </Text>
           ))}
         </Box>
       )}
-      
+
       {error && (
         <Box marginTop={1}>
-          <Text color="red">Error: {error}</Text>
+          <Text color='red'>Error: {error}</Text>
         </Box>
       )}
     </Box>

@@ -21,7 +21,7 @@ program.addCommand(searchCommand); // Ink-based search interface
 program
   .option('-v, --verbose', 'Enable verbose logging')
   .option('--config <path>', 'Path to config file')
-  .hook('preAction', (thisCommand) => {
+  .hook('preAction', thisCommand => {
     const options = thisCommand.opts();
     if (options.verbose) {
       process.env.AIYA_VERBOSE = 'true';
@@ -32,14 +32,14 @@ program
   });
 
 // Error handling
-program.exitOverride();
+// program.exitOverride(); // Removed: causes help command to throw errors
 
 process.on('SIGINT', () => {
   console.log('\nGracefully shutting down...');
   process.exit(0);
 });
 
-process.on('uncaughtException', (error) => {
+process.on('uncaughtException', error => {
   console.error('Uncaught exception:', error);
   process.exit(1);
 });

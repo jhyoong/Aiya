@@ -1,13 +1,17 @@
-import React, { useState } from 'react';
-import { Box, Text, render } from 'ink';
-import { 
-  ChatInterface, 
-  SearchResults, 
-  ToolExecution, 
-  StatusBar, 
-  CommandInput 
+import React, { useState, useCallback } from 'react';
+import { Box, Text, render, useStdin } from 'ink';
+import {
+  ChatInterface,
+  SearchResults,
+  ToolExecution,
+  StatusBar,
+  CommandInput,
 } from './components/index.js';
 import { SuggestionEngine } from '../cli/suggestions.js';
+import { useTextBuffer } from './core/TextBuffer.js';
+import { useTerminalSize } from './hooks/useTerminalSize.js';
+import * as fs from 'fs';
+import { unescapePath } from './utils/textUtils.js';
 
 interface AiyaAppProps {
   onMessage?: (message: string) => Promise<string>;
@@ -35,7 +39,9 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
   provider,
   model,
 }) => {
-  const [currentMode, setCurrentMode] = useState<'chat' | 'search' | 'command' | 'tool'>(mode);
+  const [currentMode, setCurrentMode] = useState<
+    'chat' | 'search' | 'command' | 'tool'
+  >(mode);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [toolStatus] = useState<{
     name: string;
@@ -44,7 +50,39 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
     output?: string[];
     error?: string;
   } | null>(null);
-  const [appStatus] = useState<'idle' | 'processing' | 'error' | 'success'>('idle');
+  const [appStatus] = useState<'idle' | 'processing' | 'error' | 'success'>(
+    'idle'
+  );
+
+  // Terminal size and TextBuffer setup
+  const { columns: terminalWidth } = useTerminalSize();
+  const { stdin, setRawMode } = useStdin();
+
+  const isValidPath = useCallback((filePath: string): boolean => {
+    try {
+      const unescapedPath = unescapePath(filePath);
+      return (
+        fs.existsSync(unescapedPath) && fs.statSync(unescapedPath).isFile()
+      );
+    } catch (_e) {
+      return false;
+    }
+  }, []);
+
+  const widthFraction = 0.9;
+  const inputWidth = Math.max(
+    20,
+    Math.floor(terminalWidth * widthFraction) - 3
+  );
+
+  const buffer = useTextBuffer({
+    initialText: '',
+    viewport: { height: 10, width: inputWidth },
+    stdin,
+    setRawMode,
+    isValidPath,
+    shellModeActive: false,
+  });
 
   const handleChatMessage = async (message: string) => {
     if (onMessage) {
@@ -89,9 +127,11 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
             onExit={handleExit}
             provider={provider}
             model={model}
+            buffer={buffer}
+            inputWidth={inputWidth}
           />
         );
-      
+
       case 'search':
         return (
           <SearchResults
@@ -103,7 +143,7 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
             onExit={() => setCurrentMode('command')}
           />
         );
-      
+
       case 'tool':
         return toolStatus ? (
           <ToolExecution
@@ -114,36 +154,35 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
             error={toolStatus.error}
           />
         ) : null;
-      
+
       default:
         return (
           <CommandInput
             onCommand={handleCommand}
             onExit={handleExit}
-            prompt="aiya> "
+            prompt='aiya> '
             suggestionEngine={new SuggestionEngine()}
+            buffer={buffer}
+            inputWidth={inputWidth}
           />
         );
     }
   };
 
   return (
-    <Box flexDirection="column" height={24}>
+    <Box flexDirection='column' height={24}>
       <Box flexGrow={1} paddingY={1}>
         {renderCurrentMode()}
       </Box>
-      
-      <Box borderStyle="round" borderColor="gray" paddingX={1}>
-        <Text color="gray" dimColor>
-          Mode: {currentMode.toUpperCase()} | Use /chat, /search, /command to switch modes
+
+      <Box borderStyle='round' borderColor='gray' paddingX={1}>
+        <Text color='gray' dimColor>
+          Mode: {currentMode.toUpperCase()} | Use /chat, /search, /command to
+          switch modes
         </Text>
       </Box>
-      
-      <StatusBar
-        status={appStatus}
-        provider={provider}
-        model={model}
-      />
+
+      <StatusBar status={appStatus} provider={provider} model={model} />
     </Box>
   );
 };

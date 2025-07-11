@@ -1,4 +1,8 @@
-import { MCPClient, Tool as MCPTool, ToolResult as MCPToolResult } from '../mcp/base.js';
+import {
+  MCPClient,
+  Tool as MCPTool,
+  ToolResult as MCPToolResult,
+} from '../mcp/base.js';
 import { ToolCall, ToolResult } from '../providers/base.js';
 
 /**
@@ -19,7 +23,8 @@ export interface LLMTool {
  */
 export class MCPToolService {
   private clients: MCPClient[] = [];
-  private availableTools: Map<string, { client: MCPClient; tool: MCPTool }> = new Map();
+  private availableTools: Map<string, { client: MCPClient; tool: MCPTool }> =
+    new Map();
 
   constructor(clients: MCPClient[]) {
     this.clients = clients;
@@ -30,12 +35,12 @@ export class MCPToolService {
    */
   async initialize(): Promise<void> {
     this.availableTools.clear();
-    
+
     for (const client of this.clients) {
       if (!client.isConnected()) {
         await client.connect();
       }
-      
+
       try {
         const tools = await client.listTools();
         for (const tool of tools) {
@@ -44,7 +49,9 @@ export class MCPToolService {
           this.availableTools.set(toolName, { client, tool });
         }
       } catch (error) {
-        console.warn(`Failed to discover tools from ${client.getServerName()}: ${error}`);
+        console.warn(
+          `Failed to discover tools from ${client.getServerName()}: ${error}`
+        );
       }
     }
   }
@@ -54,7 +61,7 @@ export class MCPToolService {
    */
   getToolDefinitions(): LLMTool[] {
     const tools: LLMTool[] = [];
-    
+
     for (const [toolName, { tool }] of this.availableTools) {
       tools.push({
         name: toolName,
@@ -62,11 +69,11 @@ export class MCPToolService {
         parameters: {
           type: 'object',
           properties: tool.inputSchema.properties,
-          required: tool.inputSchema.required || []
-        }
+          required: tool.inputSchema.required || [],
+        },
       });
     }
-    
+
     return tools;
   }
 
@@ -79,31 +86,34 @@ export class MCPToolService {
       return {
         toolCallId: toolCall.id,
         result: `Error: Tool '${toolCall.name}' not found`,
-        isError: true
+        isError: true,
       };
     }
 
     try {
       const { client, tool } = toolInfo;
-      
+
       // Extract the original tool name (remove client prefix)
       const originalToolName = tool.name;
-      
-      const mcpResult = await client.callTool(originalToolName, toolCall.arguments);
-      
+
+      const mcpResult = await client.callTool(
+        originalToolName,
+        toolCall.arguments
+      );
+
       // Convert MCP result to tool result
       const result = this.formatMCPResult(mcpResult);
-      
+
       return {
         toolCallId: toolCall.id,
         result,
-        isError: mcpResult.isError || false
+        isError: mcpResult.isError || false,
       };
     } catch (error) {
       return {
         toolCallId: toolCall.id,
         result: `Error executing tool: ${error}`,
-        isError: true
+        isError: true,
       };
     }
   }
@@ -113,22 +123,25 @@ export class MCPToolService {
    */
   generateToolsSystemMessage(): string {
     const tools = this.getToolDefinitions();
-    
+
     if (tools.length === 0) {
       return '';
     }
 
-    let message = 'You have access to the following tools. When you need to use a tool, respond with a tool call in this exact format:\n\n';
-    message += '```json\n{\n  "tool_calls": [\n    {\n      "id": "call_123",\n      "name": "tool_name",\n      "arguments": {"param": "value"}\n    }\n  ]\n}\n```\n\n';
+    let message =
+      'You have access to the following tools. When you need to use a tool, respond with a tool call in this exact format:\n\n';
+    message +=
+      '```json\n{\n  "tool_calls": [\n    {\n      "id": "call_123",\n      "name": "tool_name",\n      "arguments": {"param": "value"}\n    }\n  ]\n}\n```\n\n';
     message += 'Available tools:\n\n';
-    
+
     for (const tool of tools) {
       message += `**${tool.name}**: ${tool.description}\n`;
       message += `Parameters: ${JSON.stringify(tool.parameters, null, 2)}\n\n`;
     }
-    
-    message += 'Only use tools when necessary to complete the user\'s request. Always explain what you\'re doing when using tools.';
-    
+
+    message +=
+      "Only use tools when necessary to complete the user's request. Always explain what you're doing when using tools.";
+
     return message;
   }
 
@@ -139,21 +152,21 @@ export class MCPToolService {
     try {
       // Look for JSON blocks containing tool_calls
       const jsonBlocks = content.match(/```json\s*(\{[\s\S]*?\})\s*```/g);
-      
+
       if (!jsonBlocks) {
         return null;
       }
-      
+
       for (const block of jsonBlocks) {
         const jsonContent = block.replace(/```json\s*|\s*```/g, '');
-        
+
         try {
           const parsed = JSON.parse(jsonContent);
           if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
             return parsed.tool_calls.map((call: any) => ({
               id: call.id || this.generateCallId(),
               name: call.name,
-              arguments: call.arguments || {}
+              arguments: call.arguments || {},
             }));
           }
         } catch {
@@ -161,7 +174,7 @@ export class MCPToolService {
           continue;
         }
       }
-      
+
       return null;
     } catch {
       return null;
@@ -179,7 +192,7 @@ export class MCPToolService {
     if (mcpResult.content.length === 0) {
       return 'No content returned';
     }
-    
+
     return mcpResult.content
       .map(item => {
         if (item.type === 'text') {

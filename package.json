@@ -1,6 +1,6 @@
 {
   "name": "aiya-cli",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Simple terminal tool for custom model endpoints",
   "keywords": [
     "ai",
@@ -30,25 +30,57 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "start": "node dist/cli/index.js",
-    "test": "echo \"Manual testing framework - see tests/integration/\"",
-    "lint": "echo \"Linting not configured yet\"",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest --watch",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:e2e": "vitest run tests/e2e",
+    "test:manual": "echo \"Manual testing framework - see tests/integration/\"",
+    "lint": "eslint src/ tests/",
+    "lint:fix": "eslint src/ tests/ --fix",
+    "format": "prettier --write src/ tests/",
+    "format:check": "prettier --check src/ tests/",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.56.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.842.0",
+    "@google/genai": "^1.8.0",
+    "@inkjs/ui": "^2.0.0",
     "chalk": "^5.3.0",
     "commander": "^12.0.0",
     "glob": "^10.3.0",
     "ink": "6.0.1",
     "ollama": "^0.5.0",
+    "openai": "^5.8.2",
     "react": "^19.1.0",
     "yaml": "^2.4.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^20.11.0",
     "@types/react": "^19.1.8",
-    "typescript": "^5.3.0"
+    "@types/testing-library__jest-dom": "^5.14.9",
+    "@typescript-eslint/eslint-plugin": "^8.36.0",
+    "@typescript-eslint/parser": "^8.36.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
+    "eslint": "^9.30.1",
+    "eslint-config-prettier": "^10.1.5",
+    "eslint-plugin-prettier": "^5.5.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "msw": "^2.10.3",
+    "prettier": "^3.6.2",
+    "typescript": "^5.3.0",
+    "vitest": "^3.2.4"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=20.0.0"
   }
 }

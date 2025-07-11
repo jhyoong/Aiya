@@ -30,10 +30,12 @@ export class WorkspaceSecurity {
 
     // Resolve the path to get absolute path
     const resolvedPath = path.resolve(targetPath);
-    
+
     // Check if path is within workspace
     if (!this.isWithinWorkspace(resolvedPath)) {
-      throw new SecurityError(`Path '${targetPath}' is outside workspace boundary`);
+      throw new SecurityError(
+        `Path '${targetPath}' is outside workspace boundary`
+      );
     }
 
     return resolvedPath;
@@ -67,25 +69,30 @@ export class WorkspaceSecurity {
     }
   }
 
-  async validateFileAccess(filePath: string, mode: 'read' | 'write'): Promise<string> {
+  async validateFileAccess(
+    filePath: string,
+    mode: 'read' | 'write'
+  ): Promise<string> {
     const validatedPath = this.validatePath(filePath);
     this.validateFileExtension(validatedPath);
-    
+
     if (mode === 'read') {
       try {
         await fs.access(validatedPath, fs.constants.R_OK);
       } catch {
-        throw new SecurityError(`File '${filePath}' is not readable or does not exist`);
+        throw new SecurityError(
+          `File '${filePath}' is not readable or does not exist`
+        );
       }
     }
-    
+
     await this.validateFileSize(validatedPath);
     return validatedPath;
   }
 
   sanitizePath(inputPath: string): string {
     // Remove potentially dangerous characters and sequences
-    let sanitized = inputPath
+    const sanitized = inputPath
       .replace(/\.\./g, '') // Remove directory traversal
       .replace(/[<>:"|?*]/g, '') // Remove invalid filename characters
       .replace(/^\/+/, '') // Remove leading slashes
@@ -95,7 +102,9 @@ export class WorkspaceSecurity {
     const dangerousPrefixes = ['/etc', '/usr', '/bin', '/sbin', '/var', '/tmp'];
     for (const prefix of dangerousPrefixes) {
       if (sanitized.startsWith(prefix)) {
-        throw new SecurityError(`Path cannot start with system directory: ${prefix}`);
+        throw new SecurityError(
+          `Path cannot start with system directory: ${prefix}`
+        );
       }
     }
 
@@ -113,7 +122,9 @@ export class WorkspaceSecurity {
     if (path.isAbsolute(sanitized)) {
       const relativePath = path.relative(this.workspaceRoot, sanitized);
       if (relativePath.startsWith('..')) {
-        throw new SecurityError('Glob pattern cannot reference paths outside workspace');
+        throw new SecurityError(
+          'Glob pattern cannot reference paths outside workspace'
+        );
       }
       return relativePath;
     }
@@ -144,7 +155,7 @@ export class WorkspaceSecurity {
 
   private isWithinWorkspace(targetPath: string): boolean {
     const relativePath = path.relative(this.workspaceRoot, targetPath);
-    
+
     // If relative path starts with '..', it's outside the workspace
     return !relativePath.startsWith('..') && !path.isAbsolute(relativePath);
   }

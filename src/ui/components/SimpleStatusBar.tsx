@@ -7,6 +7,21 @@ interface SimpleStatusBarProps {
   provider?: string | undefined;
   model?: string | undefined;
   contextLength?: number | undefined;
+  tokenUsage?:
+    | {
+        sent: number;
+        sentTotal: number;
+        received: number;
+        receivedTotal: number;
+      }
+    | undefined;
+  currentProvider?:
+    | {
+        name: string;
+        type: string;
+        model: string;
+      }
+    | undefined;
 }
 
 export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
@@ -15,6 +30,8 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
   provider,
   model,
   contextLength,
+  tokenUsage,
+  currentProvider,
 }) => {
   const getStatusIcon = () => {
     switch (status) {
@@ -31,12 +48,21 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
 
   return (
     <Box paddingX={1} paddingY={0}>
-      <Text color="gray">
+      <Text color='gray'>
         {getStatusIcon()} {status.toUpperCase()}
         {message && ` | ${message}`}
-        {provider && ` | ${provider}`}
-        {model && `:${model}`}
-        {contextLength && ` | ${contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx`}
+        {currentProvider ? (
+          ` | ${currentProvider.name}:${currentProvider.model}`
+        ) : (
+          <>
+            {provider && ` | ${provider}`}
+            {model && `:${model}`}
+          </>
+        )}
+        {contextLength &&
+          ` | ${contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx`}
+        {tokenUsage &&
+          ` | [Tokens: sent ${tokenUsage.sent} (${tokenUsage.sentTotal}), received ${tokenUsage.received} (${tokenUsage.receivedTotal})]`}
       </Text>
     </Box>
   );

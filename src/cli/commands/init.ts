@@ -1,75 +1,97 @@
 import { Command } from 'commander';
-import chalk from 'chalk';
-import { ConfigManager } from '../../core/config/manager.js';
-import { OllamaProvider } from '../../core/providers/ollama.js';
+import { render } from 'ink';
+import React from 'react';
+import { SetupWizard } from '../../ui/components/setup/SetupWizard.js';
 
 export const initCommand = new Command('init')
   .description('Initialize Aiya configuration for current project')
-  .option('-m, --model <model>', 'Specify the model to use', 'qwen2.5:8b')
-  .option('--base-url <url>', 'Ollama base URL', 'http://localhost:11434')
-  .option('--check-connection', 'Check connection to Ollama server')
-  .action(async (options) => {
+  .option('--skip-validation', 'Skip connection testing during setup')
+  .option(
+    '--non-interactive',
+    'Run in non-interactive mode (not yet implemented)'
+  )
+  .action(async options => {
     try {
-      console.log(chalk.blue('🚀 Initializing Aiya...'));
-      
-      const configManager = new ConfigManager();
-      
-      // Check Ollama connection if requested
-      if (options.checkConnection) {
-        console.log(chalk.yellow('🔍 Checking Ollama connection...'));
-        await checkOllamaConnection(options.model, options.baseUrl);
-      }
-      
-      // Initialize configuration
-      await configManager.init(options.model, options.baseUrl);
-      
-      console.log(chalk.green('Aiya initialized successfully!'));
-      console.log(chalk.gray(`   Model: ${options.model}`));
-      console.log(chalk.gray(`   Endpoint: ${options.baseUrl}`));
-      console.log(chalk.gray(`   Config created: .aiya.yaml`));
-      
-      // Show next steps
-      console.log(chalk.blue('\nNext steps:'));
-      console.log(chalk.gray('   • Run `aiya chat` to start a conversation'));
-      console.log(chalk.gray('   • Run `aiya search <pattern>` to search files'));
-      console.log(chalk.gray('   • Edit .aiya.yaml to customize settings'));
-      
+      // Start the interactive setup wizard
+      await runSetupWizard(process.cwd(), options);
     } catch (error) {
-      console.error(chalk.red('❌ Failed to initialize Aiya:'));
-      console.error(chalk.red(`   ${error}`));
+      console.error(
+        '❌ Setup failed:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
       process.exit(1);
     }
   });
 
-async function checkOllamaConnection(model: string, baseUrl: string): Promise<void> {
-  try {
-    const provider = new OllamaProvider(model, baseUrl);
-    
-    // Check if Ollama is healthy
-    const isHealthy = await provider.isHealthy();
-    if (!isHealthy) {
-      throw new Error('Ollama server is not responding');
-    }
-    
-    // Check if model is available
-    const availableModels = await provider.listAvailableModels();
-    if (!availableModels.includes(model)) {
-      console.log(chalk.yellow(`⚠️  Model '${model}' not found. Available models:`));
-      availableModels.forEach(m => console.log(chalk.gray(`   • ${m}`)));
-      console.log(chalk.yellow(`\nTo pull the model, run: ollama pull ${model}`));
-      throw new Error(`Model '${model}' is not available`);
-    }
-    
-    console.log(chalk.green('Ollama connection successful'));
-    console.log(chalk.gray(`   Model '${model}' is available`));
-    
-  } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('ECONNREFUSED')) {
-        throw new Error('Could not connect to Ollama server. Make sure Ollama is running.');
+interface SetupOptions {
+  skipValidation?: boolean;
+  nonInteractive?: boolean;
+}
+
+async function runSetupWizard(
+  projectPath: string,
+  _options: SetupOptions
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const handleComplete = (success: boolean, _configPath?: string) => {
+      if (success) {
+        resolve();
+      } else {
+        reject(new Error('Setup was cancelled or failed'));
       }
-      throw error;
-    }
-    throw new Error('Unknown error occurred while checking Ollama connection');
-  }
+    };
+
+    const handleError = (error: string) => {
+      reject(new Error(error));
+    };
+
+    // Render the SetupWizard component
+    const { unmount } = render(
+      React.createElement(SetupWizard, {
+        projectPath,
+        onComplete: handleComplete,
+        onError: handleError,
+      })
+    );
+
+    // Handle Ctrl+C gracefully
+    const handleInterrupt = () => {
+      unmount();
+      console.log('\n\n❌ Setup cancelled by user');
+      process.exit(0);
+    };
+
+    process.on('SIGINT', handleInterrupt);
+    process.on('SIGTERM', handleInterrupt);
+
+    // Clean up event listeners when setup completes
+    const cleanup = () => {
+      process.removeListener('SIGINT', handleInterrupt);
+      process.removeListener('SIGTERM', handleInterrupt);
+      unmount();
+    };
+
+    // Override the onComplete handler to include cleanup
+    const originalOnComplete = handleComplete;
+    const wrappedOnComplete = (success: boolean, configPath?: string) => {
+      cleanup();
+      originalOnComplete(success, configPath);
+    };
+
+    const originalOnError = handleError;
+    const wrappedOnError = (error: string) => {
+      cleanup();
+      originalOnError(error);
+    };
+
+    // Re-render with wrapped handlers
+    unmount();
+    render(
+      React.createElement(SetupWizard, {
+        projectPath,
+        onComplete: wrappedOnComplete,
+        onError: wrappedOnError,
+      })
+    );
+  });
 }

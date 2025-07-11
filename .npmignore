@@ -29,3 +29,6 @@ node_modules/
 
 # Claude Code files
 .claude/
+
+# Github
+.github/
