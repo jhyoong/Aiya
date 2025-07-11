@@ -1,10 +1,10 @@
-export { 
+export {
   BaseProviderErrorHandler,
   ProviderErrorType,
   ErrorContext,
   ProviderError,
   ProviderSuccess,
-  ProviderResult
+  ProviderResult,
 } from './BaseProviderErrorHandler.js';
 
 export { OllamaErrorMapper } from './OllamaErrorMapper.js';

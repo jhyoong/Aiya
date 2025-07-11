@@ -12,6 +12,7 @@ Artificial Intelligence: Your Assistant (AIYA). A modern terminal tool for AI-as
 - **Multi-Provider Support**: Seamless integration with Ollama, OpenAI, and Google Gemini
 - **Runtime Provider Switching**: Switch between AI providers mid-conversation with `/model-switch`
 - **Modern Terminal UI**: Built with React/Ink for clean, responsive terminal interface
+- **Unified Command System**: Consistent slash command handling through CommandRegistry architecture
 - **Reactive Interface**: Slash command suggestions with smart tab completion and autocomplete
 - **Interactive Chat Sessions**: AI conversations with streaming responses and thinking display
 - **Context Management**: Add files to conversation context with visual feedback
@@ -245,6 +246,12 @@ npm run test:run          # All tests (single run)
 npm run test:unit         # Unit tests only
 npm run test:integration  # Integration tests only
 npm run test:coverage     # Tests with coverage report
+
+# Code quality and formatting
+npm run lint              # Run ESLint on source code
+npm run lint:fix          # Auto-fix ESLint issues
+npm run format            # Format code with Prettier
+npm run format:check      # Check code formatting
 ```
 
 ## Testing
@@ -270,15 +277,17 @@ Aiya is built with a modular architecture designed for extensibility:
 
 - **Terminal UI**: React/Ink-based modern terminal interface with streaming support
 - **Multi-Provider System**: Full support for Ollama, OpenAI, and Google Gemini with runtime switching
+- **Unified Command System**: CommandRegistry-based architecture for consistent slash command handling
 - **MCP Integration**: Model Context Protocol for secure file operations
 - **Context Management**: Session-based file context with automatic cleanup
 - **Testing Infrastructure**: Comprehensive test suite with mock providers and realistic behavior simulation
 - **Security Layer**: Workspace-restricted file access and validation
 - **CLI Interface**: Commander.js-based command structure with global options
+- **Development Quality**: ESLint and Prettier integration for consistent code quality
 
 ## Changelog
 
-- **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, comprehensive test suite (203+ tests), enhanced token tracking, and improved setup wizard.
+- **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), comprehensive testing infrastructure (203+ tests), and improved setup wizard.
 - **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 - **Version 1.0.0** - Basic terminal tool with Ollama support and filesystem MCP tooling.
 

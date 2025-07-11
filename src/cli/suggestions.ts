@@ -13,16 +13,17 @@ export interface SuggestionResult {
 }
 
 export class SuggestionEngine {
-
   /**
    * Convert CommandDefinition to SlashCommand for backward compatibility
    */
-  private static convertToSlashCommand(command: CommandDefinition): SlashCommand {
+  private static convertToSlashCommand(
+    command: CommandDefinition
+  ): SlashCommand {
     return {
       name: command.name,
       usage: command.usage,
       description: command.description,
-      ...(command.parameters && { parameters: command.parameters })
+      ...(command.parameters && { parameters: command.parameters }),
     };
   }
 
@@ -30,7 +31,7 @@ export class SuggestionEngine {
    * Get all commands from the CommandRegistry
    */
   private getCommands(): SlashCommand[] {
-    return CommandRegistry.getAllCommands().map(cmd => 
+    return CommandRegistry.getAllCommands().map(cmd =>
       SuggestionEngine.convertToSlashCommand(cmd)
     );
   }
@@ -45,32 +46,34 @@ export class SuggestionEngine {
     if (input === '/') {
       const commands = this.getCommands();
       const firstCommand = commands[0];
-      return firstCommand ? {
-        displayText: firstCommand.usage,
-        completionText: `/${firstCommand.name}`
-      } : null;
+      return firstCommand
+        ? {
+            displayText: firstCommand.usage,
+            completionText: `/${firstCommand.name}`,
+          }
+        : null;
     }
 
     const commandPart = input.slice(1); // Remove the '/'
-    
+
     // Use CommandRegistry for exact match
     const exactMatch = CommandRegistry.getCommand(commandPart);
     if (exactMatch) {
       return {
         displayText: exactMatch.usage,
-        completionText: `/${exactMatch.name}`
+        completionText: `/${exactMatch.name}`,
       };
     }
 
     // Use CommandRegistry for partial matches
     const partialMatches = CommandRegistry.findCommands(commandPart);
-    
+
     if (partialMatches.length === 1) {
       const match = partialMatches[0];
       if (match) {
         return {
           displayText: match.usage,
-          completionText: `/${match.name}`
+          completionText: `/${match.name}`,
         };
       }
     }
@@ -81,7 +84,7 @@ export class SuggestionEngine {
       if (firstMatch) {
         return {
           displayText: firstMatch.usage,
-          completionText: `/${firstMatch.name}`
+          completionText: `/${firstMatch.name}`,
         };
       }
     }

@@ -11,7 +11,12 @@ import os from 'os';
 import pathMod from 'path';
 import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
 import stringWidth from 'string-width';
-import { toCodePoints, cpLen, cpSlice, unescapePath } from '../utils/textUtils.js';
+import {
+  toCodePoints,
+  cpLen,
+  cpSlice,
+  unescapePath,
+} from '../utils/textUtils.js';
 
 export type Direction =
   | 'left'
@@ -40,7 +45,7 @@ function isWordChar(ch: string | undefined): boolean {
 function stripUnsafeCharacters(str: string): string {
   const stripped = stripAnsi(str);
   return toCodePoints(stripAnsi(stripped))
-    .filter((char) => {
+    .filter(char => {
       if (char.length > 1) return false;
       const code = char.codePointAt(0);
       if (code === undefined) {
@@ -81,7 +86,7 @@ interface UndoHistoryEntry {
 
 function calculateInitialCursorPosition(
   initialLines: string[],
-  offset: number,
+  offset: number
 ): [number, number] {
   let remainingChars = offset;
   let row = 0;
@@ -114,7 +119,7 @@ function calculateInitialCursorPosition(
 
 export function offsetToLogicalPos(
   text: string,
-  offset: number,
+  offset: number
 ): [number, number] {
   let row = 0;
   let col = 0;
@@ -165,7 +170,7 @@ export function offsetToLogicalPos(
 function calculateVisualLayout(
   logicalLines: string[],
   logicalCursor: [number, number],
-  viewportWidth: number,
+  viewportWidth: number
 ): {
   visualLines: string[];
   visualCursor: [number, number];
@@ -215,7 +220,7 @@ function calculateVisualLayout(
               currentChunk = codePointsInLogLine
                 .slice(
                   currentPosInLogLine,
-                  currentPosInLogLine + numCodePointsAtLastWordBreak,
+                  currentPosInLogLine + numCodePointsAtLastWordBreak
                 )
                 .join('');
               numCodePointsInChunk = numCodePointsAtLastWordBreak;
@@ -298,7 +303,8 @@ function calculateVisualLayout(
               cursorLogCol - currentPosInLogLine,
             ];
           } else if (
-            cursorLogCol === currentPosInLogLine + numCodePointsInChunk
+            cursorLogCol ===
+            currentPosInLogLine + numCodePointsInChunk
           ) {
             currentVisualCursor = [
               visualLines.length - 1,
@@ -363,7 +369,10 @@ function calculateVisualLayout(
     visualLines.length > 0
   ) {
     const lastVisLineIdx = visualLines.length - 1;
-    currentVisualCursor = [lastVisLineIdx, cpLen(visualLines[lastVisLineIdx] || '')];
+    currentVisualCursor = [
+      lastVisLineIdx,
+      cpLen(visualLines[lastVisLineIdx] || ''),
+    ];
   }
 
   return {
@@ -423,7 +432,7 @@ type TextBufferAction =
 
 export function textBufferReducer(
   state: TextBufferState,
-  action: TextBufferAction,
+  action: TextBufferAction
 ): TextBufferState {
   const pushUndo = (currentState: TextBufferState): TextBufferState => {
     const snapshot = {
@@ -470,7 +479,7 @@ export function textBufferReducer(
       const currentLine = (r: number) => newLines[r] ?? '';
 
       const str = stripUnsafeCharacters(
-        action.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n'),
+        action.payload.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
       );
       const parts = str.split('\n');
       const lineContent = currentLine(newCursorRow);
@@ -485,7 +494,7 @@ export function textBufferReducer(
         newLines.splice(
           newCursorRow + parts.length - 1,
           0,
-          lastPartOriginal + after,
+          lastPartOriginal + after
         );
         newCursorRow = newCursorRow + parts.length - 1;
         newCursorCol = cpLen(lastPartOriginal);
@@ -551,7 +560,7 @@ export function textBufferReducer(
       const visualLayout = calculateVisualLayout(
         lines,
         [cursorRow, cursorCol],
-        viewportWidth,
+        viewportWidth
       );
       const { visualLines, visualCursor, visualToLogicalMap } = visualLayout;
 
@@ -587,7 +596,7 @@ export function textBufferReducer(
             newVisualCol = clamp(
               newPreferredCol,
               0,
-              cpLen(visualLines[newVisualRow] ?? ''),
+              cpLen(visualLines[newVisualRow] ?? '')
             );
           }
           break;
@@ -598,7 +607,7 @@ export function textBufferReducer(
             newVisualCol = clamp(
               newPreferredCol,
               0,
-              cpLen(visualLines[newVisualRow] ?? ''),
+              cpLen(visualLines[newVisualRow] ?? '')
             );
           }
           break;
@@ -689,7 +698,7 @@ export function textBufferReducer(
           cursorCol: clamp(
             logStartCol + newVisualCol,
             0,
-            cpLen(state.lines[logRow] ?? ''),
+            cpLen(state.lines[logRow] ?? '')
           ),
           preferredCol: newPreferredCol,
         };
@@ -907,7 +916,7 @@ export function textBufferReducer(
             endRow - startRow + 1,
             firstLine,
             ...middleLines,
-            lastLine,
+            lastLine
           );
         }
       }
@@ -930,7 +939,7 @@ export function textBufferReducer(
       const { offset } = action.payload;
       const [newRow, newCol] = offsetToLogicalPos(
         state.lines.join('\n'),
-        offset,
+        offset
       );
       return {
         ...state,
@@ -968,7 +977,7 @@ export function useTextBuffer({
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
       lines.length === 0 ? [''] : lines,
-      initialCursorOffset,
+      initialCursorOffset
     );
     return {
       lines: lines.length === 0 ? [''] : lines,
@@ -991,7 +1000,7 @@ export function useTextBuffer({
   const visualLayout = useMemo(
     () =>
       calculateVisualLayout(lines, [cursorRow, cursorCol], state.viewportWidth),
-    [lines, cursorRow, cursorCol, state.viewportWidth],
+    [lines, cursorRow, cursorCol, state.viewportWidth]
   );
 
   const { visualLines, visualCursor } = visualLayout;
@@ -1031,7 +1040,11 @@ export function useTextBuffer({
       }
 
       const minLengthToInferAsDragDrop = 3;
-      if (ch.length >= minLengthToInferAsDragDrop && !shellModeActive && !isPasteOperation) {
+      if (
+        ch.length >= minLengthToInferAsDragDrop &&
+        !shellModeActive &&
+        !isPasteOperation
+      ) {
         let potentialPath = ch;
         if (
           potentialPath.length > 2 &&
@@ -1063,7 +1076,7 @@ export function useTextBuffer({
         dispatch({ type: 'insert', payload: currentText });
       }
     },
-    [isValidPath, shellModeActive],
+    [isValidPath, shellModeActive]
   );
 
   const newline = useCallback((): void => {
@@ -1152,7 +1165,7 @@ export function useTextBuffer({
         }
       }
     },
-    [text, stdin, setRawMode],
+    [text, stdin, setRawMode]
   );
 
   const handleInput = useCallback(
@@ -1171,9 +1184,10 @@ export function useTextBuffer({
       }
 
       // Detect potential paste operations (fallback for terminals without bracketed paste)
-      const isPotentialPaste = key.sequence && 
-        key.sequence.length > 50 && 
-        key.sequence.includes('\n') && 
+      const isPotentialPaste =
+        key.sequence &&
+        key.sequence.length > 50 &&
+        key.sequence.includes('\n') &&
         !key.name;
 
       if (isPotentialPaste) {
@@ -1188,16 +1202,11 @@ export function useTextBuffer({
         newline();
       }
       // Handle regular Enter (for submission - will be handled by parent component)
-      else if (
-        key.name === 'return' ||
-        input === '\r' ||
-        input === '\n'
-      ) {
+      else if (key.name === 'return' || input === '\r' || input === '\n') {
         // Don't insert newline for regular enter - let parent handle submission
         // This allows UnifiedInput to distinguish between Shift+Enter (newline) and Enter (submit)
         return;
-      }
-      else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
+      } else if (key.name === 'left' && !key.meta && !key.ctrl) move('left');
       else if (key.ctrl && key.name === 'b') move('left');
       else if (key.ctrl && key.name === 'left') move('left');
       else if (key.name === 'right' && !key.meta && !key.ctrl) move('right');
@@ -1218,7 +1227,7 @@ export function useTextBuffer({
       else if (key.ctrl && key.name === 'e') move('end');
       else if (key.ctrl && key.name === 'w') deleteWordLeft();
       else if (
-        (key.meta) &&
+        key.meta &&
         (key.name === 'backspace' ||
           (input === '\x7f' && key.name !== 'delete'))
       )
@@ -1237,12 +1246,12 @@ export function useTextBuffer({
         insert(input);
       }
     },
-    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert],
+    [newline, move, deleteWordLeft, deleteWordRight, backspace, del, insert]
   );
 
   const renderedVisualLines = useMemo(
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
-    [visualLines, visualScrollRow, viewport.height],
+    [visualLines, visualScrollRow, viewport.height]
   );
 
   const replaceRange = useCallback(
@@ -1251,14 +1260,14 @@ export function useTextBuffer({
       startCol: number,
       endRow: number,
       endCol: number,
-      text: string,
+      text: string
     ): void => {
       dispatch({
         type: 'replace_range',
         payload: { startRow, startCol, endRow, endCol, text },
       });
     },
-    [],
+    []
   );
 
   const replaceRangeByOffset = useCallback(
@@ -1267,7 +1276,7 @@ export function useTextBuffer({
       const [endRow, endCol] = offsetToLogicalPos(text, endOffset);
       replaceRange(startRow, startCol, endRow, endCol, replacementText);
     },
-    [text, replaceRange],
+    [text, replaceRange]
   );
 
   const moveToOffset = useCallback((offset: number): void => {
@@ -1360,7 +1369,7 @@ export interface TextBuffer {
     startCol: number,
     endRow: number,
     endCol: number,
-    text: string,
+    text: string
   ) => void;
   /**
    * Delete the word to the *left* of the caret, mirroring common
@@ -1414,7 +1423,7 @@ export interface TextBuffer {
   replaceRangeByOffset: (
     startOffset: number,
     endOffset: number,
-    replacementText: string,
+    replacementText: string
   ) => void;
   moveToOffset(offset: number): void;
 }

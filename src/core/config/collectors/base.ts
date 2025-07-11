@@ -15,7 +15,10 @@ export abstract class BaseProviderCollector {
   protected providerType: ExtendedProviderConfig['type'];
   protected options: CollectorOptions;
 
-  constructor(providerType: ExtendedProviderConfig['type'], options: CollectorOptions = {}) {
+  constructor(
+    providerType: ExtendedProviderConfig['type'],
+    options: CollectorOptions = {}
+  ) {
     this.providerType = providerType;
     this.options = options;
   }
@@ -33,12 +36,16 @@ export abstract class BaseProviderCollector {
   /**
    * Test connection to the provider
    */
-  abstract testConnection(config: ExtendedProviderConfig): Promise<ConnectionTestResult>;
+  abstract testConnection(
+    config: ExtendedProviderConfig
+  ): Promise<ConnectionTestResult>;
 
   /**
    * Get available models for the provider
    */
-  abstract getAvailableModels(config: Partial<ExtendedProviderConfig>): Promise<string[]>;
+  abstract getAvailableModels(
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]>;
 
   /**
    * Get default configuration for the provider
@@ -60,7 +67,7 @@ export abstract class BaseProviderCollector {
       gemini: 'Google Gemini - Gemini models',
       anthropic: 'Anthropic - Claude models',
       azure: 'Azure OpenAI - Enterprise GPT',
-      bedrock: 'AWS Bedrock - Various models'
+      bedrock: 'AWS Bedrock - Various models',
     };
     return displayNames[this.providerType] || this.providerType;
   }
@@ -75,7 +82,7 @@ export abstract class BaseProviderCollector {
       gemini: 'Paid API, large context windows, vision support',
       anthropic: 'Paid API, 200K context, thinking mode',
       azure: 'Enterprise deployment, custom models',
-      bedrock: 'AWS managed, multiple model providers'
+      bedrock: 'AWS managed, multiple model providers',
     };
     return capabilities[this.providerType] || 'Provider-specific capabilities';
   }
@@ -87,11 +94,11 @@ export abstract class BaseProviderCollector {
     if (!apiKey || apiKey.trim().length === 0) {
       return false;
     }
-    
+
     if (prefix && !apiKey.startsWith(prefix)) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -112,7 +119,7 @@ export abstract class BaseProviderCollector {
    */
   protected handleConnectionError(error: any): ConnectionTestResult {
     const errorMessage = error?.message || 'Unknown error occurred';
-    
+
     if (errorMessage.includes('ECONNREFUSED')) {
       return {
         success: false,
@@ -120,11 +127,11 @@ export abstract class BaseProviderCollector {
         suggestions: [
           'Check if the service is running',
           'Verify the endpoint URL is correct',
-          'Check firewall and network settings'
-        ]
+          'Check firewall and network settings',
+        ],
       };
     }
-    
+
     if (errorMessage.includes('ENOTFOUND')) {
       return {
         success: false,
@@ -132,11 +139,11 @@ export abstract class BaseProviderCollector {
         suggestions: [
           'Check if the hostname is correct',
           'Verify DNS resolution',
-          'Check internet connectivity'
-        ]
+          'Check internet connectivity',
+        ],
       };
     }
-    
+
     if (errorMessage.includes('401') || errorMessage.includes('403')) {
       return {
         success: false,
@@ -144,15 +151,15 @@ export abstract class BaseProviderCollector {
         suggestions: [
           'Check if the API key is correct',
           'Verify API key permissions',
-          'Check if the API key is active'
-        ]
+          'Check if the API key is active',
+        ],
       };
     }
-    
+
     return {
       success: false,
       error: errorMessage,
-      suggestions: ['Check the error details and try again']
+      suggestions: ['Check the error details and try again'],
     };
   }
 }

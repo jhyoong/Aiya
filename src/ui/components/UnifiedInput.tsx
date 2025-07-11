@@ -46,7 +46,8 @@ export function UnifiedInput({
   inputWidth,
   focus = true,
 }: UnifiedInputProps) {
-  const [currentSuggestion, setCurrentSuggestion] = React.useState<SuggestionResult | null>(null);
+  const [currentSuggestion, setCurrentSuggestion] =
+    React.useState<SuggestionResult | null>(null);
   const [escapeCount, setEscapeCount] = React.useState(0);
   const escapeTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   const submitTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -59,115 +60,131 @@ export function UnifiedInput({
         buffer.setText(newText);
       }
     }
-    
+
     if (onTab) {
       onTab();
     }
   }, [currentSuggestion, buffer, onTab]);
 
   // Handle keyboard input using useKeypress hook
-  const handleKeypress = useCallback((key: any) => {
-    if (!focus) {
-      return;
-    }
-
-    // Detect potential paste operations (fallback for terminals without bracketed paste)
-    const isPotentialPaste = key.sequence && 
-      key.sequence.length > 50 && 
-      key.sequence.includes('\n') && 
-      !key.name;
-
-    // Handle paste events - don't submit, just insert
-    if (key.paste || isPotentialPaste) {
-      try {
-        buffer.handleInput(key);
-      } catch (error) {
-        console.error('Error handling paste input in TextBuffer:', error, { key });
-      }
-      return;
-    }
-
-    // Handle component-level keys before passing to TextBuffer
-    
-    // Handle Shift+Enter: let TextBuffer handle it for newline insertion
-    if (key.name === 'shift+return' && !key.paste && !isPotentialPaste) {
-      try {
-        buffer.handleInput(key);
-      } catch (error) {
-        console.error('Error handling Shift+Enter in TextBuffer:', error, { key });
-      }
-      return;
-    }
-    
-    // Handle regular Enter: submit the message
-    if (key.name === 'return' && !key.paste && !isPotentialPaste) {
-      // Clear any existing submit timeout to prevent double submission
-      if (submitTimeoutRef.current) {
-        clearTimeout(submitTimeoutRef.current);
-        submitTimeoutRef.current = null;
+  const handleKeypress = useCallback(
+    (key: any) => {
+      if (!focus) {
+        return;
       }
 
-      // Add small debounce to prevent rapid multiple submissions
-      submitTimeoutRef.current = setTimeout(() => {
-        if (onSubmit) {
-          onSubmit(buffer.text);
+      // Detect potential paste operations (fallback for terminals without bracketed paste)
+      const isPotentialPaste =
+        key.sequence &&
+        key.sequence.length > 50 &&
+        key.sequence.includes('\n') &&
+        !key.name;
+
+      // Handle paste events - don't submit, just insert
+      if (key.paste || isPotentialPaste) {
+        try {
+          buffer.handleInput(key);
+        } catch (error) {
+          console.error('Error handling paste input in TextBuffer:', error, {
+            key,
+          });
         }
-        submitTimeoutRef.current = null;
-      }, 10); // Very small delay to catch rapid events
-      return;
-    }
-
-    if (key.name === 'escape') {
-      if (escapeTimeoutRef.current) {
-        clearTimeout(escapeTimeoutRef.current);
+        return;
       }
-      
-      const newEscapeCount = escapeCount + 1;
-      setEscapeCount(newEscapeCount);
-      
-      if (newEscapeCount >= 2) {
-        // Second ESC press - exit
-        if (onEscape) {
-          onEscape();
+
+      // Handle component-level keys before passing to TextBuffer
+
+      // Handle Shift+Enter: let TextBuffer handle it for newline insertion
+      if (key.name === 'shift+return' && !key.paste && !isPotentialPaste) {
+        try {
+          buffer.handleInput(key);
+        } catch (error) {
+          console.error('Error handling Shift+Enter in TextBuffer:', error, {
+            key,
+          });
         }
-        setEscapeCount(0);
-      } else {
-        // First ESC press - set timeout to reset counter
-        escapeTimeoutRef.current = setTimeout(() => {
+        return;
+      }
+
+      // Handle regular Enter: submit the message
+      if (key.name === 'return' && !key.paste && !isPotentialPaste) {
+        // Clear any existing submit timeout to prevent double submission
+        if (submitTimeoutRef.current) {
+          clearTimeout(submitTimeoutRef.current);
+          submitTimeoutRef.current = null;
+        }
+
+        // Add small debounce to prevent rapid multiple submissions
+        submitTimeoutRef.current = setTimeout(() => {
+          if (onSubmit) {
+            onSubmit(buffer.text);
+          }
+          submitTimeoutRef.current = null;
+        }, 10); // Very small delay to catch rapid events
+        return;
+      }
+
+      if (key.name === 'escape') {
+        if (escapeTimeoutRef.current) {
+          clearTimeout(escapeTimeoutRef.current);
+        }
+
+        const newEscapeCount = escapeCount + 1;
+        setEscapeCount(newEscapeCount);
+
+        if (newEscapeCount >= 2) {
+          // Second ESC press - exit
+          if (onEscape) {
+            onEscape();
+          }
           setEscapeCount(0);
-        }, 1000); // Reset after 1 second
+        } else {
+          // First ESC press - set timeout to reset counter
+          escapeTimeoutRef.current = setTimeout(() => {
+            setEscapeCount(0);
+          }, 1000); // Reset after 1 second
+        }
+        return;
       }
-      return;
-    }
 
-    if (key.name === 'tab') {
-      handleTabCompletion();
-      return;
-    }
-
-    if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
-      if (onCancel) {
-        onCancel();
+      if (key.name === 'tab') {
+        handleTabCompletion();
+        return;
       }
-      return;
-    }
 
-    // Reset escape count on other key presses
-    if (escapeCount > 0) {
-      setEscapeCount(0);
-      if (escapeTimeoutRef.current) {
-        clearTimeout(escapeTimeoutRef.current);
-        escapeTimeoutRef.current = null;
+      if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
+        if (onCancel) {
+          onCancel();
+        }
+        return;
       }
-    }
 
-    // Pass all other keys directly to TextBuffer - no adaptation needed!
-    try {
-      buffer.handleInput(key);
-    } catch (error) {
-      console.error('Error handling input in TextBuffer:', error, { key });
-    }
-  }, [focus, buffer, onSubmit, onEscape, onCancel, handleTabCompletion, escapeCount]);
+      // Reset escape count on other key presses
+      if (escapeCount > 0) {
+        setEscapeCount(0);
+        if (escapeTimeoutRef.current) {
+          clearTimeout(escapeTimeoutRef.current);
+          escapeTimeoutRef.current = null;
+        }
+      }
+
+      // Pass all other keys directly to TextBuffer - no adaptation needed!
+      try {
+        buffer.handleInput(key);
+      } catch (error) {
+        console.error('Error handling input in TextBuffer:', error, { key });
+      }
+    },
+    [
+      focus,
+      buffer,
+      onSubmit,
+      onEscape,
+      onCancel,
+      handleTabCompletion,
+      escapeCount,
+    ]
+  );
 
   // Cleanup timeouts on unmount
   React.useEffect(() => {
@@ -194,7 +211,8 @@ export function UnifiedInput({
 
   const renderInputText = () => {
     const linesToRender = buffer.viewportVisualLines;
-    const [cursorVisualRowAbsolute, cursorVisualColAbsolute] = buffer.visualCursor;
+    const [cursorVisualRowAbsolute, cursorVisualColAbsolute] =
+      buffer.visualCursor;
     const scrollVisualRow = buffer.visualScrollRow;
 
     if (buffer.text.length === 0 && placeholder) {
@@ -209,12 +227,12 @@ export function UnifiedInput({
     }
 
     return (
-      <Box flexDirection="column">
+      <Box flexDirection='column'>
         {linesToRender.map((lineText, visualIdxInRenderedSet) => {
           const cursorVisualRow = cursorVisualRowAbsolute - scrollVisualRow;
           let display = cpSlice(lineText, 0, inputWidth);
           const currentVisualWidth = stringWidth(display);
-          
+
           if (currentVisualWidth < inputWidth) {
             display = display + ' '.repeat(inputWidth - currentVisualWidth);
           }
@@ -227,7 +245,7 @@ export function UnifiedInput({
                   cpSlice(
                     display,
                     relativeVisualColForHighlight,
-                    relativeVisualColForHighlight + 1,
+                    relativeVisualColForHighlight + 1
                   ) || ' ';
                 const highlighted = chalk.inverse(charToHighlight);
                 display =
@@ -242,10 +260,8 @@ export function UnifiedInput({
               }
             }
           }
-          
-          return (
-            <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>
-          );
+
+          return <Text key={`line-${visualIdxInRenderedSet}`}>{display}</Text>;
         })}
       </Box>
     );
@@ -262,9 +278,7 @@ export function UnifiedInput({
 
     return (
       <Box marginTop={1}>
-        <Text color={suggestionColor}>
-          💡 {currentSuggestion.displayText}
-        </Text>
+        <Text color={suggestionColor}>💡 {currentSuggestion.displayText}</Text>
         <Text color={placeholderColor}> (Tab to complete)</Text>
       </Box>
     );
@@ -273,19 +287,17 @@ export function UnifiedInput({
   const borderColorToUse = focus ? focusColor : borderColor;
 
   return (
-    <Box flexDirection="column">
-      <Box 
-        borderStyle="round" 
+    <Box flexDirection='column'>
+      <Box
+        borderStyle='round'
         borderColor={borderColorToUse}
         paddingX={1}
         paddingY={0}
         minHeight={1}
       >
-        <Box flexDirection="row" width="100%">
+        <Box flexDirection='row' width='100%'>
           {prefix && <Text color={textColor}>{prefix}</Text>}
-          <Box flexGrow={1}>
-            {renderInputText()}
-          </Box>
+          <Box flexGrow={1}>{renderInputText()}</Box>
           {suffix && <Text color={textColor}>{suffix}</Text>}
         </Box>
       </Box>

@@ -28,10 +28,12 @@ export interface QueueExecutionResult {
   success: boolean;
   completed: Operation[];
   failed: Operation[];
-  rollbackInfo: {
-    rolledBack: Operation[];
-    rollbackFailed: Operation[];
-  } | undefined;
+  rollbackInfo:
+    | {
+        rolledBack: Operation[];
+        rollbackFailed: Operation[];
+      }
+    | undefined;
 }
 
 export class OperationQueue {
@@ -43,8 +45,8 @@ export class OperationQueue {
   private options: OperationQueueOptions;
 
   constructor(
-    _security: WorkspaceSecurity, 
-    atomicOps: AtomicFileOperations, 
+    _security: WorkspaceSecurity,
+    atomicOps: AtomicFileOperations,
     diffPreview: DiffPreviewSystem,
     options: OperationQueueOptions = {}
   ) {
@@ -55,14 +57,18 @@ export class OperationQueue {
       enableRollback: true,
       autoCleanup: true,
       timeoutMs: 300000, // 5 minutes
-      ...options
+      ...options,
     };
   }
 
   /**
    * Add a write operation to the queue
    */
-  addWriteOperation(filePath: string, content: string, dependencies: string[] = []): string {
+  addWriteOperation(
+    filePath: string,
+    content: string,
+    dependencies: string[] = []
+  ): string {
     const operation: Operation = {
       id: randomUUID(),
       type: 'write',
@@ -74,7 +80,7 @@ export class OperationQueue {
       status: 'pending',
       result: undefined,
       error: undefined,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     this.operations.set(operation.id, operation);
@@ -85,7 +91,12 @@ export class OperationQueue {
   /**
    * Add an edit operation to the queue
    */
-  addEditOperation(filePath: string, oldContent: string, newContent: string, dependencies: string[] = []): string {
+  addEditOperation(
+    filePath: string,
+    oldContent: string,
+    newContent: string,
+    dependencies: string[] = []
+  ): string {
     const operation: Operation = {
       id: randomUUID(),
       type: 'edit',
@@ -97,7 +108,7 @@ export class OperationQueue {
       status: 'pending',
       result: undefined,
       error: undefined,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     this.operations.set(operation.id, operation);
@@ -108,7 +119,11 @@ export class OperationQueue {
   /**
    * Add a create operation to the queue
    */
-  addCreateOperation(filePath: string, content: string, dependencies: string[] = []): string {
+  addCreateOperation(
+    filePath: string,
+    content: string,
+    dependencies: string[] = []
+  ): string {
     const operation: Operation = {
       id: randomUUID(),
       type: 'create',
@@ -120,7 +135,7 @@ export class OperationQueue {
       status: 'pending',
       result: undefined,
       error: undefined,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     this.operations.set(operation.id, operation);
@@ -160,7 +175,9 @@ export class OperationQueue {
    * Get operations by status
    */
   getOperationsByStatus(status: Operation['status']): Operation[] {
-    return Array.from(this.operations.values()).filter(op => op.status === status);
+    return Array.from(this.operations.values()).filter(
+      op => op.status === status
+    );
   }
 
   /**
@@ -168,14 +185,14 @@ export class OperationQueue {
    */
   async previewAllOperations(): Promise<PreviewResult[]> {
     const previews: PreviewResult[] = [];
-    
+
     for (const operationId of this.executionOrder) {
       const operation = this.operations.get(operationId);
       if (!operation || operation.status !== 'pending') continue;
 
       try {
         let preview: PreviewResult;
-        
+
         switch (operation.type) {
           case 'write':
           case 'create':
@@ -196,18 +213,18 @@ export class OperationQueue {
           default:
             continue;
         }
-        
+
         previews.push(preview);
       } catch (error) {
         previews.push({
           filePath: operation.filePath,
           hasChanges: false,
           preview: `Error previewing operation: ${error}`,
-          stats: { additions: 0, deletions: 0, changes: 0 }
+          stats: { additions: 0, deletions: 0, changes: 0 },
         });
       }
     }
-    
+
     return previews;
   }
 
@@ -222,22 +239,22 @@ export class OperationQueue {
     this.isExecuting = true;
     const completed: Operation[] = [];
     const failed: Operation[] = [];
-    
+
     try {
       // Resolve execution order based on dependencies
       const sortedOperations = this.resolveDependencies();
-      
+
       // Execute operations
       for (const operationId of sortedOperations) {
         const operation = this.operations.get(operationId);
         if (!operation) continue;
 
         operation.status = 'running';
-        
+
         try {
           const result = await this.executeOperation(operation);
           operation.result = result;
-          
+
           if (result.success) {
             operation.status = 'completed';
             completed.push(operation);
@@ -245,7 +262,7 @@ export class OperationQueue {
             operation.status = 'failed';
             operation.error = result.error;
             failed.push(operation);
-            
+
             // Stop execution on failure if rollback is enabled
             if (this.options.enableRollback) {
               break;
@@ -255,7 +272,7 @@ export class OperationQueue {
           operation.status = 'failed';
           operation.error = `Execution failed: ${error}`;
           failed.push(operation);
-          
+
           if (this.options.enableRollback) {
             break;
           }
@@ -272,11 +289,11 @@ export class OperationQueue {
         success: failed.length === 0,
         completed,
         failed,
-        rollbackInfo
+        rollbackInfo,
       };
     } finally {
       this.isExecuting = false;
-      
+
       if (this.options.autoCleanup) {
         this.cleanup();
       }
@@ -292,12 +309,12 @@ export class OperationQueue {
   }> {
     const rolledBack: Operation[] = [];
     const rollbackFailed: Operation[] = [];
-    
+
     // Rollback in reverse order
     for (const operation of operations.reverse()) {
       try {
         const result = await this.atomicOps.rollback(operation.filePath);
-        
+
         if (result.success) {
           operation.status = 'rolled_back';
           rolledBack.push(operation);
@@ -308,7 +325,7 @@ export class OperationQueue {
         rollbackFailed.push(operation);
       }
     }
-    
+
     return { rolledBack, rollbackFailed };
   }
 
@@ -327,12 +344,14 @@ export class OperationQueue {
     const toRemove = Array.from(this.operations.values())
       .filter(op => op.status === 'completed' || op.status === 'failed')
       .map(op => op.id);
-    
+
     toRemove.forEach(id => {
       this.operations.delete(id);
     });
-    
-    this.executionOrder = this.executionOrder.filter(id => !toRemove.includes(id));
+
+    this.executionOrder = this.executionOrder.filter(
+      id => !toRemove.includes(id)
+    );
   }
 
   /**
@@ -347,21 +366,26 @@ export class OperationQueue {
     rolledBack: number;
   } {
     const operations = Array.from(this.operations.values());
-    
+
     return {
       total: operations.length,
       pending: operations.filter(op => op.status === 'pending').length,
       running: operations.filter(op => op.status === 'running').length,
       completed: operations.filter(op => op.status === 'completed').length,
       failed: operations.filter(op => op.status === 'failed').length,
-      rolledBack: operations.filter(op => op.status === 'rolled_back').length
+      rolledBack: operations.filter(op => op.status === 'rolled_back').length,
     };
   }
 
-  private async executeOperation(operation: Operation): Promise<AtomicOperationResult> {
+  private async executeOperation(
+    operation: Operation
+  ): Promise<AtomicOperationResult> {
     switch (operation.type) {
       case 'write':
-        return await this.atomicOps.atomicWrite(operation.filePath, operation.content || '');
+        return await this.atomicOps.atomicWrite(
+          operation.filePath,
+          operation.content || ''
+        );
       case 'edit':
         return await this.atomicOps.atomicEdit(
           operation.filePath,
@@ -369,7 +393,10 @@ export class OperationQueue {
           operation.newContent || ''
         );
       case 'create':
-        return await this.atomicOps.atomicCreate(operation.filePath, operation.content || '');
+        return await this.atomicOps.atomicCreate(
+          operation.filePath,
+          operation.content || ''
+        );
       default:
         throw new Error(`Unknown operation type: ${operation.type}`);
     }
@@ -382,9 +409,11 @@ export class OperationQueue {
 
     const visit = (operationId: string) => {
       if (visiting.has(operationId)) {
-        throw new Error(`Circular dependency detected involving operation ${operationId}`);
+        throw new Error(
+          `Circular dependency detected involving operation ${operationId}`
+        );
       }
-      
+
       if (visited.has(operationId)) {
         return;
       }
@@ -395,14 +424,14 @@ export class OperationQueue {
       }
 
       visiting.add(operationId);
-      
+
       // Visit dependencies first
       for (const depId of operation.dependencies) {
         if (this.operations.has(depId)) {
           visit(depId);
         }
       }
-      
+
       visiting.delete(operationId);
       visited.add(operationId);
       resolved.push(operationId);

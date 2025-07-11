@@ -14,19 +14,19 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   }, [onContinue]);
 
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
+    <Box flexDirection='column' paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="blue">
+        <Text bold color='blue'>
           🤖 Welcome to Aiya Setup
         </Text>
       </Box>
-      
+
       <Box marginBottom={1}>
         <Text>
           This wizard will help you configure AI providers for your project.
         </Text>
       </Box>
-      
+
       <Box marginBottom={1}>
         <Text dimColor>
           You can always reconfigure later by running 'aiya init' again.
@@ -34,7 +34,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
       </Box>
 
       <Box marginBottom={1}>
-        <Alert variant="info">
+        <Alert variant='info'>
           <Text>Getting started...</Text>
         </Alert>
       </Box>

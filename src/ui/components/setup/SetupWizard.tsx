@@ -6,7 +6,10 @@ import { ProviderSelection } from './ProviderSelection.js';
 import { ProviderConfigForm } from './ProviderConfigForm.js';
 import { ConnectionTest } from './ConnectionTest.js';
 import { ExtendedProviderConfig } from '../../../core/config/manager.js';
-import { ConfigurationGenerator, SetupSession } from '../../../core/config/generation.js';
+import {
+  ConfigurationGenerator,
+  SetupSession,
+} from '../../../core/config/generation.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -17,12 +20,12 @@ interface ThreeChoiceInputProps {
   onSaveAndExit: () => void;
 }
 
-const ThreeChoiceInput: React.FC<ThreeChoiceInputProps> = ({ 
-  onAddProvider, 
-  onFinishSetup, 
-  onSaveAndExit 
+const ThreeChoiceInput: React.FC<ThreeChoiceInputProps> = ({
+  onAddProvider,
+  onFinishSetup,
+  onSaveAndExit,
 }) => {
-  useInput((input) => {
+  useInput(input => {
     if (input === 'y' || input === 'Y') {
       onAddProvider();
     } else if (input === 'n' || input === 'N') {
@@ -36,9 +39,9 @@ const ThreeChoiceInput: React.FC<ThreeChoiceInputProps> = ({
 };
 
 // Setup steps state machine
-type SetupStep = 
+type SetupStep =
   | 'welcome'
-  | 'provider-selection' 
+  | 'provider-selection'
   | 'provider-config'
   | 'connection-test'
   | 'multi-provider-prompt'
@@ -68,12 +71,12 @@ interface SetupWizardProps {
 export const SetupWizard: React.FC<SetupWizardProps> = ({
   projectPath = process.cwd(),
   onComplete,
-  onError
+  onError,
 }) => {
   const [state, setState] = React.useState<SetupWizardState>({
     step: 'welcome',
     additionalProviders: [],
-    skipValidation: false
+    skipValidation: false,
   });
 
   const configGenerator = React.useMemo(() => new ConfigurationGenerator(), []);
@@ -93,25 +96,28 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setState(prev => ({ ...prev, step: 'provider-selection' }));
   };
 
-  const handleProviderSelect = (providerType: ExtendedProviderConfig['type']) => {
-    setState(prev => ({ 
-      ...prev, 
+  const handleProviderSelect = (
+    providerType: ExtendedProviderConfig['type']
+  ) => {
+    setState(prev => ({
+      ...prev,
       step: 'provider-config',
-      currentProviderType: providerType
+      currentProviderType: providerType,
     }));
   };
 
   const handleProviderConfigComplete = (config: ExtendedProviderConfig) => {
     const isAdditional = state.step === 'additional-provider-config';
-    
+
     if (isAdditional) {
       // Check for duplicates in additional providers
-      const existingIndex = state.additionalProviders.findIndex(provider => 
-        provider.type === config.type && 
-        provider.model === config.model && 
-        provider.baseUrl === config.baseUrl
+      const existingIndex = state.additionalProviders.findIndex(
+        provider =>
+          provider.type === config.type &&
+          provider.model === config.model &&
+          provider.baseUrl === config.baseUrl
       );
-      
+
       let updatedProviders: ExtendedProviderConfig[];
       if (existingIndex !== -1) {
         // Replace existing duplicate configuration
@@ -121,17 +127,17 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         // Add new configuration
         updatedProviders = [...state.additionalProviders, config];
       }
-      
+
       setState(prev => ({
         ...prev,
         additionalProviders: updatedProviders,
-        step: 'additional-connection-test'
+        step: 'additional-connection-test',
       }));
     } else {
       setState(prev => ({
         ...prev,
         primaryProvider: config,
-        step: 'connection-test'
+        step: 'connection-test',
       }));
     }
   };
@@ -141,7 +147,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setState(prev => {
       const newState: SetupWizardState = {
         ...prev,
-        step: isAdditional ? 'additional-provider-selection' : 'provider-selection'
+        step: isAdditional
+          ? 'additional-provider-selection'
+          : 'provider-selection',
       };
       delete newState.currentProviderType;
       return newState;
@@ -150,7 +158,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
   const handleConnectionTestSuccess = () => {
     const isAdditional = state.step === 'additional-connection-test';
-    
+
     if (isAdditional) {
       setState(prev => ({ ...prev, step: 'multi-provider-prompt' }));
     } else {
@@ -175,11 +183,13 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     setState(prev => ({ ...prev, step: 'save-and-exit' }));
   };
 
-  const handleAdditionalProviderSelect = (providerType: ExtendedProviderConfig['type']) => {
+  const handleAdditionalProviderSelect = (
+    providerType: ExtendedProviderConfig['type']
+  ) => {
     setState(prev => ({
       ...prev,
       step: 'additional-provider-config',
-      currentProviderType: providerType
+      currentProviderType: providerType,
     }));
   };
 
@@ -188,7 +198,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       await saveConfiguration();
       setState(prev => ({ ...prev, step: 'complete' }));
     } catch (error) {
-      handleError(error instanceof Error ? error.message : 'Failed to save configuration');
+      handleError(
+        error instanceof Error ? error.message : 'Failed to save configuration'
+      );
     }
   };
 
@@ -201,15 +213,18 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
       primaryProvider: state.primaryProvider,
       additionalProviders: state.additionalProviders,
       skipValidation: state.skipValidation,
-      projectPath
+      projectPath,
     };
 
     const configPath = path.join(projectPath, '.aiya.yaml');
-    
+
     // Check if config exists and create backup
     try {
       await fs.access(configPath);
-      const backupPath = path.join(projectPath, configGenerator.generateBackupFilename());
+      const backupPath = path.join(
+        projectPath,
+        configGenerator.generateBackupFilename()
+      );
       await fs.copyFile(configPath, backupPath);
     } catch {
       // File doesn't exist, no backup needed
@@ -218,10 +233,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
     // Generate and save new configuration
     const yamlContent = configGenerator.generateYAML(session);
     await fs.writeFile(configPath, yamlContent, 'utf8');
-    
+
     onComplete(true, configPath);
   };
-
 
   const renderStep = () => {
     switch (state.step) {
@@ -230,9 +244,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
       case 'provider-selection':
         return (
-          <ProviderSelection 
+          <ProviderSelection
             onSelect={handleProviderSelect}
-            title="Choose your primary AI provider:"
+            title='Choose your primary AI provider:'
           />
         );
 
@@ -264,29 +278,31 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
       case 'multi-provider-prompt':
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
             <Box marginBottom={1}>
-              <Text bold color="blue">
+              <Text bold color='blue'>
                 Add Another Provider?
               </Text>
             </Box>
-            
+
             <Box marginBottom={1}>
               <Text>
-                You can configure additional AI providers to switch between during chat sessions.
+                You can configure additional AI providers to switch between
+                during chat sessions.
               </Text>
             </Box>
-            
+
             <Box marginBottom={1}>
               <Text dimColor>
-                This allows you to use '/model-switch' to change providers on the fly.
+                This allows you to use '/model-switch' to change providers on
+                the fly.
               </Text>
             </Box>
 
             <Box marginBottom={1}>
               <Text bold>Choose an option:</Text>
             </Box>
-            
+
             <Box marginBottom={1}>
               <Text dimColor>[y] Add another provider</Text>
               <Text dimColor>[n] Finish setup with current configuration</Text>
@@ -306,7 +322,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           <ProviderSelection
             onSelect={handleAdditionalProviderSelect}
             onSaveAndExit={handleSaveAndExit}
-            title="Choose an additional provider:"
+            title='Choose an additional provider:'
             showSaveAndExit={true}
           />
         );
@@ -325,7 +341,8 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
         );
 
       case 'additional-connection-test':
-        const lastProvider = state.additionalProviders[state.additionalProviders.length - 1];
+        const lastProvider =
+          state.additionalProviders[state.additionalProviders.length - 1];
         if (!lastProvider) {
           handleError('No additional provider configured');
           return null;
@@ -343,39 +360,40 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           handleError('No primary provider configured');
           return null;
         }
-        
+
         const partialSession: SetupSession = {
           primaryProvider: state.primaryProvider,
           additionalProviders: state.additionalProviders,
           skipValidation: state.skipValidation,
-          projectPath
+          projectPath,
         };
-        
+
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
             <Box marginBottom={1}>
-              <Text bold color="yellow">
+              <Text bold color='yellow'>
                 Save Current Configuration
               </Text>
             </Box>
-            
+
             <Box marginBottom={1}>
               <Text>
-                Your current configuration will be saved and you can add more providers later.
+                Your current configuration will be saved and you can add more
+                providers later.
               </Text>
             </Box>
-            
+
             <Box marginBottom={1}>
-              <Text>
-                {configGenerator.generatePreview(partialSession)}
-              </Text>
+              <Text>{configGenerator.generatePreview(partialSession)}</Text>
             </Box>
-            
+
             <ConfirmInput
               onConfirm={handleSummaryComplete}
-              onCancel={() => setState(prev => ({ ...prev, step: 'multi-provider-prompt' }))}
+              onCancel={() =>
+                setState(prev => ({ ...prev, step: 'multi-provider-prompt' }))
+              }
             />
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Press y to save and exit, n to go back to multi-provider prompt
@@ -389,33 +407,33 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           handleError('No primary provider configured');
           return null;
         }
-        
+
         const session: SetupSession = {
           primaryProvider: state.primaryProvider,
           additionalProviders: state.additionalProviders,
           skipValidation: state.skipValidation,
-          projectPath
+          projectPath,
         };
 
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
             <Box marginBottom={1}>
-              <Text bold color="green">
+              <Text bold color='green'>
                 Setup Complete!
               </Text>
             </Box>
-            
+
             <Box marginBottom={1}>
-              <Text>
-                {configGenerator.generatePreview(session)}
-              </Text>
+              <Text>{configGenerator.generatePreview(session)}</Text>
             </Box>
-            
+
             <ConfirmInput
               onConfirm={handleSummaryComplete}
-              onCancel={() => setState(prev => ({ ...prev, step: 'multi-provider-prompt' }))}
+              onCancel={() =>
+                setState(prev => ({ ...prev, step: 'multi-provider-prompt' }))
+              }
             />
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Press y to save configuration, n to go back and modify
@@ -426,24 +444,22 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
       case 'complete':
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
-            <Alert variant="success">
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
+            <Alert variant='success'>
               <Text>✅ Configuration saved successfully!</Text>
             </Alert>
-            
+
             <Box marginTop={1} marginBottom={1}>
-              <Text>
-                Your Aiya configuration has been saved to .aiya.yaml
-              </Text>
+              <Text>Your Aiya configuration has been saved to .aiya.yaml</Text>
             </Box>
-            
+
             <Box marginBottom={1}>
-              <Text bold color="blue">
+              <Text bold color='blue'>
                 Next Steps:
               </Text>
             </Box>
-            
-            <Box flexDirection="column" paddingLeft={2} marginBottom={1}>
+
+            <Box flexDirection='column' paddingLeft={2} marginBottom={1}>
               <Text>• Run 'aiya chat' to start chatting with your AI</Text>
               <Text>• Use 'aiya search &lt;pattern&gt;' to search files</Text>
               {state.additionalProviders.length > 0 && (
@@ -451,7 +467,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
               )}
               <Text>• Type '/help' in chat for available commands</Text>
             </Box>
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Press Ctrl+C to exit, or wait a moment for automatic exit...
@@ -462,17 +478,15 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
       case 'error':
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
-            <Alert variant="error">
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
+            <Alert variant='error'>
               <Text>Setup Error</Text>
             </Alert>
-            
+
             <Box marginTop={1}>
-              <Text color="red">
-                {state.error || 'Unknown error occurred'}
-              </Text>
+              <Text color='red'>{state.error || 'Unknown error occurred'}</Text>
             </Box>
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Please try running 'aiya init' again or check the documentation.
@@ -483,7 +497,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
       default:
         return (
-          <Box flexDirection="column" paddingX={2} paddingY={1}>
+          <Box flexDirection='column' paddingX={2} paddingY={1}>
             <Text>Unknown setup step: {state.step}</Text>
           </Box>
         );
@@ -502,14 +516,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   }, [state.step, onComplete]);
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection='column'>
       {/* Progress indicator */}
-      <Box paddingX={2} paddingY={1} borderStyle="single" borderColor="gray">
-        <Text dimColor>
-          Aiya Setup Wizard - Step {getStepNumber()}/5
-        </Text>
+      <Box paddingX={2} paddingY={1} borderStyle='single' borderColor='gray'>
+        <Text dimColor>Aiya Setup Wizard - Step {getStepNumber()}/5</Text>
       </Box>
-      
+
       {/* Main content */}
       {renderStep()}
     </Box>
@@ -518,10 +530,12 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
   function getStepNumber(): number {
     const stepOrder: SetupStep[] = [
       'welcome',
-      'provider-selection', 'provider-config', 'connection-test',
-      'multi-provider-prompt'
+      'provider-selection',
+      'provider-config',
+      'connection-test',
+      'multi-provider-prompt',
     ];
-    
+
     const currentIndex = stepOrder.indexOf(state.step);
     return currentIndex === -1 ? 5 : currentIndex + 1;
   }

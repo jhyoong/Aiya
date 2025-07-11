@@ -36,7 +36,7 @@ export class EnhancedPatternMatching {
     multiline: false,
     caseSensitive: true,
     wholeWord: false,
-    contextLines: 0
+    contextLines: 0,
   };
 
   constructor(_security: WorkspaceSecurity) {
@@ -54,17 +54,21 @@ export class EnhancedPatternMatching {
     const mergedOptions = { ...this.defaultOptions, ...options };
     const lines = content.split('\n');
     const matches: MatchResult[] = [];
-    
+
     // Convert string patterns to RegExp
     const regex = this.createRegex(pattern, mergedOptions);
-    
+
     if (mergedOptions.multiline) {
       // Multi-line matching
       const globalRegex = new RegExp(regex.source, regex.flags + 'g');
       let match;
-      
+
       while ((match = globalRegex.exec(content)) !== null) {
-        const matchResult = this.createMatchResult(content, match, mergedOptions);
+        const matchResult = this.createMatchResult(
+          content,
+          match,
+          mergedOptions
+        );
         matches.push(matchResult);
       }
     } else {
@@ -73,12 +77,12 @@ export class EnhancedPatternMatching {
         const line = lines[i] ?? '';
         const globalRegex = new RegExp(regex.source, regex.flags + 'g');
         let match;
-        
+
         while ((match = globalRegex.exec(line)) !== null) {
           const lineStartIndex = this.getLineStartIndex(content, i);
           const absoluteStartIndex = lineStartIndex + (match.index ?? 0);
           const absoluteEndIndex = absoluteStartIndex + (match[0]?.length ?? 0);
-          
+
           const matchResult: MatchResult = {
             match: match[0] ?? '',
             startIndex: absoluteStartIndex,
@@ -86,14 +90,18 @@ export class EnhancedPatternMatching {
             lineNumber: i + 1,
             columnNumber: (match.index ?? 0) + 1,
             indentation: this.extractIndentation(line),
-            context: this.extractContext(lines, i, mergedOptions.contextLines || 0)
+            context: this.extractContext(
+              lines,
+              i,
+              mergedOptions.contextLines || 0
+            ),
           };
-          
+
           matches.push(matchResult);
         }
       }
     }
-    
+
     return matches;
   }
 
@@ -108,45 +116,45 @@ export class EnhancedPatternMatching {
   ): ReplacementResult {
     const mergedOptions = { ...this.defaultOptions, ...options };
     const matches = this.findMatches(content, pattern, mergedOptions);
-    
+
     if (matches.length === 0) {
       return {
         originalContent: content,
         newContent: content,
         matches: [],
-        replacements: 0
+        replacements: 0,
       };
     }
-    
+
     let newContent = content;
     let offset = 0;
-    
+
     for (const match of matches) {
-      const replacementText = typeof replacement === 'function' 
-        ? replacement(match) 
-        : replacement;
-      
+      const replacementText =
+        typeof replacement === 'function' ? replacement(match) : replacement;
+
       const processedReplacement = this.processReplacement(
         replacementText,
         match,
         mergedOptions
       );
-      
+
       const adjustedStart = match.startIndex + offset;
       const adjustedEnd = match.endIndex + offset;
-      
-      newContent = newContent.substring(0, adjustedStart) + 
-                  processedReplacement + 
-                  newContent.substring(adjustedEnd);
-      
+
+      newContent =
+        newContent.substring(0, adjustedStart) +
+        processedReplacement +
+        newContent.substring(adjustedEnd);
+
       offset += processedReplacement.length - match.match.length;
     }
-    
+
     return {
       originalContent: content,
       newContent,
       matches,
-      replacements: matches.length
+      replacements: matches.length,
     };
   }
 
@@ -159,11 +167,20 @@ export class EnhancedPatternMatching {
     replacement: string,
     options: PatternMatchOptions = {}
   ): ReplacementResult {
-    const mergedOptions = { ...this.defaultOptions, ...options, preserveIndentation: true };
-    
-    return this.replaceMatches(content, pattern, (match) => {
-      return this.applyIndentation(replacement, match.indentation || '');
-    }, mergedOptions);
+    const mergedOptions = {
+      ...this.defaultOptions,
+      ...options,
+      preserveIndentation: true,
+    };
+
+    return this.replaceMatches(
+      content,
+      pattern,
+      match => {
+        return this.applyIndentation(replacement, match.indentation || '');
+      },
+      mergedOptions
+    );
   }
 
   /**
@@ -175,20 +192,26 @@ export class EnhancedPatternMatching {
     replacement: string,
     options: PatternMatchOptions = {}
   ): ReplacementResult {
-    const mergedOptions = { 
-      ...this.defaultOptions, 
-      ...options, 
+    const mergedOptions = {
+      ...this.defaultOptions,
+      ...options,
       multiline: true,
-      preserveIndentation: true
+      preserveIndentation: true,
     };
-    
-    return this.replaceMatches(content, pattern, (match) => {
-      const baseIndentation = this.extractIndentation(
-        content.substring(match.startIndex, match.endIndex).split('\n')[0] || ''
-      );
-      
-      return this.applyIndentation(replacement, baseIndentation);
-    }, mergedOptions);
+
+    return this.replaceMatches(
+      content,
+      pattern,
+      match => {
+        const baseIndentation = this.extractIndentation(
+          content.substring(match.startIndex, match.endIndex).split('\n')[0] ||
+            ''
+        );
+
+        return this.applyIndentation(replacement, baseIndentation);
+      },
+      mergedOptions
+    );
   }
 
   /**
@@ -200,63 +223,77 @@ export class EnhancedPatternMatching {
     replacement: string,
     options: PatternMatchOptions = {}
   ): ReplacementResult {
-    const mergedOptions = { 
-      ...this.defaultOptions, 
+    const mergedOptions = {
+      ...this.defaultOptions,
       ...options,
       preserveIndentation: true,
-      normalizeWhitespace: true
+      normalizeWhitespace: true,
     };
-    
-    return this.replaceMatches(content, pattern, (match) => {
-      // Extract context for smart replacement
-      const lines = content.split('\n');
-      const lineIndex = match.lineNumber - 1;
-      
-      // Determine if we're in a code block
-      const isCodeBlock = this.isInCodeBlock(lines, lineIndex);
-      
-      // Apply appropriate formatting
-      if (isCodeBlock) {
-        return this.applyIndentation(replacement, match.indentation || '');
-      } else {
-        return this.normalizeWhitespace(replacement);
-      }
-    }, mergedOptions);
+
+    return this.replaceMatches(
+      content,
+      pattern,
+      match => {
+        // Extract context for smart replacement
+        const lines = content.split('\n');
+        const lineIndex = match.lineNumber - 1;
+
+        // Determine if we're in a code block
+        const isCodeBlock = this.isInCodeBlock(lines, lineIndex);
+
+        // Apply appropriate formatting
+        if (isCodeBlock) {
+          return this.applyIndentation(replacement, match.indentation || '');
+        } else {
+          return this.normalizeWhitespace(replacement);
+        }
+      },
+      mergedOptions
+    );
   }
 
   /**
    * Validate pattern safety
    */
-  validatePattern(pattern: string | RegExp): { valid: boolean; reason?: string } {
+  validatePattern(pattern: string | RegExp): {
+    valid: boolean;
+    reason?: string;
+  } {
     try {
       const regex = pattern instanceof RegExp ? pattern : new RegExp(pattern);
-      
+
       // Check for potentially dangerous patterns
       if (this.isDangerousPattern(regex)) {
-        return { valid: false, reason: 'Pattern may cause excessive backtracking' };
+        return {
+          valid: false,
+          reason: 'Pattern may cause excessive backtracking',
+        };
       }
-      
+
       return { valid: true };
     } catch (error) {
       return { valid: false, reason: `Invalid pattern: ${error}` };
     }
   }
 
-  private createRegex(pattern: string | RegExp, options: PatternMatchOptions): RegExp {
+  private createRegex(
+    pattern: string | RegExp,
+    options: PatternMatchOptions
+  ): RegExp {
     if (pattern instanceof RegExp) {
       return pattern;
     }
-    
+
     let flags = '';
     if (!options.caseSensitive) flags += 'i';
     if (options.multiline) flags += 'm';
-    
+
     let processedPattern = pattern;
-    
+
     if (options.wholeWord) {
       processedPattern = `\\b${processedPattern}\\b`;
     }
-    
+
     return new RegExp(processedPattern, flags);
   }
 
@@ -268,7 +305,7 @@ export class EnhancedPatternMatching {
     const lines = content.split('\n');
     const lineNumber = this.getLineNumber(content, regexMatch.index);
     const columnNumber = this.getColumnNumber(content, regexMatch.index);
-    
+
     return {
       match: regexMatch[0] ?? '',
       startIndex: regexMatch.index ?? 0,
@@ -276,18 +313,22 @@ export class EnhancedPatternMatching {
       lineNumber,
       columnNumber,
       indentation: this.extractIndentation(lines[lineNumber - 1] ?? ''),
-      context: this.extractContext(lines, lineNumber - 1, options.contextLines || 0)
+      context: this.extractContext(
+        lines,
+        lineNumber - 1,
+        options.contextLines || 0
+      ),
     };
   }
 
   private getLineStartIndex(content: string, lineIndex: number): number {
     const lines = content.split('\n');
     let index = 0;
-    
+
     for (let i = 0; i < lineIndex; i++) {
       index += (lines[i] ?? '').length + 1; // +1 for newline
     }
-    
+
     return index;
   }
 
@@ -307,16 +348,20 @@ export class EnhancedPatternMatching {
     return (match && match[1]) || '';
   }
 
-  private extractContext(lines: string[], lineIndex: number, contextLines: number): {
+  private extractContext(
+    lines: string[],
+    lineIndex: number,
+    contextLines: number
+  ): {
     before: string[];
     after: string[];
   } {
     const start = Math.max(0, lineIndex - contextLines);
     const end = Math.min(lines.length - 1, lineIndex + contextLines);
-    
+
     return {
       before: lines.slice(start, lineIndex),
-      after: lines.slice(lineIndex + 1, end + 1)
+      after: lines.slice(lineIndex + 1, end + 1),
     };
   }
 
@@ -326,39 +371,44 @@ export class EnhancedPatternMatching {
     options: PatternMatchOptions
   ): string {
     let processedReplacement = replacement;
-    
+
     if (options.preserveIndentation) {
-      processedReplacement = this.applyIndentation(processedReplacement, match.indentation || '');
+      processedReplacement = this.applyIndentation(
+        processedReplacement,
+        match.indentation || ''
+      );
     }
-    
+
     if (options.normalizeWhitespace) {
       processedReplacement = this.normalizeWhitespace(processedReplacement);
     }
-    
+
     return processedReplacement;
   }
 
   private applyIndentation(text: string, indentation: string): string {
     const lines = text.split('\n');
-    
-    return lines.map((line, index) => {
-      // Don't indent empty lines
-      if (line.trim() === '') return line;
-      
-      // First line keeps original indentation if it has any
-      if (index === 0 && line.match(/^\s/)) {
-        return line;
-      }
-      
-      // Apply base indentation to all lines
-      return indentation + line;
-    }).join('\n');
+
+    return lines
+      .map((line, index) => {
+        // Don't indent empty lines
+        if (line.trim() === '') return line;
+
+        // First line keeps original indentation if it has any
+        if (index === 0 && line.match(/^\s/)) {
+          return line;
+        }
+
+        // Apply base indentation to all lines
+        return indentation + line;
+      })
+      .join('\n');
   }
 
   private normalizeWhitespace(text: string): string {
     return text
-      .replace(/\s+/g, ' ')  // Multiple spaces to single space
-      .replace(/\s*\n\s*/g, '\n')  // Remove spaces around newlines
+      .replace(/\s+/g, ' ') // Multiple spaces to single space
+      .replace(/\s*\n\s*/g, '\n') // Remove spaces around newlines
       .trim();
   }
 
@@ -369,13 +419,13 @@ export class EnhancedPatternMatching {
 
   private isDangerousPattern(regex: RegExp): boolean {
     const dangerousPatterns = [
-      /\(\?\!/,  // Negative lookahead
-      /\(\?\</,  // Negative lookbehind
-      /\*\*\+/,  // Nested quantifiers
-      /\+\+/,    // Consecutive quantifiers
-      /\{\d+,\}/  // Large ranges
+      /\(\?\!/, // Negative lookahead
+      /\(\?\</, // Negative lookbehind
+      /\*\*\+/, // Nested quantifiers
+      /\+\+/, // Consecutive quantifiers
+      /\{\d+,\}/, // Large ranges
     ];
-    
+
     return dangerousPatterns.some(pattern => pattern.test(regex.source));
   }
 }

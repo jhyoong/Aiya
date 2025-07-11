@@ -36,11 +36,14 @@ export class DiffPreviewSystem {
     newContent: string,
     _options: DiffPreviewOptions = {}
   ): Promise<PreviewResult> {
-    
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'read');
-      const relativePath = this.security.getRelativePathFromWorkspace(validatedPath);
-      
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'read'
+      );
+      const relativePath =
+        this.security.getRelativePathFromWorkspace(validatedPath);
+
       let currentContent = '';
       try {
         currentContent = await fs.readFile(validatedPath, 'utf8');
@@ -54,7 +57,11 @@ export class DiffPreviewSystem {
 
       let preview = '';
       if (hasChanges) {
-        preview = DiffGenerator.previewChanges(currentContent, newContent, relativePath);
+        preview = DiffGenerator.previewChanges(
+          currentContent,
+          newContent,
+          relativePath
+        );
       } else {
         preview = `No changes detected in ${relativePath}`;
       }
@@ -63,7 +70,7 @@ export class DiffPreviewSystem {
         filePath: relativePath,
         hasChanges,
         preview,
-        stats: diff.stats
+        stats: diff.stats,
       };
     } catch (error) {
       throw new Error(`Failed to preview changes for ${filePath}: ${error}`);
@@ -78,21 +85,25 @@ export class DiffPreviewSystem {
     options: DiffPreviewOptions = {}
   ): Promise<PreviewResult[]> {
     const results: PreviewResult[] = [];
-    
+
     for (const change of changes) {
       try {
-        const result = await this.previewFileChanges(change.filePath, change.newContent, options);
+        const result = await this.previewFileChanges(
+          change.filePath,
+          change.newContent,
+          options
+        );
         results.push(result);
       } catch (error) {
         results.push({
           filePath: change.filePath,
           hasChanges: false,
           preview: `Error previewing changes: ${error}`,
-          stats: { additions: 0, deletions: 0, changes: 0 }
+          stats: { additions: 0, deletions: 0, changes: 0 },
         });
       }
     }
-    
+
     return results;
   }
 
@@ -106,24 +117,30 @@ export class DiffPreviewSystem {
     options: DiffPreviewOptions = {}
   ): Promise<PreviewResult> {
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'read');
-      const relativePath = this.security.getRelativePathFromWorkspace(validatedPath);
-      
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'read'
+      );
+      const relativePath =
+        this.security.getRelativePathFromWorkspace(validatedPath);
+
       const currentContent = await fs.readFile(validatedPath, 'utf8');
-      
+
       if (!currentContent.includes(oldContent)) {
         return {
           filePath: relativePath,
           hasChanges: false,
           preview: `Content to replace not found in ${relativePath}`,
-          stats: { additions: 0, deletions: 0, changes: 0 }
+          stats: { additions: 0, deletions: 0, changes: 0 },
         };
       }
 
       const updatedContent = currentContent.replace(oldContent, newContent);
       return await this.previewFileChanges(filePath, updatedContent, options);
     } catch (error) {
-      throw new Error(`Failed to preview edit operation for ${filePath}: ${error}`);
+      throw new Error(
+        `Failed to preview edit operation for ${filePath}: ${error}`
+      );
     }
   }
 
@@ -136,9 +153,13 @@ export class DiffPreviewSystem {
     options: { oldPath?: string; newPath?: string } = {}
   ): Promise<string> {
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'read');
-      const relativePath = this.security.getRelativePathFromWorkspace(validatedPath);
-      
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'read'
+      );
+      const relativePath =
+        this.security.getRelativePathFromWorkspace(validatedPath);
+
       let currentContent = '';
       try {
         currentContent = await fs.readFile(validatedPath, 'utf8');
@@ -149,10 +170,17 @@ export class DiffPreviewSystem {
 
       const oldPath = options.oldPath || `a/${relativePath}`;
       const newPath = options.newPath || `b/${relativePath}`;
-      
-      return DiffGenerator.createUnifiedDiff(currentContent, newContent, oldPath, newPath);
+
+      return DiffGenerator.createUnifiedDiff(
+        currentContent,
+        newContent,
+        oldPath,
+        newPath
+      );
     } catch (error) {
-      throw new Error(`Failed to generate unified diff for ${filePath}: ${error}`);
+      throw new Error(
+        `Failed to generate unified diff for ${filePath}: ${error}`
+      );
     }
   }
 
@@ -165,7 +193,7 @@ export class DiffPreviewSystem {
       (acc, p) => ({
         additions: acc.additions + p.stats.additions,
         deletions: acc.deletions + p.stats.deletions,
-        changes: acc.changes + p.stats.changes
+        changes: acc.changes + p.stats.changes,
       }),
       { additions: 0, deletions: 0, changes: 0 }
     );
@@ -191,10 +219,15 @@ export class DiffPreviewSystem {
   /**
    * Validate that a preview can be applied safely
    */
-  async validatePreviewApplication(preview: PreviewResult): Promise<{ valid: boolean; reason?: string }> {
+  async validatePreviewApplication(
+    preview: PreviewResult
+  ): Promise<{ valid: boolean; reason?: string }> {
     try {
-      const validatedPath = await this.security.validateFileAccess(preview.filePath, 'write');
-      
+      const validatedPath = await this.security.validateFileAccess(
+        preview.filePath,
+        'write'
+      );
+
       // Check if file exists and is writable
       try {
         await fs.access(validatedPath, fs.constants.F_OK | fs.constants.W_OK);

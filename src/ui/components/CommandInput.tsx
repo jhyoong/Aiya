@@ -27,7 +27,7 @@ export const CommandInput: React.FC<CommandInputProps> = ({
     if (!submittedInput.trim()) return;
 
     setIsProcessing(true);
-    
+
     try {
       await onCommand(submittedInput.trim());
     } catch (error) {
@@ -47,30 +47,30 @@ export const CommandInput: React.FC<CommandInputProps> = ({
   };
 
   return (
-    <Box flexDirection="column">
+    <Box flexDirection='column'>
       <UnifiedInput
         buffer={buffer}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         onEscape={handleEscape}
-        placeholder="Enter command..."
+        placeholder='Enter command...'
         suggestionEngine={suggestionEngine}
         showSuggestions={true}
         prefix={prompt}
-        borderColor="blue"
-        focusColor="cyan"
+        borderColor='blue'
+        focusColor='cyan'
         inputWidth={inputWidth}
         focus={!isProcessing}
       />
-      
+
       {isProcessing && (
         <Box marginTop={1}>
-          <Text color="yellow">Processing...</Text>
+          <Text color='yellow'>Processing...</Text>
         </Box>
       )}
-      
+
       <Box marginTop={1}>
-        <Text color="gray" dimColor>
+        <Text color='gray' dimColor>
           Use Tab to autocomplete, ESC to exit, Ctrl+C to quit
         </Text>
       </Box>

@@ -1,13 +1,47 @@
-import { CommandRegistry, CommandDefinition, ValidationResult } from './CommandRegistry.js';
+import {
+  CommandRegistry,
+  CommandDefinition,
+  ValidationResult,
+} from './CommandRegistry.js';
+import { Message, LLMProvider } from '../core/providers/base.js';
+import { TokenCounter } from '../core/tokens/counter.js';
+import { ConfigManager } from '../core/config/manager.js';
+import { MCPToolService } from '../core/tools/mcp-tools.js';
+import { ToolExecutor } from '../core/tools/executor.js';
+import { EnhancedFilesystemMCPClient } from '../core/mcp/enhanced-filesystem.js';
 
+/**
+ * Chat session state containing messages, context, and provider information
+ */
+export interface ChatSession {
+  messages: Message[];
+  tokenCounter: TokenCounter;
+  toolService?: MCPToolService;
+  toolExecutor?: ToolExecutor;
+  addedFiles: string[];
+  thinkingMode: 'on' | 'brief' | 'off';
+  configManager: ConfigManager;
+  provider: LLMProvider;
+  currentProviderName: string;
+}
+
+/**
+ * Context passed to command handlers containing session and configuration data
+ */
 export interface CommandContext {
   workingDirectory: string;
   configPath?: string;
   isConfigured: boolean;
   userId?: string;
   sessionId?: string;
+  // Add session data for chat commands
+  session?: ChatSession;
+  mcpClient?: EnhancedFilesystemMCPClient;
 }
 
+/**
+ * Result of command execution including success status and output
+ */
 export interface ExecutionResult {
   success: boolean;
   output?: string;
@@ -27,17 +61,17 @@ export class CommandExecutor {
    */
   static parseCommandLine(input: string): { command: string; args: string[] } {
     const trimmed = input.trim();
-    
+
     if (!trimmed.startsWith('/')) {
       throw new Error('Invalid command format: must start with /');
     }
 
     // Remove the leading slash
     const withoutSlash = trimmed.slice(1);
-    
+
     // Split on spaces but preserve quoted strings
     const parts = withoutSlash.match(/(?:[^\s"]+|"[^"]*")+/g) || [];
-    
+
     // Remove quotes from quoted arguments
     const processedParts = parts.map(part => {
       if (part.startsWith('"') && part.endsWith('"')) {
@@ -57,7 +91,7 @@ export class CommandExecutor {
    */
   validateCommand(commandName: string, args: string[]): ValidationResult {
     const validation = CommandRegistry.validateCommand(commandName, args);
-    
+
     if (!validation.valid) {
       return validation;
     }
@@ -70,8 +104,8 @@ export class CommandExecutor {
         error: `Command ${commandName} requires project configuration`,
         suggestions: [
           'Run `aiya init` to configure the project',
-          'Ensure .aiya.yaml exists in your project directory'
-        ]
+          'Ensure .aiya.yaml exists in your project directory',
+        ],
       };
     }
 
@@ -84,14 +118,14 @@ export class CommandExecutor {
   async executeCommand(input: string): Promise<ExecutionResult> {
     try {
       const { command, args } = CommandExecutor.parseCommandLine(input);
-      
+
       // Validate the command
       const validation = this.validateCommand(command, args);
       if (!validation.valid) {
         return {
           success: false,
           error: validation.error || 'Validation failed',
-          suggestions: validation.suggestions || []
+          suggestions: validation.suggestions || [],
         };
       }
 
@@ -101,17 +135,17 @@ export class CommandExecutor {
         return {
           success: false,
           error: `Unknown command: ${command}`,
-          suggestions: ['Use /help to see available commands']
+          suggestions: ['Use /help to see available commands'],
         };
       }
 
       // Execute the command
       try {
         const result = await commandDef.handler.execute(args, this.context);
-        
+
         return {
           success: true,
-          output: typeof result === 'string' ? result : JSON.stringify(result)
+          output: typeof result === 'string' ? result : JSON.stringify(result),
         };
       } catch (handlerError: any) {
         return {
@@ -119,11 +153,10 @@ export class CommandExecutor {
           error: `Command execution failed: ${handlerError.message}`,
           suggestions: [
             `Use /help ${command} for usage information`,
-            'Check command arguments and try again'
-          ]
+            'Check command arguments and try again',
+          ],
         };
       }
-
     } catch (parseError: any) {
       return {
         success: false,
@@ -131,8 +164,8 @@ export class CommandExecutor {
         suggestions: [
           'Commands must start with /',
           'Use quotes for arguments with spaces',
-          'Example: /read "file name.txt"'
-        ]
+          'Example: /read "file name.txt"',
+        ],
       };
     }
   }
@@ -188,17 +221,23 @@ export class CommandExecutor {
   /**
    * Get command statistics
    */
-  getStats(): { totalCommands: number; availableCommands: number; configRequiredCommands: number } {
+  getStats(): {
+    totalCommands: number;
+    availableCommands: number;
+    configRequiredCommands: number;
+  } {
     const allCommands = CommandRegistry.getAllCommands();
-    const configRequiredCommands = allCommands.filter(cmd => cmd.requiresConfig);
-    const availableCommands = this.context.isConfigured 
-      ? allCommands.length 
+    const configRequiredCommands = allCommands.filter(
+      cmd => cmd.requiresConfig
+    );
+    const availableCommands = this.context.isConfigured
+      ? allCommands.length
       : allCommands.length - configRequiredCommands.length;
 
     return {
       totalCommands: allCommands.length,
       availableCommands,
-      configRequiredCommands: configRequiredCommands.length
+      configRequiredCommands: configRequiredCommands.length,
     };
   }
 }

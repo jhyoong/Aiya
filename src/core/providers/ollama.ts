@@ -1,14 +1,14 @@
 import { Ollama } from 'ollama';
-import { 
-  LLMProvider, 
-  Message, 
-  Response, 
-  StreamResponse, 
-  ModelInfo, 
-  ConnectionError, 
+import {
+  LLMProvider,
+  Message,
+  Response,
+  StreamResponse,
+  ModelInfo,
+  ConnectionError,
   ModelNotFoundError,
   ProviderError,
-  ProviderConfig
+  ProviderConfig,
 } from './base.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
 import { OllamaErrorMapper, ErrorContext } from '../errors/index.js';
@@ -31,11 +31,11 @@ export class OllamaProvider extends LLMProvider {
       provider: 'ollama',
       operation,
       model: this.model,
-      endpoint: this.baseUrl
+      endpoint: this.baseUrl,
     };
 
     const result = OllamaErrorMapper.handleOllamaError(error, context);
-    
+
     // Convert standardized error to provider-specific error type
     if (result.success) {
       throw new ProviderError('Unknown error occurred');
@@ -55,18 +55,18 @@ export class OllamaProvider extends LLMProvider {
     try {
       // Convert messages to Ollama format, handling tool messages
       const ollamaMessages = this.convertMessagesToOllamaFormat(messages);
-      
+
       const response = await this.client.chat({
         model: this.model,
         messages: ollamaMessages,
         stream: false,
-        ...this.buildOllamaOptions()
+        ...this.buildOllamaOptions(),
       });
 
       return {
         content: response.message.content,
         tokensUsed: response.eval_count,
-        ...(response.done && { finishReason: 'stop' as const })
+        ...(response.done && { finishReason: 'stop' as const }),
       };
     } catch (error) {
       this.handleError(error, 'chat');
@@ -77,19 +77,19 @@ export class OllamaProvider extends LLMProvider {
     try {
       // Convert messages to Ollama format, handling tool messages
       const ollamaMessages = this.convertMessagesToOllamaFormat(messages);
-      
+
       const stream = await this.client.chat({
         model: this.model,
         messages: ollamaMessages,
         stream: true,
-        ...this.buildOllamaOptions()
+        ...this.buildOllamaOptions(),
       });
 
       for await (const chunk of stream) {
         yield {
           content: chunk.message.content,
           done: chunk.done,
-          tokensUsed: chunk.eval_count
+          tokensUsed: chunk.eval_count,
         };
       }
     } catch (error) {
@@ -108,11 +108,11 @@ export class OllamaProvider extends LLMProvider {
   async getModelInfo(): Promise<ModelInfo> {
     try {
       const modelInfo = await this.client.show({ model: this.model });
-      
+
       return {
         name: this.model,
         contextLength: this.extractContextLength(modelInfo),
-        supportedFeatures: ['chat', 'streaming']
+        supportedFeatures: ['chat', 'streaming'],
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {
@@ -140,7 +140,10 @@ export class OllamaProvider extends LLMProvider {
       const response = await this.client.list();
       return response.models.map(model => model.name);
     } catch (error) {
-      throw new ConnectionError('Failed to list available models', error as Error);
+      throw new ConnectionError(
+        'Failed to list available models',
+        error as Error
+      );
     }
   }
 
@@ -155,15 +158,17 @@ export class OllamaProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const capabilities = CapabilityManager.getCapabilities('ollama', this.model);
+    const capabilities = CapabilityManager.getCapabilities(
+      'ollama',
+      this.model
+    );
     return {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
       supportsThinking: capabilities.supportsThinking,
-      maxTokens: capabilities.maxTokens
+      maxTokens: capabilities.maxTokens,
     };
   }
-
 
   protected override getProviderVersion(): string | undefined {
     return '1.0'; // Could be enhanced to fetch actual Ollama version
@@ -174,9 +179,9 @@ export class OllamaProvider extends LLMProvider {
     if (this.configuredMaxTokens !== undefined) {
       return this.configuredMaxTokens;
     }
-    
+
     const defaultContextLength = 4096;
-    
+
     try {
       if (modelInfo.parameters?.includes('context_length')) {
         const match = modelInfo.parameters.match(/context_length\s+(\d+)/);
@@ -184,11 +189,11 @@ export class OllamaProvider extends LLMProvider {
           return parseInt(match[1], 10);
         }
       }
-      
+
       if (modelInfo.model_info?.['llama.context_length']) {
         return modelInfo.model_info['llama.context_length'];
       }
-      
+
       return defaultContextLength;
     } catch {
       return defaultContextLength;
@@ -202,8 +207,8 @@ export class OllamaProvider extends LLMProvider {
     if (this.configuredMaxTokens !== undefined) {
       return {
         options: {
-          num_ctx: this.configuredMaxTokens
-        }
+          num_ctx: this.configuredMaxTokens,
+        },
       };
     }
     return {};
@@ -212,27 +217,33 @@ export class OllamaProvider extends LLMProvider {
   /**
    * Convert our message format to Ollama format, handling tool messages
    */
-  private convertMessagesToOllamaFormat(messages: Message[]): Array<{ role: string; content: string }> {
+  private convertMessagesToOllamaFormat(
+    messages: Message[]
+  ): Array<{ role: string; content: string }> {
     return messages.map(msg => {
       // Handle tool messages by converting them to user messages with context
       if (msg.role === 'tool') {
         return {
           role: 'user',
-          content: `Tool result: ${msg.content}`
+          content: `Tool result: ${msg.content}`,
         };
       }
-      
+
       // For assistant messages with tool calls, include the tool call info
-      if (msg.role === 'assistant' && msg.toolCalls && msg.toolCalls.length > 0) {
+      if (
+        msg.role === 'assistant' &&
+        msg.toolCalls &&
+        msg.toolCalls.length > 0
+      ) {
         return {
           role: msg.role,
-          content: msg.content // The content already contains the tool call JSON
+          content: msg.content, // The content already contains the tool call JSON
         };
       }
-      
+
       return {
         role: msg.role,
-        content: msg.content
+        content: msg.content,
       };
     });
   }

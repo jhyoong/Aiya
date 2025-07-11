@@ -18,13 +18,16 @@ export class CommandUtils {
    * Parse parameter definitions from usage string
    * Example: "/read <file_path>" -> [{ name: 'file_path', required: true, type: 'file' }]
    */
-  static parseParameterDefinitions(_usage: string, parameters?: string[]): ArgumentDefinition[] {
+  static parseParameterDefinitions(
+    _usage: string,
+    parameters?: string[]
+  ): ArgumentDefinition[] {
     if (!parameters) return [];
 
-    return parameters.map((param) => {
+    return parameters.map(param => {
       const isRequired = param.startsWith('<') && param.endsWith('>');
       const isOptional = param.startsWith('[') && param.endsWith(']');
-      
+
       let name = param;
       if (isRequired || isOptional) {
         name = param.slice(1, -1);
@@ -36,9 +39,17 @@ export class CommandUtils {
         type = 'file';
       } else if (name.includes('dir') || name.includes('directory')) {
         type = 'directory';
-      } else if (name.includes('count') || name.includes('number') || name.includes('size')) {
+      } else if (
+        name.includes('count') ||
+        name.includes('number') ||
+        name.includes('size')
+      ) {
         type = 'number';
-      } else if (name.includes('enable') || name.includes('disable') || name.includes('flag')) {
+      } else if (
+        name.includes('enable') ||
+        name.includes('disable') ||
+        name.includes('flag')
+      ) {
         type = 'boolean';
       }
 
@@ -46,7 +57,7 @@ export class CommandUtils {
         name,
         required: isRequired,
         type,
-        description: `${name} parameter`
+        description: `${name} parameter`,
       };
     });
   }
@@ -54,13 +65,16 @@ export class CommandUtils {
   /**
    * Parse command arguments based on argument definitions
    */
-  static parseArguments(args: string[], definitions: ArgumentDefinition[]): ParsedArguments {
+  static parseArguments(
+    args: string[],
+    definitions: ArgumentDefinition[]
+  ): ParsedArguments {
     const parsed: ParsedArguments = {};
 
     for (let i = 0; i < definitions.length; i++) {
       const def = definitions[i];
       if (!def) continue;
-      
+
       const value = args[i];
 
       if (!value && def.required) {
@@ -86,7 +100,10 @@ export class CommandUtils {
             }
             break;
           case 'boolean':
-            parsed[def.name] = value.toLowerCase() === 'true' || value === '1' || value.toLowerCase() === 'yes';
+            parsed[def.name] =
+              value.toLowerCase() === 'true' ||
+              value === '1' ||
+              value.toLowerCase() === 'yes';
             break;
           case 'string':
           case 'file':
@@ -97,10 +114,14 @@ export class CommandUtils {
         }
 
         // Validate allowed values
-        if (def.allowedValues && !def.allowedValues.includes(parsed[def.name])) {
-          throw new Error(`Invalid value for ${def.name}. Allowed values: ${def.allowedValues.join(', ')}`);
+        if (
+          def.allowedValues &&
+          !def.allowedValues.includes(parsed[def.name])
+        ) {
+          throw new Error(
+            `Invalid value for ${def.name}. Allowed values: ${def.allowedValues.join(', ')}`
+          );
         }
-
       } catch (error: any) {
         throw new Error(`Error parsing argument ${def.name}: ${error.message}`);
       }
@@ -122,8 +143,11 @@ export class CommandUtils {
 
     if (command.parameters && command.parameters.length > 0) {
       help += `\n**Parameters:**\n`;
-      const definitions = this.parseParameterDefinitions(command.usage, command.parameters);
-      
+      const definitions = this.parseParameterDefinitions(
+        command.usage,
+        command.parameters
+      );
+
       for (const def of definitions) {
         const required = def.required ? '(required)' : '(optional)';
         help += `  **${def.name}** ${required} - ${def.description}\n`;
@@ -158,7 +182,10 @@ export class CommandUtils {
     }
 
     if (path.startsWith('/') && process.platform === 'win32') {
-      return { valid: false, error: 'Absolute Unix paths not supported on Windows' };
+      return {
+        valid: false,
+        error: 'Absolute Unix paths not supported on Windows',
+      };
     }
 
     return { valid: true };
@@ -167,7 +194,10 @@ export class CommandUtils {
   /**
    * Validate directory path argument
    */
-  static validateDirectoryPath(path: string): { valid: boolean; error?: string } {
+  static validateDirectoryPath(path: string): {
+    valid: boolean;
+    error?: string;
+  } {
     return this.validateFilePath(path); // Same validation for now
   }
 
@@ -205,13 +235,16 @@ export class CommandUtils {
   /**
    * Suggest similar command names based on typos
    */
-  static suggestSimilarCommands(input: string, availableCommands: string[]): string[] {
+  static suggestSimilarCommands(
+    input: string,
+    availableCommands: string[]
+  ): string[] {
     const suggestions: string[] = [];
     const inputLower = input.toLowerCase();
 
     for (const command of availableCommands) {
       const commandLower = command.toLowerCase();
-      
+
       // Exact prefix match
       if (commandLower.startsWith(inputLower)) {
         suggestions.push(command);
@@ -232,7 +265,9 @@ export class CommandUtils {
    * Calculate Levenshtein distance between two strings
    */
   private static levenshteinDistance(str1: string, str2: string): number {
-    const matrix = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+    const matrix = Array(str2.length + 1)
+      .fill(null)
+      .map(() => Array(str1.length + 1).fill(null));
 
     for (let i = 0; i <= str1.length; i++) {
       const row = matrix[0];
@@ -250,12 +285,12 @@ export class CommandUtils {
         const currentRow = matrix[j];
         const prevRow = matrix[j - 1];
         const currentRowPrev = matrix[j];
-        
+
         if (currentRow && prevRow && currentRowPrev) {
           currentRow[i] = Math.min(
-            (currentRowPrev[i - 1] || 0) + 1,      // deletion
-            (prevRow[i] || 0) + 1,      // insertion
-            (prevRow[i - 1] || 0) + indicator  // substitution
+            (currentRowPrev[i - 1] || 0) + 1, // deletion
+            (prevRow[i] || 0) + 1, // insertion
+            (prevRow[i - 1] || 0) + indicator // substitution
           );
         }
       }

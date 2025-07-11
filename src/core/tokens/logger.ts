@@ -24,12 +24,12 @@ export class TokenLogger {
     this.provider = provider;
     this.model = model;
     this.isNewSession = !sessionId; // Track if this is a new session or continuing existing one
-    
+
     // Create logs directory in ~/.aiya/logs/
     const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     const aiyaDir = path.join(homeDir, '.aiya');
     const logsDir = path.join(aiyaDir, 'logs');
-    
+
     // Ensure directories exist
     if (!fs.existsSync(aiyaDir)) {
       fs.mkdirSync(aiyaDir, { recursive: true });
@@ -37,7 +37,7 @@ export class TokenLogger {
     if (!fs.existsSync(logsDir)) {
       fs.mkdirSync(logsDir, { recursive: true });
     }
-    
+
     this.logFile = path.join(logsDir, 'tokens.log');
   }
 
@@ -45,7 +45,11 @@ export class TokenLogger {
     return this.sessionId;
   }
 
-  logTokenUsage(sent: number, received: number, estimated: boolean = false): void {
+  logTokenUsage(
+    sent: number,
+    received: number,
+    estimated: boolean = false
+  ): void {
     const entry: TokenLogEntry = {
       timestamp: new Date().toISOString(),
       sessionId: this.sessionId,
@@ -53,11 +57,11 @@ export class TokenLogger {
       received,
       provider: this.provider,
       model: this.model,
-      estimated
+      estimated,
     };
 
     const logLine = this.formatLogEntry(entry);
-    
+
     try {
       fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
     } catch (error) {
@@ -94,14 +98,14 @@ export class TokenLogger {
   logSessionChange(newProvider: string, newModel: string): void {
     const oldProvider = `${this.provider}:${this.model}`;
     const newProviderModel = `${newProvider}:${newModel}`;
-    
+
     const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_CHANGE ${oldProvider} -> ${newProviderModel}`;
     try {
       fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
     } catch (error) {
       console.error('Failed to write session change log:', error);
     }
-    
+
     // Update the current provider and model
     this.provider = newProvider;
     this.model = newModel;
@@ -140,8 +144,16 @@ export class TokenLogger {
    * Create a new TokenLogger for the same session with a different provider/model
    * This preserves the session ID while switching models
    */
-  static continueSession(existingLogger: TokenLogger, newProvider: string, newModel: string): TokenLogger {
-    const newLogger = new TokenLogger(newProvider, newModel, existingLogger.getSessionId());
+  static continueSession(
+    existingLogger: TokenLogger,
+    newProvider: string,
+    newModel: string
+  ): TokenLogger {
+    const newLogger = new TokenLogger(
+      newProvider,
+      newModel,
+      existingLogger.getSessionId()
+    );
     // Mark this as continuing an existing session, not a new one
     newLogger.isNewSession = false;
     return newLogger;

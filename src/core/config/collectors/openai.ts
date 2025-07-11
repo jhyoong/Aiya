@@ -12,12 +12,13 @@ export class OpenAICollector extends BaseProviderCollector {
   }
 
   async collectConfig(): Promise<ExtendedProviderConfig> {
-    const apiKey = this.options.existingConfig?.apiKey || process.env.OPENAI_API_KEY;
+    const apiKey =
+      this.options.existingConfig?.apiKey || process.env.OPENAI_API_KEY;
     const existingConfig = {
       ...this.options.existingConfig,
-      ...(apiKey && { apiKey })
+      ...(apiKey && { apiKey }),
     };
-    
+
     return CapabilityManager.getDefaultConfig('openai', existingConfig);
   }
 
@@ -28,7 +29,10 @@ export class OpenAICollector extends BaseProviderCollector {
     }
 
     // API key validation (optional for some custom endpoints)
-    if (config.apiKey && !CapabilityManager.validateApiKey('openai', config.apiKey)) {
+    if (
+      config.apiKey &&
+      !CapabilityManager.validateApiKey('openai', config.apiKey)
+    ) {
       return false;
     }
 
@@ -40,14 +44,16 @@ export class OpenAICollector extends BaseProviderCollector {
     return true;
   }
 
-  async testConnection(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
+  async testConnection(
+    config: ExtendedProviderConfig
+  ): Promise<ConnectionTestResult> {
     if (!this.options.skipValidation) {
       const isValid = await this.validateConfig(config);
       if (!isValid) {
         return {
           success: false,
           error: 'Invalid configuration',
-          suggestions: ['Check model name and API key format']
+          suggestions: ['Check model name and API key format'],
         };
       }
     }
@@ -55,17 +61,22 @@ export class OpenAICollector extends BaseProviderCollector {
     return this.connectionTester.testOpenAI(config);
   }
 
-  async getAvailableModels(config: Partial<ExtendedProviderConfig>): Promise<string[]> {
-    return await CapabilityManager.getAvailableModelsWithFetching('openai', config);
+  async getAvailableModels(
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]> {
+    return await CapabilityManager.getAvailableModelsWithFetching(
+      'openai',
+      config
+    );
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {
     const apiKey = process.env.OPENAI_API_KEY;
     const defaultConfig = CapabilityManager.getDefaultConfig('openai');
-    
+
     return {
       ...defaultConfig,
-      ...(apiKey && { apiKey })
+      ...(apiKey && { apiKey }),
     };
   }
 
@@ -81,7 +92,7 @@ export class OpenAICollector extends BaseProviderCollector {
     return CapabilityManager.getContextLengthInfo('openai');
   }
 
-  getCostInfo(): Record<string, {input: number; output: number}> {
+  getCostInfo(): Record<string, { input: number; output: number }> {
     return CapabilityManager.getCostInfo('openai');
   }
 }

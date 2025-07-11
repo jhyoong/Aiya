@@ -68,26 +68,26 @@ export abstract class LLMProvider {
   }
 
   abstract chat(messages: Message[]): Promise<Response>;
-  
+
   abstract stream(messages: Message[]): AsyncGenerator<StreamResponse>;
-  
+
   abstract countTokens(text: string): number;
-  
+
   abstract getModel(): string;
-  
+
   abstract getModelInfo(): Promise<ModelInfo>;
-  
+
   abstract supportsStreaming(): boolean;
-  
+
   abstract isHealthy(): Promise<boolean>;
-  
+
   abstract listAvailableModels(): Promise<string[]>;
-  
+
   /**
    * Check if the provider is properly authenticated
    */
   abstract isAuthenticated(): Promise<boolean>;
-  
+
   /**
    * Get provider-specific capabilities
    */
@@ -97,7 +97,7 @@ export abstract class LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }>;
-  
+
   /**
    * Get provider metadata
    */
@@ -106,17 +106,17 @@ export abstract class LLMProvider {
     return {
       type: this.config.type,
       name: this.config.type,
-      ...(version && { version })
+      ...(version && { version }),
     };
   }
-  
+
   /**
    * Get provider version (can be overridden)
    */
   protected getProviderVersion(): string | undefined {
     return undefined;
   }
-  
+
   /**
    * Validate API key format (can be overridden)
    */
@@ -126,7 +126,10 @@ export abstract class LLMProvider {
 }
 
 export class ProviderError extends Error {
-  constructor(message: string, public override cause?: Error) {
+  constructor(
+    message: string,
+    public override cause?: Error
+  ) {
     super(message);
     this.name = 'ProviderError';
   }

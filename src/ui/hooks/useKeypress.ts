@@ -19,7 +19,7 @@ export interface Key {
  */
 export function useKeypress(
   onKeypress: (key: Key) => void,
-  { isActive }: { isActive: boolean },
+  { isActive }: { isActive: boolean }
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
@@ -34,7 +34,7 @@ export function useKeypress(
     }
 
     setRawMode(true);
-    
+
     // Enable bracketed paste mode
     process.stdout.write('\x1b[?2004h');
 
@@ -80,7 +80,7 @@ export function useKeypress(
           if (key.name === 'return' && key.sequence === '\x1B\r') {
             key.meta = true;
           }
-          
+
           // Detect Shift+Enter combination
           // Shift+Enter typically sends sequence '\r' with shift: true
           // or can be detected by sequence comparison
@@ -88,7 +88,7 @@ export function useKeypress(
             // This is Shift+Enter
             key.name = 'shift+return';
           }
-          
+
           onKeypressRef.current({ ...key, paste: isPaste });
         }
       }
@@ -100,7 +100,7 @@ export function useKeypress(
     return () => {
       // Disable bracketed paste mode before cleanup
       process.stdout.write('\x1b[?2004l');
-      
+
       stdin.removeListener('keypress', handleKeypress);
       rl.close();
       setRawMode(false);

@@ -1,14 +1,14 @@
 import { GoogleGenAI } from '@google/genai';
-import { 
-  LLMProvider, 
-  Message, 
-  Response, 
-  StreamResponse, 
-  ModelInfo, 
-  ConnectionError, 
+import {
+  LLMProvider,
+  Message,
+  Response,
+  StreamResponse,
+  ModelInfo,
+  ConnectionError,
   ModelNotFoundError,
   ProviderError,
-  ProviderConfig
+  ProviderConfig,
 } from './base.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
 import { GeminiErrorMapper, ErrorContext } from '../errors/index.js';
@@ -32,25 +32,25 @@ export class GeminiProvider extends LLMProvider {
 
   constructor(config: ProviderConfig) {
     super(config);
-    
+
     if (!config.apiKey) {
       throw new ProviderError('Google AI API key is required');
     }
-    
+
     this.client = new GoogleGenAI({ apiKey: config.apiKey });
-    
+
     this.generationConfig = {
       maxOutputTokens: config.maxTokens || config.gemini?.maxTokens || 8192,
       temperature: 0.7,
       topP: 0.8,
-      topK: 40
+      topK: 40,
     };
 
     // Configure thinking mode for 2.5 models
     if (this.model.includes('2.5')) {
       this.thinkingConfig = {
         thinkingBudget: config.gemini?.thinkingBudget || -1, // Dynamic thinking by default
-        includeThoughts: config.gemini?.includeThoughts || false
+        includeThoughts: config.gemini?.includeThoughts || false,
       };
     }
   }
@@ -63,11 +63,11 @@ export class GeminiProvider extends LLMProvider {
       provider: 'gemini',
       operation,
       model: this.model,
-      endpoint: 'https://generativelanguage.googleapis.com/v1'
+      endpoint: 'https://generativelanguage.googleapis.com/v1',
     };
 
     const result = GeminiErrorMapper.handleGeminiError(error, context);
-    
+
     // Convert standardized error to provider-specific error type
     if (result.success) {
       throw new ProviderError('Unknown error occurred');
@@ -88,23 +88,23 @@ export class GeminiProvider extends LLMProvider {
   async chat(messages: Message[]): Promise<Response> {
     try {
       const { contents } = this.convertMessagesToGeminiFormat(messages);
-      
+
       const config = {
         ...this.generationConfig,
-        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig })
+        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig }),
       };
-      
+
       const response = await this.client.models.generateContent({
         model: this.model,
         contents: contents,
-        config: config
+        config: config,
       });
-      
+
       return {
         content: response.text || '',
-        ...(response.usageMetadata?.totalTokenCount && { 
-          tokensUsed: response.usageMetadata.totalTokenCount 
-        })
+        ...(response.usageMetadata?.totalTokenCount && {
+          tokensUsed: response.usageMetadata.totalTokenCount,
+        }),
       };
     } catch (error) {
       this.handleError(error, 'chat');
@@ -114,16 +114,16 @@ export class GeminiProvider extends LLMProvider {
   async *stream(messages: Message[]): AsyncGenerator<StreamResponse> {
     try {
       const { contents } = this.convertMessagesToGeminiFormat(messages);
-      
+
       const config = {
         ...this.generationConfig,
-        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig })
+        ...(this.thinkingConfig && { thinkingConfig: this.thinkingConfig }),
       };
-      
+
       const response = await this.client.models.generateContentStream({
         model: this.model,
         contents: contents,
-        config: config
+        config: config,
       });
 
       let totalTokens = 0;
@@ -133,10 +133,10 @@ export class GeminiProvider extends LLMProvider {
         if (chunkText) {
           yield {
             content: chunkText,
-            done: false
+            done: false,
           };
         }
-        
+
         // Update token count if available
         if (chunk.usageMetadata?.totalTokenCount) {
           totalTokens = chunk.usageMetadata.totalTokenCount;
@@ -148,9 +148,8 @@ export class GeminiProvider extends LLMProvider {
         content: '',
         done: true,
         tokensUsed: totalTokens,
-        usageMetadata: usageMetadata // Include full usage metadata
+        usageMetadata: usageMetadata, // Include full usage metadata
       };
-
     } catch (error) {
       this.handleError(error, 'stream');
     }
@@ -169,8 +168,11 @@ export class GeminiProvider extends LLMProvider {
 
   async getModelInfo(): Promise<ModelInfo> {
     try {
-      const capabilities = CapabilityManager.getCapabilities('gemini', this.model);
-      
+      const capabilities = CapabilityManager.getCapabilities(
+        'gemini',
+        this.model
+      );
+
       return {
         name: this.model,
         contextLength: capabilities.maxTokens,
@@ -178,8 +180,8 @@ export class GeminiProvider extends LLMProvider {
         capabilities: {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
-          supportsThinking: capabilities.supportsThinking
-        }
+          supportsThinking: capabilities.supportsThinking,
+        },
       };
     } catch (error) {
       throw new ProviderError(`Failed to get model info: ${error}`);
@@ -194,7 +196,7 @@ export class GeminiProvider extends LLMProvider {
     try {
       await this.client.models.generateContent({
         model: this.model,
-        contents: 'Hi'
+        contents: 'Hi',
       });
       return true;
     } catch {
@@ -211,7 +213,7 @@ export class GeminiProvider extends LLMProvider {
     try {
       await this.client.models.generateContent({
         model: this.model,
-        contents: 'Hi'
+        contents: 'Hi',
       });
       return true;
     } catch (error) {
@@ -225,12 +227,15 @@ export class GeminiProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const capabilities = CapabilityManager.getCapabilities('gemini', this.model);
+    const capabilities = CapabilityManager.getCapabilities(
+      'gemini',
+      this.model
+    );
     return {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
       supportsThinking: capabilities.supportsThinking,
-      maxTokens: capabilities.maxTokens
+      maxTokens: capabilities.maxTokens,
     };
   }
 
@@ -247,7 +252,7 @@ export class GeminiProvider extends LLMProvider {
     // Process messages
     for (const msg of messages) {
       if (!msg) continue;
-      
+
       if (msg.role === 'system') {
         systemPrompt += (systemPrompt ? '\n\n' : '') + msg.content;
       } else if (msg.role === 'tool') {
@@ -261,11 +266,10 @@ export class GeminiProvider extends LLMProvider {
     }
 
     // Combine system prompt with conversation
-    const contents = systemPrompt 
+    const contents = systemPrompt
       ? `${systemPrompt}${conversationContent}`
       : conversationContent.trim();
 
     return { contents };
   }
-
 }

@@ -12,24 +12,25 @@ export class GeminiCollector extends BaseProviderCollector {
   }
 
   async collectConfig(): Promise<ExtendedProviderConfig> {
-    const apiKey = this.options.existingConfig?.apiKey || process.env.GEMINI_API_KEY;
+    const apiKey =
+      this.options.existingConfig?.apiKey || process.env.GEMINI_API_KEY;
     const existingConfig = {
       ...this.options.existingConfig,
-      ...(apiKey && { apiKey })
+      ...(apiKey && { apiKey }),
     };
-    
+
     const config = CapabilityManager.getDefaultConfig('gemini', existingConfig);
-    
+
     // Add Gemini-specific configurations
     if (!config.gemini) {
       config.gemini = {
         location: existingConfig?.gemini?.location || 'us-central1',
         maxTokens: 8192,
         thinkingBudget: 20000,
-        includeThoughts: true
+        includeThoughts: true,
       };
     }
-    
+
     return config;
   }
 
@@ -47,14 +48,16 @@ export class GeminiCollector extends BaseProviderCollector {
     return true;
   }
 
-  async testConnection(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
+  async testConnection(
+    config: ExtendedProviderConfig
+  ): Promise<ConnectionTestResult> {
     if (!this.options.skipValidation) {
       const isValid = await this.validateConfig(config);
       if (!isValid) {
         return {
           success: false,
           error: 'Invalid configuration',
-          suggestions: ['Check model name and API key']
+          suggestions: ['Check model name and API key'],
         };
       }
     }
@@ -62,14 +65,19 @@ export class GeminiCollector extends BaseProviderCollector {
     return this.connectionTester.testGemini(config);
   }
 
-  async getAvailableModels(config: Partial<ExtendedProviderConfig>): Promise<string[]> {
-    return await CapabilityManager.getAvailableModelsWithFetching('gemini', config);
+  async getAvailableModels(
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]> {
+    return await CapabilityManager.getAvailableModelsWithFetching(
+      'gemini',
+      config
+    );
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {
     const apiKey = process.env.GEMINI_API_KEY;
     const defaultConfig = CapabilityManager.getDefaultConfig('gemini');
-    
+
     return {
       ...defaultConfig,
       ...(apiKey && { apiKey }),
@@ -77,8 +85,8 @@ export class GeminiCollector extends BaseProviderCollector {
         location: 'us-central1',
         maxTokens: 8192,
         thinkingBudget: 20000,
-        includeThoughts: true
-      }
+        includeThoughts: true,
+      },
     };
   }
 
@@ -94,20 +102,20 @@ export class GeminiCollector extends BaseProviderCollector {
     return CapabilityManager.getContextLengthInfo('gemini');
   }
 
-  getThinkingOptions(): Array<{label: string; value: boolean}> {
+  getThinkingOptions(): Array<{ label: string; value: boolean }> {
     return CapabilityManager.getThinkingOptions('gemini') || [];
   }
 
-  getThinkingBudgetOptions(): Array<{label: string; value: number}> {
+  getThinkingBudgetOptions(): Array<{ label: string; value: number }> {
     return CapabilityManager.getThinkingBudgetOptions('gemini') || [];
   }
 
-  getLocationOptions(): Array<{label: string; value: string}> {
+  getLocationOptions(): Array<{ label: string; value: string }> {
     return [
       { label: 'US Central (us-central1)', value: 'us-central1' },
       { label: 'US East (us-east1)', value: 'us-east1' },
       { label: 'Europe West (europe-west1)', value: 'europe-west1' },
-      { label: 'Asia Pacific (asia-southeast1)', value: 'asia-southeast1' }
+      { label: 'Asia Pacific (asia-southeast1)', value: 'asia-southeast1' },
     ];
   }
 }

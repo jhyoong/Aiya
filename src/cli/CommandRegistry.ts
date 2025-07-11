@@ -1,9 +1,18 @@
+/**
+ * Categories for organizing commands in the registry
+ */
 export type CommandCategory = 'core' | 'config' | 'utility';
 
+/**
+ * Handler interface for command execution
+ */
 export interface CommandHandler {
   execute(args: string[], context?: any): Promise<any> | any;
 }
 
+/**
+ * Complete definition of a command including metadata and handler
+ */
 export interface CommandDefinition {
   name: string;
   description: string;
@@ -16,6 +25,9 @@ export interface CommandDefinition {
   examples?: string[];
 }
 
+/**
+ * Result of command validation including error details and suggestions
+ */
 export interface ValidationResult {
   valid: boolean;
   error?: string;
@@ -31,7 +43,7 @@ export class CommandRegistry {
    */
   static registerCommand(definition: CommandDefinition): void {
     this.commands.set(definition.name, definition);
-    
+
     // Register aliases
     if (definition.aliases) {
       for (const alias of definition.aliases) {
@@ -112,29 +124,29 @@ export class CommandRegistry {
    */
   static validateCommand(name: string, args: string[]): ValidationResult {
     const command = this.getCommand(name);
-    
+
     if (!command) {
       const similar = this.findCommands(name);
       return {
         valid: false,
         error: `Unknown command: ${name}`,
-        suggestions: similar.length > 0 
-          ? [`Did you mean: ${similar.map(c => c.name).join(', ')}?`]
-          : ['Use /help to see available commands']
+        suggestions:
+          similar.length > 0
+            ? [`Did you mean: ${similar.map(c => c.name).join(', ')}?`]
+            : ['Use /help to see available commands'],
       };
     }
 
     // Basic parameter validation
     if (command.parameters) {
-      const requiredParams = command.parameters.filter(p => !p.startsWith('[') || !p.endsWith(']'));
+      const requiredParams = command.parameters.filter(
+        p => !p.startsWith('[') || !p.endsWith(']')
+      );
       if (args.length < requiredParams.length) {
         return {
           valid: false,
           error: `Missing required parameters for ${command.name}`,
-          suggestions: [
-            `Usage: ${command.usage}`,
-            ...(command.examples || [])
-          ]
+          suggestions: [`Usage: ${command.usage}`, ...(command.examples || [])],
         };
       }
     }
@@ -154,18 +166,18 @@ export class CommandRegistry {
 
       let help = `**${command.name}** - ${command.description}\n\n`;
       help += `**Usage:** ${command.usage}\n`;
-      
+
       if (command.aliases && command.aliases.length > 0) {
         help += `**Aliases:** ${command.aliases.join(', ')}\n`;
       }
-      
+
       if (command.examples && command.examples.length > 0) {
         help += `**Examples:**\n`;
         for (const example of command.examples) {
           help += `  ${example}\n`;
         }
       }
-      
+
       if (command.requiresConfig) {
         help += `\n*Note: This command requires project configuration*\n`;
       }
@@ -177,14 +189,16 @@ export class CommandRegistry {
     let help = '**Available Commands**\n\n';
 
     const categories: CommandCategory[] = ['core', 'config', 'utility'];
-    
+
     for (const category of categories) {
       const commands = this.getCommandsByCategory(category);
       if (commands.length === 0) continue;
 
       help += `**${category.charAt(0).toUpperCase() + category.slice(1)} Commands:**\n`;
-      
-      for (const command of commands.sort((a, b) => a.name.localeCompare(b.name))) {
+
+      for (const command of commands.sort((a, b) =>
+        a.name.localeCompare(b.name)
+      )) {
         help += `  **/${command.name}** - ${command.description}\n`;
         if (command.aliases && command.aliases.length > 0) {
           help += `    *Aliases: ${command.aliases.join(', ')}*\n`;
@@ -193,7 +207,8 @@ export class CommandRegistry {
       help += '\n';
     }
 
-    help += 'Use `/help <command>` for detailed information about a specific command.\n';
+    help +=
+      'Use `/help <command>` for detailed information about a specific command.\n';
     return help;
   }
 
@@ -217,11 +232,15 @@ export class CommandRegistry {
   /**
    * Get command statistics
    */
-  static getStats(): { totalCommands: number; totalAliases: number; categoryCounts: Record<CommandCategory, number> } {
+  static getStats(): {
+    totalCommands: number;
+    totalAliases: number;
+    categoryCounts: Record<CommandCategory, number>;
+  } {
     const categoryCounts: Record<CommandCategory, number> = {
       core: 0,
       config: 0,
-      utility: 0
+      utility: 0,
     };
 
     for (const command of this.commands.values()) {
@@ -231,7 +250,7 @@ export class CommandRegistry {
     return {
       totalCommands: this.commands.size,
       totalAliases: this.aliases.size,
-      categoryCounts
+      categoryCounts,
     };
   }
 }

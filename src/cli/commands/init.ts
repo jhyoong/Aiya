@@ -6,13 +6,19 @@ import { SetupWizard } from '../../ui/components/setup/SetupWizard.js';
 export const initCommand = new Command('init')
   .description('Initialize Aiya configuration for current project')
   .option('--skip-validation', 'Skip connection testing during setup')
-  .option('--non-interactive', 'Run in non-interactive mode (not yet implemented)')
-  .action(async (options) => {
+  .option(
+    '--non-interactive',
+    'Run in non-interactive mode (not yet implemented)'
+  )
+  .action(async options => {
     try {
       // Start the interactive setup wizard
       await runSetupWizard(process.cwd(), options);
     } catch (error) {
-      console.error('❌ Setup failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.error(
+        '❌ Setup failed:',
+        error instanceof Error ? error.message : 'Unknown error'
+      );
       process.exit(1);
     }
   });
@@ -22,7 +28,10 @@ interface SetupOptions {
   nonInteractive?: boolean;
 }
 
-async function runSetupWizard(projectPath: string, _options: SetupOptions): Promise<void> {
+async function runSetupWizard(
+  projectPath: string,
+  _options: SetupOptions
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const handleComplete = (success: boolean, _configPath?: string) => {
       if (success) {
@@ -41,7 +50,7 @@ async function runSetupWizard(projectPath: string, _options: SetupOptions): Prom
       React.createElement(SetupWizard, {
         projectPath,
         onComplete: handleComplete,
-        onError: handleError
+        onError: handleError,
       })
     );
 
@@ -81,7 +90,7 @@ async function runSetupWizard(projectPath: string, _options: SetupOptions): Prom
       React.createElement(SetupWizard, {
         projectPath,
         onComplete: wrappedOnComplete,
-        onError: wrappedOnError
+        onError: wrappedOnError,
       })
     );
   });

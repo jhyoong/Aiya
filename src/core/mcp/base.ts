@@ -44,19 +44,22 @@ export abstract class MCPClient {
   }
 
   abstract connect(): Promise<void>;
-  
+
   abstract disconnect(): Promise<void>;
-  
+
   abstract ping(): Promise<boolean>;
-  
+
   abstract getServerInfo(): Promise<MCPServerInfo>;
-  
+
   abstract listTools(): Promise<Tool[]>;
-  
-  abstract callTool(name: string, args: Record<string, any>): Promise<ToolResult>;
-  
+
+  abstract callTool(
+    name: string,
+    args: Record<string, any>
+  ): Promise<ToolResult>;
+
   abstract listResources(): Promise<Resource[]>;
-  
+
   abstract readResource(uri: string): Promise<ToolResult>;
 
   isConnected(): boolean {
@@ -69,7 +72,11 @@ export abstract class MCPClient {
 }
 
 export class MCPError extends Error {
-  constructor(message: string, public code?: number, public override cause?: Error) {
+  constructor(
+    message: string,
+    public code?: number,
+    public override cause?: Error
+  ) {
     super(message);
     this.name = 'MCPError';
   }

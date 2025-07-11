@@ -16,28 +16,30 @@ interface ProviderSelectionProps {
   showSaveAndExit?: boolean;
 }
 
-export const ProviderSelection: React.FC<ProviderSelectionProps> = ({ 
-  onSelect, 
+export const ProviderSelection: React.FC<ProviderSelectionProps> = ({
+  onSelect,
   onSaveAndExit,
-  title = "Choose your AI provider:",
-  showSaveAndExit = false
+  title = 'Choose your AI provider:',
+  showSaveAndExit = false,
 }) => {
   const allProviders: ProviderOption[] = [
     {
       label: 'Ollama - Local AI models',
       value: 'ollama',
-      description: 'Free, runs locally, good for development and privacy'
+      description: 'Free, runs locally, good for development and privacy',
     },
     {
       label: 'OpenAI - GPT models',
       value: 'openai',
-      description: 'Paid API or free, state-of-the-art models, function calling'
+      description:
+        'Paid API or free, state-of-the-art models, function calling',
     },
     {
       label: 'Google Gemini - Gemini models',
       value: 'gemini',
-      description: 'Paid API, large context windows, vision support, thinking mode'
-    }
+      description:
+        'Paid API, large context windows, vision support, thinking mode',
+    },
   ];
 
   const availableProviders = allProviders;
@@ -51,17 +53,15 @@ export const ProviderSelection: React.FC<ProviderSelectionProps> = ({
   };
 
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
+    <Box flexDirection='column' paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="green">
+        <Text bold color='green'>
           {title}
         </Text>
       </Box>
-      
+
       <Box marginBottom={1}>
-        <Text dimColor>
-          Use arrow keys to navigate, Enter to select
-        </Text>
+        <Text dimColor>Use arrow keys to navigate, Enter to select</Text>
       </Box>
 
       <Box marginBottom={1}>
@@ -69,12 +69,16 @@ export const ProviderSelection: React.FC<ProviderSelectionProps> = ({
           options={[
             ...availableProviders.map(provider => ({
               label: provider.label,
-              value: provider.value
+              value: provider.value,
             })),
-            ...(showSaveAndExit ? [{
-              label: 'I changed my mind (Save current config and exit)',
-              value: 'save-and-exit'
-            }] : [])
+            ...(showSaveAndExit
+              ? [
+                  {
+                    label: 'I changed my mind (Save current config and exit)',
+                    value: 'save-and-exit',
+                  },
+                ]
+              : []),
           ]}
           onChange={handleSelect}
         />

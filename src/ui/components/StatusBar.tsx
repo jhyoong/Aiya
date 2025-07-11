@@ -7,12 +7,14 @@ interface StatusBarProps {
   provider?: string | undefined;
   model?: string | undefined;
   contextLength?: number | undefined;
-  tokenUsage?: {
-    sent: number;
-    sentTotal: number;
-    received: number;
-    receivedTotal: number;
-  } | undefined;
+  tokenUsage?:
+    | {
+        sent: number;
+        sentTotal: number;
+        received: number;
+        receivedTotal: number;
+      }
+    | undefined;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -51,28 +53,34 @@ export const StatusBar: React.FC<StatusBarProps> = ({
 
   return (
     <Box
-      borderStyle="round"
-      borderColor="gray"
+      borderStyle='round'
+      borderColor='gray'
       paddingX={1}
-      justifyContent="space-between"
+      justifyContent='space-between'
     >
       <Box>
         <Text color={getStatusColor()}>
           {getStatusIcon()} {status.toUpperCase()}
         </Text>
-        {message && (
-          <Text color="gray"> | {message}</Text>
-        )}
+        {message && <Text color='gray'> | {message}</Text>}
       </Box>
       {(provider || model || contextLength || tokenUsage) && (
         <Box>
-          {provider && <Text color="cyan">{provider}</Text>}
-          {model && <Text color="magenta">:{model}</Text>}
+          {provider && <Text color='cyan'>{provider}</Text>}
+          {model && <Text color='magenta'>:{model}</Text>}
           {contextLength && (
-            <Text color="blue"> | {contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}ctx</Text>
+            <Text color='blue'>
+              {' '}
+              | {contextLength.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+              ctx
+            </Text>
           )}
           {tokenUsage && (
-            <Text color="green"> | [Tokens: sent {tokenUsage.sent} ({tokenUsage.sentTotal}), received {tokenUsage.received} ({tokenUsage.receivedTotal})]</Text>
+            <Text color='green'>
+              {' '}
+              | [Tokens: sent {tokenUsage.sent} ({tokenUsage.sentTotal}),
+              received {tokenUsage.received} ({tokenUsage.receivedTotal})]
+            </Text>
           )}
         </Box>
       )}

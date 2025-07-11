@@ -40,7 +40,7 @@ export class ThinkingParser {
           if (this.buffer.length > 0) {
             results.push({
               content: this.buffer,
-              isThinking: false
+              isThinking: false,
             });
             this.buffer = '';
           }
@@ -51,7 +51,7 @@ export class ThinkingParser {
         if (thinkStart > 0) {
           results.push({
             content: this.buffer.substring(0, thinkStart),
-            isThinking: false
+            isThinking: false,
           });
         }
 
@@ -70,7 +70,7 @@ export class ThinkingParser {
             if (newThinkingContent) {
               results.push({
                 content: newThinkingContent,
-                isThinking: true
+                isThinking: true,
               });
             }
             this.thinkingContent += this.buffer;
@@ -85,13 +85,13 @@ export class ThinkingParser {
         // Found closing tag, process final thinking content
         const finalThinkingChunk = this.buffer.substring(0, thinkEnd);
         this.thinkingContent += finalThinkingChunk;
-        
+
         if (this.incrementalMode) {
           // Emit the final chunk if there's any content
           if (finalThinkingChunk) {
             results.push({
               content: finalThinkingChunk,
-              isThinking: true
+              isThinking: true,
             });
           }
         } else {
@@ -100,7 +100,7 @@ export class ThinkingParser {
           if (formattedThinking) {
             results.push({
               content: formattedThinking,
-              isThinking: true
+              isThinking: true,
             });
           }
         }
@@ -115,27 +115,30 @@ export class ThinkingParser {
     return results;
   }
 
-
   private formatThinking(content: string): string {
     if (this.mode === 'off') {
       return '';
     }
 
     const lines = content.trim().split('\n');
-    
+
     if (this.mode === 'brief') {
       // Show only first and last lines with summary
       if (lines.length <= 2) {
         return chalk.dim(chalk.yellow('💭 │ ') + lines[0]);
       }
-      
+
       const firstLine = lines[0]?.trim() || '';
       const lastLine = lines[lines.length - 1]?.trim() || '';
-      const summary = chalk.dim(chalk.yellow(`💭 Thinking (${lines.length} lines)`));
+      const summary = chalk.dim(
+        chalk.yellow(`💭 Thinking (${lines.length} lines)`)
+      );
       const first = chalk.dim(chalk.yellow('   ├─ ') + firstLine);
-      const ellipsis = chalk.dim(chalk.yellow('   ├─ ... (processing steps) ...'));
+      const ellipsis = chalk.dim(
+        chalk.yellow('   ├─ ... (processing steps) ...')
+      );
       const last = chalk.dim(chalk.yellow('   └─ ') + lastLine);
-      
+
       return `${summary}\n${first}\n${ellipsis}\n${last}`;
     }
 

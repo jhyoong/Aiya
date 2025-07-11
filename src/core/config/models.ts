@@ -31,7 +31,7 @@ export interface ProviderDefaults {
   baseUrl?: string;
   model: string;
   capabilities: ProviderCapabilities;
-  contextLengthOptions?: Array<{label: string; value: number}>;
+  contextLengthOptions?: Array<{ label: string; value: number }>;
   helpText: string;
   requiresApiKey: boolean;
   apiKeyPrefix?: string;
@@ -60,8 +60,8 @@ export const OLLAMA_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
-    }
+      supportsThinking: false,
+    },
   },
   {
     name: 'devstral:latest',
@@ -71,8 +71,8 @@ export const OLLAMA_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
-    }
+      supportsThinking: false,
+    },
   },
   {
     name: 'qwen2.5-coder:14b',
@@ -82,27 +82,28 @@ export const OLLAMA_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
-    }
-  }
+      supportsThinking: false,
+    },
+  },
 ];
 
 // OpenAI model definitions
 export const OPENAI_MODELS: ModelMetadata[] = [
   {
     name: 'gpt-4o',
-    description: 'Latest multimodal model with vision, best overall performance',
+    description:
+      'Latest multimodal model with vision, best overall performance',
     contextLength: 128000,
     capabilities: {
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.005,
-      output: 0.015
-    }
+      output: 0.015,
+    },
   },
   {
     name: 'gpt-4o-mini',
@@ -112,12 +113,12 @@ export const OPENAI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.00015,
-      output: 0.0006
-    }
+      output: 0.0006,
+    },
   },
   {
     name: 'gpt-4-turbo',
@@ -127,12 +128,12 @@ export const OPENAI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.01,
-      output: 0.03
-    }
+      output: 0.03,
+    },
   },
   {
     name: 'gpt-4',
@@ -142,12 +143,12 @@ export const OPENAI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.03,
-      output: 0.06
-    }
+      output: 0.06,
+    },
   },
   {
     name: 'gpt-3.5-turbo',
@@ -157,12 +158,12 @@ export const OPENAI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.001,
-      output: 0.002
-    }
+      output: 0.002,
+    },
   },
   {
     name: 'gpt-3.5-turbo-16k',
@@ -172,13 +173,13 @@ export const OPENAI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.003,
-      output: 0.004
-    }
-  }
+      output: 0.004,
+    },
+  },
 ];
 
 // Gemini model definitions
@@ -191,12 +192,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: true
+      supportsThinking: true,
     },
     costPerToken: {
       input: 0.000075,
-      output: 0.0003
-    }
+      output: 0.0003,
+    },
   },
   {
     name: 'gemini-2.5-pro',
@@ -206,12 +207,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: true
+      supportsThinking: true,
     },
     costPerToken: {
       input: 0.00125,
-      output: 0.005
-    }
+      output: 0.005,
+    },
   },
   {
     name: 'gemini-2.5-flash',
@@ -221,12 +222,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: true
+      supportsThinking: true,
     },
     costPerToken: {
       input: 0.000075,
-      output: 0.0003
-    }
+      output: 0.0003,
+    },
   },
   {
     name: 'gemini-2.5-flash-lite-preview-06-17',
@@ -236,12 +237,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: true
+      supportsThinking: true,
     },
     costPerToken: {
       input: 0.0000375,
-      output: 0.00015
-    }
+      output: 0.00015,
+    },
   },
   {
     name: 'gemini-1.5-pro',
@@ -251,12 +252,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.00125,
-      output: 0.005
-    }
+      output: 0.005,
+    },
   },
   {
     name: 'gemini-1.5-flash',
@@ -266,12 +267,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.000075,
-      output: 0.0003
-    }
+      output: 0.0003,
+    },
   },
   {
     name: 'gemini-1.5-flash-8b',
@@ -281,12 +282,12 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: true,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.0000375,
-      output: 0.00015
-    }
+      output: 0.00015,
+    },
   },
   {
     name: 'gemini-1.0-pro',
@@ -296,32 +297,40 @@ export const GEMINI_MODELS: ModelMetadata[] = [
       supportsFunctionCalling: true,
       supportsVision: false,
       supportsStreaming: true,
-      supportsThinking: false
+      supportsThinking: false,
     },
     costPerToken: {
       input: 0.0005,
-      output: 0.0015
-    }
-  }
+      output: 0.0015,
+    },
+  },
 ];
 
 // Combined model definitions
 export const MODEL_DEFINITIONS: ProviderModels = {
   ollama: OLLAMA_MODELS,
   openai: OPENAI_MODELS,
-  gemini: GEMINI_MODELS
+  gemini: GEMINI_MODELS,
 };
 
 // Utility functions
-export function getModelMetadata(providerType: keyof ProviderModels, modelName: string): ModelMetadata | undefined {
-  return MODEL_DEFINITIONS[providerType].find(model => model.name === modelName);
+export function getModelMetadata(
+  providerType: keyof ProviderModels,
+  modelName: string
+): ModelMetadata | undefined {
+  return MODEL_DEFINITIONS[providerType].find(
+    model => model.name === modelName
+  );
 }
 
 export function getModelNames(providerType: keyof ProviderModels): string[] {
   return MODEL_DEFINITIONS[providerType].map(model => model.name);
 }
 
-export function getModelCapabilities(providerType: keyof ProviderModels, modelName: string) {
+export function getModelCapabilities(
+  providerType: keyof ProviderModels,
+  modelName: string
+) {
   const metadata = getModelMetadata(providerType, modelName);
   if (!metadata) {
     // Return default capabilities for unknown models
@@ -330,21 +339,24 @@ export function getModelCapabilities(providerType: keyof ProviderModels, modelNa
       supportsVision: false,
       supportsFunctionCalling: true,
       supportsThinking: false,
-      supportsStreaming: true
+      supportsStreaming: true,
     };
   }
-  
+
   return {
     contextLength: metadata.contextLength,
     supportsVision: metadata.capabilities.supportsVision,
     supportsFunctionCalling: metadata.capabilities.supportsFunctionCalling,
     supportsThinking: metadata.capabilities.supportsThinking,
     supportsStreaming: metadata.capabilities.supportsStreaming,
-    ...(metadata.costPerToken && { costPerToken: metadata.costPerToken })
+    ...(metadata.costPerToken && { costPerToken: metadata.costPerToken }),
   };
 }
 
-export function getModelDescription(providerType: keyof ProviderModels, modelName: string): string {
+export function getModelDescription(
+  providerType: keyof ProviderModels,
+  modelName: string
+): string {
   const metadata = getModelMetadata(providerType, modelName);
   return metadata?.description || `${modelName} - No description available`;
 }
@@ -353,32 +365,33 @@ export function getDefaultModel(providerType: keyof ProviderModels): string {
   const defaults = {
     ollama: 'qwen3:8b',
     openai: 'gpt-4o',
-    gemini: 'gemini-2.0-flash-exp'
+    gemini: 'gemini-2.0-flash-exp',
   };
-  
+
   return defaults[providerType];
 }
 
 // Provider-specific defaults
-export const PROVIDER_DEFAULTS: Record<keyof ProviderModels, ProviderDefaults> = {
-  ollama: {
-    baseUrl: 'http://localhost:11434',
-    model: 'qwen3:8b',
-    capabilities: {
-      supportsFunctionCalling: true,
-      supportsVision: false,
-      supportsStreaming: true,
-      supportsThinking: false,
-      maxTokens: 8192
-    },
-    contextLengthOptions: [
-      { label: '4K tokens (Standard)', value: 4096 },
-      { label: '8K tokens (Extended)', value: 8192 },
-      { label: '16K tokens (Large)', value: 16384 },
-      { label: '32K tokens (Very Large)', value: 32768 },
-      { label: '64K tokens (Maximum)', value: 65536 }
-    ],
-    helpText: `Ollama Configuration Help:
+export const PROVIDER_DEFAULTS: Record<keyof ProviderModels, ProviderDefaults> =
+  {
+    ollama: {
+      baseUrl: 'http://localhost:11434',
+      model: 'qwen3:8b',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: false,
+        supportsStreaming: true,
+        supportsThinking: false,
+        maxTokens: 8192,
+      },
+      contextLengthOptions: [
+        { label: '4K tokens (Standard)', value: 4096 },
+        { label: '8K tokens (Extended)', value: 8192 },
+        { label: '16K tokens (Large)', value: 16384 },
+        { label: '32K tokens (Very Large)', value: 32768 },
+        { label: '64K tokens (Maximum)', value: 65536 },
+      ],
+      helpText: `Ollama Configuration Help:
 
 • Model: The name of the model to use (e.g., qwen2.5:8b, llama3.1:8b)
 • Base URL: The Ollama server endpoint (default: http://localhost:11434)
@@ -399,20 +412,20 @@ Troubleshooting:
 • If connection fails, ensure Ollama is running
 • Use 'ollama list' to see available models
 • Use 'ollama pull <model>' to download models`,
-    requiresApiKey: false
-  },
-  
-  openai: {
-    baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o',
-    capabilities: {
-      supportsFunctionCalling: true,
-      supportsVision: true,
-      supportsStreaming: true,
-      supportsThinking: false,
-      maxTokens: 128000
+      requiresApiKey: false,
     },
-    helpText: `OpenAI Configuration Help:
+
+    openai: {
+      baseUrl: 'https://api.openai.com/v1',
+      model: 'gpt-4o',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: true,
+        supportsStreaming: true,
+        supportsThinking: false,
+        maxTokens: 128000,
+      },
+      helpText: `OpenAI Configuration Help:
 
 • Model: The GPT model to use (e.g., gpt-4o, gpt-4-turbo)
 • API Key: Your OpenAI API key (starts with sk-)
@@ -445,20 +458,20 @@ Troubleshooting:
 • Check billing status in OpenAI dashboard
 • Verify model availability in your region
 • For custom endpoints, ensure they are OpenAI API compatible`,
-    requiresApiKey: true,
-    apiKeyPrefix: 'sk-'
-  },
-  
-  gemini: {
-    model: 'gemini-2.0-flash-exp',
-    capabilities: {
-      supportsFunctionCalling: true,
-      supportsVision: true,
-      supportsStreaming: true,
-      supportsThinking: true,
-      maxTokens: 1000000
+      requiresApiKey: true,
+      apiKeyPrefix: 'sk-',
     },
-    helpText: `Google Gemini Configuration Help:
+
+    gemini: {
+      model: 'gemini-2.0-flash-exp',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: true,
+        supportsStreaming: true,
+        supportsThinking: true,
+        maxTokens: 1000000,
+      },
+      helpText: `Google Gemini Configuration Help:
 
 • Model: The Gemini model to use (e.g., gemini-2.0-flash-exp, gemini-1.5-pro)
 • API Key: Your Google AI Studio API key
@@ -489,46 +502,52 @@ Troubleshooting:
 • Ensure API key is valid
 • Check if Gemini API is enabled
 • Verify model availability in your region`,
-    requiresApiKey: true
-  }
-};
+      requiresApiKey: true,
+    },
+  };
 
 // Create the unified provider registry
 export const PROVIDER_REGISTRY: ProviderRegistry = {
   ollama: {
     models: OLLAMA_MODELS,
-    defaults: PROVIDER_DEFAULTS.ollama
+    defaults: PROVIDER_DEFAULTS.ollama,
   },
   openai: {
     models: OPENAI_MODELS,
-    defaults: PROVIDER_DEFAULTS.openai
+    defaults: PROVIDER_DEFAULTS.openai,
   },
   gemini: {
     models: GEMINI_MODELS,
-    defaults: PROVIDER_DEFAULTS.gemini
-  }
+    defaults: PROVIDER_DEFAULTS.gemini,
+  },
 };
 
 // Enhanced utility functions
-export function getProviderDefaults(providerType: keyof ProviderModels): ProviderDefaults {
+export function getProviderDefaults(
+  providerType: keyof ProviderModels
+): ProviderDefaults {
   return PROVIDER_DEFAULTS[providerType];
 }
 
-export function getProviderCapabilities(providerType: keyof ProviderModels): ProviderCapabilities {
+export function getProviderCapabilities(
+  providerType: keyof ProviderModels
+): ProviderCapabilities {
   return PROVIDER_DEFAULTS[providerType].capabilities;
 }
 
-export function createDefaultConfig(providerType: keyof ProviderModels): Partial<any> {
+export function createDefaultConfig(
+  providerType: keyof ProviderModels
+): Partial<any> {
   const defaults = PROVIDER_DEFAULTS[providerType];
   const config: any = {
     type: providerType,
     model: defaults.model,
-    capabilities: defaults.capabilities
+    capabilities: defaults.capabilities,
   };
-  
+
   if (defaults.baseUrl) {
     config.baseUrl = defaults.baseUrl;
   }
-  
+
   return config;
 }

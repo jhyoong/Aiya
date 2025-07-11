@@ -15,7 +15,7 @@ export function useTerminalSize() {
     };
 
     process.stdout.on('resize', handleResize);
-    
+
     return () => {
       process.stdout.off('resize', handleResize);
     };

@@ -1,8 +1,25 @@
-export { CommandRegistry, CommandDefinition, CommandHandler, CommandCategory } from '../CommandRegistry.js';
-export { registerDefaultCommands, getCommandDefinition, CORE_COMMANDS } from './definitions.js';
+export {
+  CommandRegistry,
+  CommandDefinition,
+  CommandHandler,
+  CommandCategory,
+} from '../CommandRegistry.js';
+export {
+  registerDefaultCommands,
+  getCommandDefinition,
+  CORE_COMMANDS,
+} from './definitions.js';
 export { SuggestionEngine } from '../suggestions.js';
-export { CommandExecutor, CommandContext, ExecutionResult } from '../CommandExecutor.js';
-export { CommandUtils, ArgumentDefinition, ParsedArguments } from '../CommandUtils.js';
+export {
+  CommandExecutor,
+  CommandContext,
+  ExecutionResult,
+} from '../CommandExecutor.js';
+export {
+  CommandUtils,
+  ArgumentDefinition,
+  ParsedArguments,
+} from '../CommandUtils.js';
 import { registerDefaultCommands } from './definitions.js';
 
 /**

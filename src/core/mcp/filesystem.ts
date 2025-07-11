@@ -1,15 +1,15 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
-import { 
-  MCPClient, 
-  Tool, 
-  ToolResult, 
-  Resource, 
+import {
+  MCPClient,
+  Tool,
+  ToolResult,
+  Resource,
   MCPServerInfo,
   MCPError,
   MCPToolError,
-  MCPResourceError
+  MCPResourceError,
 } from './base.js';
 import { WorkspaceSecurity } from '../security/workspace.js';
 
@@ -40,8 +40,8 @@ export class FilesystemMCPClient extends MCPClient {
       capabilities: {
         tools: true,
         resources: true,
-        prompts: false
-      }
+        prompts: false,
+      },
     };
   }
 
@@ -55,11 +55,11 @@ export class FilesystemMCPClient extends MCPClient {
           properties: {
             path: {
               type: 'string',
-              description: 'Path to the file to read'
-            }
+              description: 'Path to the file to read',
+            },
           },
-          required: ['path']
-        }
+          required: ['path'],
+        },
       },
       {
         name: 'write_file',
@@ -69,15 +69,15 @@ export class FilesystemMCPClient extends MCPClient {
           properties: {
             path: {
               type: 'string',
-              description: 'Path to the file to write'
+              description: 'Path to the file to write',
             },
             content: {
               type: 'string',
-              description: 'Content to write to the file'
-            }
+              description: 'Content to write to the file',
+            },
           },
-          required: ['path', 'content']
-        }
+          required: ['path', 'content'],
+        },
       },
       {
         name: 'list_directory',
@@ -87,11 +87,11 @@ export class FilesystemMCPClient extends MCPClient {
           properties: {
             path: {
               type: 'string',
-              description: 'Path to the directory to list'
-            }
+              description: 'Path to the directory to list',
+            },
           },
-          required: ['path']
-        }
+          required: ['path'],
+        },
       },
       {
         name: 'search_files',
@@ -101,15 +101,15 @@ export class FilesystemMCPClient extends MCPClient {
           properties: {
             pattern: {
               type: 'string',
-              description: 'Glob pattern to search for files'
+              description: 'Glob pattern to search for files',
             },
             content: {
               type: 'string',
-              description: 'Optional: Search for files containing this text'
-            }
+              description: 'Optional: Search for files containing this text',
+            },
           },
-          required: ['pattern']
-        }
+          required: ['pattern'],
+        },
       },
       {
         name: 'edit_file',
@@ -119,20 +119,20 @@ export class FilesystemMCPClient extends MCPClient {
           properties: {
             path: {
               type: 'string',
-              description: 'Path to the file to edit'
+              description: 'Path to the file to edit',
             },
             old_content: {
               type: 'string',
-              description: 'Content to replace'
+              description: 'Content to replace',
             },
             new_content: {
               type: 'string',
-              description: 'New content to replace with'
-            }
+              description: 'New content to replace with',
+            },
           },
-          required: ['path', 'old_content', 'new_content']
-        }
-      }
+          required: ['path', 'old_content', 'new_content'],
+        },
+      },
     ];
   }
 
@@ -148,7 +148,11 @@ export class FilesystemMCPClient extends MCPClient {
         case 'search_files':
           return await this.searchFiles(args.pattern, args.content);
         case 'edit_file':
-          return await this.editFile(args.path, args.old_content, args.new_content);
+          return await this.editFile(
+            args.path,
+            args.old_content,
+            args.new_content
+          );
         default:
           throw new MCPToolError(name, `Unknown tool: ${name}`);
       }
@@ -164,15 +168,15 @@ export class FilesystemMCPClient extends MCPClient {
     try {
       const workspaceRoot = this.security.getWorkspaceRoot();
       const pattern = path.join(workspaceRoot, '**/*');
-      const files = await glob(pattern, { 
+      const files = await glob(pattern, {
         ignore: ['**/node_modules/**', '**/.*/**'],
-        nodir: true 
+        nodir: true,
       });
 
       return files.map(file => ({
         uri: `file://${file}`,
         name: path.relative(workspaceRoot, file),
-        mimeType: this.getMimeType(file)
+        mimeType: this.getMimeType(file),
       }));
     } catch (error) {
       throw new MCPResourceError('*', `Failed to list resources: ${error}`);
@@ -197,30 +201,43 @@ export class FilesystemMCPClient extends MCPClient {
 
   private async readFile(filePath: string): Promise<ToolResult> {
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'read');
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'read'
+      );
       const content = await fs.readFile(validatedPath, 'utf8');
-      
+
       return {
-        content: [{
-          type: 'text',
-          text: content
-        }]
+        content: [
+          {
+            type: 'text',
+            text: content,
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error reading file: ${error}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error reading file: ${error}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
 
-  private async writeFile(filePath: string, content: string): Promise<ToolResult> {
+  private async writeFile(
+    filePath: string,
+    content: string
+  ): Promise<ToolResult> {
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'write');
-      
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'write'
+      );
+
       // Create backup if file exists
       let backupCreated = false;
       try {
@@ -237,18 +254,22 @@ export class FilesystemMCPClient extends MCPClient {
       await fs.writeFile(validatedPath, content, 'utf8');
 
       return {
-        content: [{
-          type: 'text',
-          text: `Successfully wrote to ${filePath}${backupCreated ? ' (backup created)' : ''}`
-        }]
+        content: [
+          {
+            type: 'text',
+            text: `Successfully wrote to ${filePath}${backupCreated ? ' (backup created)' : ''}`,
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error writing file: ${error}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error writing file: ${error}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
@@ -259,53 +280,61 @@ export class FilesystemMCPClient extends MCPClient {
       const entries = await fs.readdir(validatedPath, { withFileTypes: true });
 
       const result = await Promise.all(
-        entries.map(async (entry) => {
+        entries.map(async entry => {
           const fullPath = path.join(validatedPath, entry.name);
           const stats = await fs.stat(fullPath);
-          const relativePath = this.security.getRelativePathFromWorkspace(fullPath);
-          
+          const relativePath =
+            this.security.getRelativePathFromWorkspace(fullPath);
+
           return {
             name: entry.name,
             path: relativePath,
             type: entry.isDirectory() ? 'directory' : 'file',
             size: entry.isFile() ? stats.size : undefined,
-            modified: stats.mtime.toISOString()
+            modified: stats.mtime.toISOString(),
           };
         })
       );
 
       return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(result, null, 2)
-        }]
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error listing directory: ${error}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error listing directory: ${error}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
 
-  private async searchFiles(pattern: string, contentSearch?: string): Promise<ToolResult> {
+  private async searchFiles(
+    pattern: string,
+    contentSearch?: string
+  ): Promise<ToolResult> {
     try {
       let safePattern = this.security.createSafeGlobPattern(pattern);
-      
+
       // If pattern doesn't contain ** and starts with *, make it recursive
       if (safePattern.startsWith('*') && !safePattern.includes('**')) {
         safePattern = '**/' + safePattern;
       }
-      
+
       const workspaceRoot = this.security.getWorkspaceRoot();
       const fullPattern = path.join(workspaceRoot, safePattern);
-      
-      let files = await glob(fullPattern, { 
+
+      let files = await glob(fullPattern, {
         nodir: true,
-        ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**']
+        ignore: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
       });
 
       // Filter by allowed extensions
@@ -333,44 +362,57 @@ export class FilesystemMCPClient extends MCPClient {
         files = matchingFiles;
       }
 
-      const relativePaths = files.map(file => 
+      const relativePaths = files.map(file =>
         this.security.getRelativePathFromWorkspace(file)
       );
 
       return {
-        content: [{
-          type: 'text',
-          text: JSON.stringify(relativePaths, null, 2)
-        }]
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(relativePaths, null, 2),
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error searching files: ${error}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error searching files: ${error}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
 
-  private async editFile(filePath: string, oldContent: string, newContent: string): Promise<ToolResult> {
+  private async editFile(
+    filePath: string,
+    oldContent: string,
+    newContent: string
+  ): Promise<ToolResult> {
     try {
-      const validatedPath = await this.security.validateFileAccess(filePath, 'write');
+      const validatedPath = await this.security.validateFileAccess(
+        filePath,
+        'write'
+      );
       const currentContent = await fs.readFile(validatedPath, 'utf8');
 
       if (!currentContent.includes(oldContent)) {
         return {
-          content: [{
-            type: 'text',
-            text: `Content to replace not found in file: ${filePath}`
-          }],
-          isError: true
+          content: [
+            {
+              type: 'text',
+              text: `Content to replace not found in file: ${filePath}`,
+            },
+          ],
+          isError: true,
         };
       }
 
       const updatedContent = currentContent.replace(oldContent, newContent);
-      
+
       // Create backup
       const backupPath = `${validatedPath}.backup.${Date.now()}`;
       await fs.copyFile(validatedPath, backupPath);
@@ -379,18 +421,22 @@ export class FilesystemMCPClient extends MCPClient {
       await fs.writeFile(validatedPath, updatedContent, 'utf8');
 
       return {
-        content: [{
-          type: 'text',
-          text: `Successfully edited ${filePath} (backup created at ${path.basename(backupPath)})`
-        }]
+        content: [
+          {
+            type: 'text',
+            text: `Successfully edited ${filePath} (backup created at ${path.basename(backupPath)})`,
+          },
+        ],
       };
     } catch (error) {
       return {
-        content: [{
-          type: 'text',
-          text: `Error editing file: ${error}`
-        }],
-        isError: true
+        content: [
+          {
+            type: 'text',
+            text: `Error editing file: ${error}`,
+          },
+        ],
+        isError: true,
       };
     }
   }
@@ -413,7 +459,7 @@ export class FilesystemMCPClient extends MCPClient {
       '.cpp': 'text/x-c++',
       '.h': 'text/x-c-header',
       '.yaml': 'application/x-yaml',
-      '.yml': 'application/x-yaml'
+      '.yml': 'application/x-yaml',
     };
 
     return mimeMap[ext] || 'text/plain';

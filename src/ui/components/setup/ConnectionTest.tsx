@@ -15,7 +15,7 @@ type TestState = 'idle' | 'testing' | 'success' | 'error' | 'skipped';
 export const ConnectionTest: React.FC<ConnectionTestProps> = ({
   config,
   onSuccess,
-  onSkip
+  onSkip,
 }) => {
   const [state, setState] = React.useState<TestState>('idle');
   const [error, setError] = React.useState<string>('');
@@ -37,7 +37,7 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
 
     try {
       const result = await connectionTester.testProvider(config);
-      
+
       if (result.success) {
         setState('success');
         // Auto-proceed after showing success message
@@ -71,18 +71,18 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
     switch (state) {
       case 'idle':
         return (
-          <Box flexDirection="column">
+          <Box flexDirection='column'>
             <Text>Preparing connection test...</Text>
           </Box>
         );
 
       case 'testing':
         return (
-          <Box flexDirection="column">
+          <Box flexDirection='column'>
             <Box marginBottom={1}>
               <Spinner label={`Testing connection to ${config.type}...`} />
             </Box>
-            
+
             <Text dimColor>
               Checking: {config.model} @ {config.baseUrl || 'default endpoint'}
             </Text>
@@ -91,11 +91,11 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
 
       case 'success':
         return (
-          <Box flexDirection="column">
-            <Alert variant="success">
+          <Box flexDirection='column'>
+            <Alert variant='success'>
               <Text>✅ Connection test successful!</Text>
             </Alert>
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Model {config.model} is available and ready to use.
@@ -106,17 +106,17 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
 
       case 'error':
         return (
-          <Box flexDirection="column">
-            <Alert variant="error">
+          <Box flexDirection='column'>
+            <Alert variant='error'>
               <Text>❌ Connection test failed</Text>
             </Alert>
-            
+
             <Box marginTop={1} marginBottom={1}>
-              <Text color="red">Error: {error}</Text>
+              <Text color='red'>Error: {error}</Text>
             </Box>
-            
+
             {suggestions.length > 0 && (
-              <Box flexDirection="column" marginBottom={1}>
+              <Box flexDirection='column' marginBottom={1}>
                 <Text bold>💡 Suggestions:</Text>
                 {suggestions.map((suggestion, index) => (
                   <Text key={index} dimColor>
@@ -125,14 +125,11 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
                 ))}
               </Box>
             )}
-            
+
             {showSkipOption ? (
-              <Box flexDirection="column">
-                <ConfirmInput
-                  onConfirm={handleRetry}
-                  onCancel={handleSkip}
-                />
-                
+              <Box flexDirection='column'>
+                <ConfirmInput onConfirm={handleRetry} onCancel={handleSkip} />
+
                 <Box marginTop={1}>
                   <Text dimColor>
                     Press y to retry, n to skip testing and continue setup
@@ -140,20 +137,18 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
                 </Box>
               </Box>
             ) : (
-              <Text dimColor>
-                Testing will continue in a moment...
-              </Text>
+              <Text dimColor>Testing will continue in a moment...</Text>
             )}
           </Box>
         );
 
       case 'skipped':
         return (
-          <Box flexDirection="column">
-            <Alert variant="warning">
+          <Box flexDirection='column'>
+            <Alert variant='warning'>
               <Text>⚠️ Connection test skipped</Text>
             </Alert>
-            
+
             <Box marginTop={1}>
               <Text dimColor>
                 Configuration saved but may need adjustment later.
@@ -168,21 +163,19 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
   };
 
   return (
-    <Box flexDirection="column" paddingX={2} paddingY={1}>
+    <Box flexDirection='column' paddingX={2} paddingY={1}>
       <Box marginBottom={1}>
-        <Text bold color="blue">
+        <Text bold color='blue'>
           Testing Connection
         </Text>
       </Box>
-      
+
       <Box marginBottom={1}>
-        <Text dimColor>
-          Verifying your {config.type} configuration...
-        </Text>
+        <Text dimColor>Verifying your {config.type} configuration...</Text>
       </Box>
-      
+
       {renderContent()}
-      
+
       {state !== 'success' && state !== 'skipped' && (
         <Box marginTop={2}>
           <Text dimColor>

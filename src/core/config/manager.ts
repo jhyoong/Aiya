@@ -70,7 +70,6 @@ export interface AiyaConfig {
   max_tokens?: number;
 }
 
-
 const DEFAULT_PROVIDER: ExtendedProviderConfig = {
   type: 'ollama',
   baseUrl: 'http://localhost:11434',
@@ -80,34 +79,52 @@ const DEFAULT_PROVIDER: ExtendedProviderConfig = {
     supportsFunctionCalling: true,
     supportsVision: false,
     supportsStreaming: true,
-    supportsThinking: false
-  }
+    supportsThinking: false,
+  },
 };
 
 const DEFAULT_CONFIG: AiyaConfig = {
   provider: DEFAULT_PROVIDER,
   security: {
     allowedExtensions: [
-      '.ts', '.js', '.tsx', '.jsx',
-      '.py', '.rs', '.go', '.java',
-      '.c', '.cpp', '.h', '.hpp',
-      '.md', '.txt', '.json', '.yaml', '.yml',
-      '.html', '.css', '.scss', '.sass',
-      '.sql', '.sh', '.bash'
+      '.ts',
+      '.js',
+      '.tsx',
+      '.jsx',
+      '.py',
+      '.rs',
+      '.go',
+      '.java',
+      '.c',
+      '.cpp',
+      '.h',
+      '.hpp',
+      '.md',
+      '.txt',
+      '.json',
+      '.yaml',
+      '.yml',
+      '.html',
+      '.css',
+      '.scss',
+      '.sass',
+      '.sql',
+      '.sh',
+      '.bash',
     ],
     restrictToWorkspace: true,
-    maxFileSize: 1024 * 1024 // 1MB
+    maxFileSize: 1024 * 1024, // 1MB
   },
   ui: {
     streaming: true,
     showTokens: true,
     theme: 'auto',
-    thinking: 'on'
+    thinking: 'on',
   },
   mcp: {
-    servers: []
+    servers: [],
   },
-  max_tokens: 4096
+  max_tokens: 4096,
 };
 
 export class ConfigManager {
@@ -136,13 +153,13 @@ export class ConfigManager {
 
   async save(config: Partial<AiyaConfig>): Promise<void> {
     this.config = this.mergeConfigs(this.config, config);
-    
+
     await fs.mkdir(path.dirname(this.configPath), { recursive: true });
     const yamlContent = yaml.stringify(this.config, {
       indent: 2,
-      lineWidth: 80
+      lineWidth: 80,
     });
-    
+
     await fs.writeFile(this.configPath, yamlContent, 'utf8');
   }
 
@@ -151,25 +168,25 @@ export class ConfigManager {
       provider: {
         ...DEFAULT_PROVIDER,
         ...(model && { model }),
-        ...(baseUrl && { baseUrl })
-      }
+        ...(baseUrl && { baseUrl }),
+      },
     };
 
     await this.save(initConfig);
-    
+
     const projectConfigPath = path.join(process.cwd(), '.aiya.yaml');
-    
+
     // Use ConfigurationGenerator for consistent format
     const configGenerator = new ConfigurationGenerator();
     const session = {
       primaryProvider: {
         ...DEFAULT_PROVIDER,
         ...(model && { model }),
-        ...(baseUrl && { baseUrl })
+        ...(baseUrl && { baseUrl }),
       },
       additionalProviders: [],
       skipValidation: false,
-      projectPath: process.cwd()
+      projectPath: process.cwd(),
     };
 
     const yamlContent = configGenerator.generateYAML(session);
@@ -188,24 +205,24 @@ export class ConfigManager {
         return provider;
       }
     }
-    
+
     // Fallback to single provider or default
     return this.config.provider || DEFAULT_PROVIDER;
   }
 
   getAvailableProviders(): string[] {
     const providers: string[] = [];
-    
+
     // Add named providers first
     if (this.config.providers) {
       providers.push(...Object.keys(this.config.providers));
     }
-    
+
     // Only add 'default' if no named providers exist
     if (this.config.provider && !this.config.providers) {
       providers.push('default');
     }
-    
+
     return providers;
   }
 
@@ -214,12 +231,12 @@ export class ConfigManager {
     if (this.config.providers && this.config.providers[name]) {
       return this.config.providers[name];
     }
-    
+
     // Only use 'default' if no named providers exist
     if (name === 'default' && this.config.provider && !this.config.providers) {
       return this.config.provider;
     }
-    
+
     return null;
   }
 
@@ -229,7 +246,7 @@ export class ConfigManager {
     if (!providerConfig) {
       return false;
     }
-    
+
     // Update current provider
     if (providerName === 'default' && !this.config.providers) {
       // Using single provider, clear current_provider
@@ -238,7 +255,7 @@ export class ConfigManager {
       // Using named provider
       this.config.current_provider = providerName;
     }
-    
+
     return true;
   }
 
@@ -252,7 +269,7 @@ export class ConfigManager {
       path.join(cwd, '.aiya.yaml'),
       path.join(cwd, '.aiya.yml'),
       path.join(cwd, 'aiya.config.yaml'),
-      path.join(cwd, 'aiya.config.yml')
+      path.join(cwd, 'aiya.config.yml'),
     ];
 
     for (const configPath of possiblePaths) {
@@ -285,12 +302,14 @@ export class ConfigManager {
     try {
       const content = await fs.readFile(this.projectConfigPath, 'utf8');
       const rawConfig = yaml.parse(content);
-      
+
       // Parse as nested config format only
       const projectConfig = rawConfig as Partial<AiyaConfig>;
       this.config = this.mergeConfigs(this.config, projectConfig);
     } catch (error) {
-      console.warn(`Failed to load project config from ${this.projectConfigPath}: ${error}`);
+      console.warn(
+        `Failed to load project config from ${this.projectConfigPath}: ${error}`
+      );
     }
   }
 
@@ -299,83 +318,103 @@ export class ConfigManager {
     if (!this.config.provider) {
       this.config.provider = { ...DEFAULT_PROVIDER };
     }
-    
+
     if (process.env.AIYA_PROVIDER) {
       const providerType = process.env.AIYA_PROVIDER.toLowerCase();
-      if (['ollama', 'openai', 'anthropic', 'azure', 'gemini', 'bedrock'].includes(providerType)) {
-        this.config.provider.type = providerType as ExtendedProviderConfig['type'];
+      if (
+        [
+          'ollama',
+          'openai',
+          'anthropic',
+          'azure',
+          'gemini',
+          'bedrock',
+        ].includes(providerType)
+      ) {
+        this.config.provider.type =
+          providerType as ExtendedProviderConfig['type'];
       }
     }
-    
+
     if (process.env.AIYA_MODEL) {
       this.config.provider.model = process.env.AIYA_MODEL;
     }
-    
+
     if (process.env.AIYA_BASE_URL) {
       this.config.provider.baseUrl = process.env.AIYA_BASE_URL;
     }
-    
+
     if (process.env.AIYA_API_KEY) {
       this.config.provider.apiKey = process.env.AIYA_API_KEY;
     }
-    
+
     if (process.env.OPENAI_API_KEY && this.config.provider.type === 'openai') {
       this.config.provider.apiKey = process.env.OPENAI_API_KEY;
     }
-    
-    if (process.env.ANTHROPIC_API_KEY && this.config.provider.type === 'anthropic') {
+
+    if (
+      process.env.ANTHROPIC_API_KEY &&
+      this.config.provider.type === 'anthropic'
+    ) {
       this.config.provider.apiKey = process.env.ANTHROPIC_API_KEY;
     }
-    
-    if (process.env.AZURE_OPENAI_API_KEY && this.config.provider.type === 'azure') {
+
+    if (
+      process.env.AZURE_OPENAI_API_KEY &&
+      this.config.provider.type === 'azure'
+    ) {
       this.config.provider.apiKey = process.env.AZURE_OPENAI_API_KEY;
     }
-    
+
     if (process.env.GEMINI_API_KEY && this.config.provider.type === 'gemini') {
       this.config.provider.apiKey = process.env.GEMINI_API_KEY;
     }
-    
+
     // AWS Bedrock environment variables
     if (this.config.provider.type === 'bedrock') {
       if (process.env.AWS_REGION) {
         this.config.provider.bedrock = {
           region: process.env.AWS_REGION,
-          ...this.config.provider.bedrock
+          ...this.config.provider.bedrock,
         };
       }
-      
+
       if (process.env.AWS_ACCESS_KEY_ID) {
         this.config.provider.bedrock = {
           region: this.config.provider.bedrock?.region || 'us-east-1',
           ...this.config.provider.bedrock,
-          accessKeyId: process.env.AWS_ACCESS_KEY_ID
+          accessKeyId: process.env.AWS_ACCESS_KEY_ID,
         };
       }
-      
+
       if (process.env.AWS_SECRET_ACCESS_KEY) {
         this.config.provider.bedrock = {
           region: this.config.provider.bedrock?.region || 'us-east-1',
           ...this.config.provider.bedrock,
-          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+          secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
         };
       }
-      
+
       if (process.env.AWS_SESSION_TOKEN) {
         this.config.provider.bedrock = {
           region: this.config.provider.bedrock?.region || 'us-east-1',
           ...this.config.provider.bedrock,
-          sessionToken: process.env.AWS_SESSION_TOKEN
+          sessionToken: process.env.AWS_SESSION_TOKEN,
         };
       }
     }
-    
+
     if (process.env.AIYA_STREAMING) {
       this.config.ui.streaming = process.env.AIYA_STREAMING === 'true';
     }
-    
+
     if (process.env.AIYA_THINKING) {
       const thinkingMode = process.env.AIYA_THINKING.toLowerCase();
-      if (thinkingMode === 'on' || thinkingMode === 'brief' || thinkingMode === 'off') {
+      if (
+        thinkingMode === 'on' ||
+        thinkingMode === 'brief' ||
+        thinkingMode === 'off'
+      ) {
         this.config.ui.thinking = thinkingMode as 'on' | 'brief' | 'off';
       }
     }
@@ -383,16 +422,21 @@ export class ConfigManager {
 
   private validateConfig(): void {
     const currentProvider = this.getCurrentProvider();
-    
+
     if (!currentProvider.model) {
       throw new Error('Provider model is required');
     }
-    
+
     // Only validate baseUrl for providers that require it
-    if (this.requiresBaseUrl(currentProvider.type) && !currentProvider.baseUrl) {
-      throw new Error(`Provider baseUrl is required for ${currentProvider.type}`);
+    if (
+      this.requiresBaseUrl(currentProvider.type) &&
+      !currentProvider.baseUrl
+    ) {
+      throw new Error(
+        `Provider baseUrl is required for ${currentProvider.type}`
+      );
     }
-    
+
     if (this.config.security.maxFileSize <= 0) {
       throw new Error('Max file size must be positive');
     }
@@ -405,55 +449,72 @@ export class ConfigManager {
     return providerType === 'ollama';
   }
 
-
-  private mergeConfigs(base: AiyaConfig, override: Partial<AiyaConfig>): AiyaConfig {
+  private mergeConfigs(
+    base: AiyaConfig,
+    override: Partial<AiyaConfig>
+  ): AiyaConfig {
     const result = { ...base };
-    
+
     if (override.provider) {
       result.provider = { ...result.provider, ...override.provider };
-      
+
       // Merge provider-specific configurations
       if (override.provider.azure) {
-        result.provider.azure = { ...result.provider.azure, ...override.provider.azure };
+        result.provider.azure = {
+          ...result.provider.azure,
+          ...override.provider.azure,
+        };
       }
       if (override.provider.anthropic) {
-        result.provider.anthropic = { ...result.provider.anthropic, ...override.provider.anthropic };
+        result.provider.anthropic = {
+          ...result.provider.anthropic,
+          ...override.provider.anthropic,
+        };
       }
       if (override.provider.gemini) {
-        result.provider.gemini = { ...result.provider.gemini, ...override.provider.gemini };
+        result.provider.gemini = {
+          ...result.provider.gemini,
+          ...override.provider.gemini,
+        };
       }
       if (override.provider.bedrock) {
-        result.provider.bedrock = { ...result.provider.bedrock, ...override.provider.bedrock };
+        result.provider.bedrock = {
+          ...result.provider.bedrock,
+          ...override.provider.bedrock,
+        };
       }
       if (override.provider.capabilities) {
-        result.provider.capabilities = { ...result.provider.capabilities, ...override.provider.capabilities };
+        result.provider.capabilities = {
+          ...result.provider.capabilities,
+          ...override.provider.capabilities,
+        };
       }
     }
-    
+
     if (override.providers) {
       result.providers = { ...result.providers, ...override.providers };
     }
-    
+
     if (override.current_provider !== undefined) {
       result.current_provider = override.current_provider;
     }
-    
+
     if (override.security) {
       result.security = { ...result.security, ...override.security };
     }
-    
+
     if (override.ui) {
       result.ui = { ...result.ui, ...override.ui };
     }
-    
+
     if (override.mcp) {
       result.mcp = { ...result.mcp, ...override.mcp };
     }
-    
+
     if (override.max_tokens !== undefined) {
       result.max_tokens = override.max_tokens;
     }
-    
+
     return result;
   }
 }

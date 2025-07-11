@@ -1,15 +1,15 @@
 /** This has not yet been fully tested. */
 import Anthropic from '@anthropic-ai/sdk';
-import { 
-  LLMProvider, 
-  Message, 
-  Response, 
-  StreamResponse, 
-  ModelInfo, 
-  ConnectionError, 
+import {
+  LLMProvider,
+  Message,
+  Response,
+  StreamResponse,
+  ModelInfo,
+  ConnectionError,
   ModelNotFoundError,
   ProviderError,
-  ProviderConfig
+  ProviderConfig,
 } from './base.js';
 
 export class AnthropicProvider extends LLMProvider {
@@ -17,41 +17,50 @@ export class AnthropicProvider extends LLMProvider {
 
   constructor(config: ProviderConfig) {
     super(config);
-    
+
     if (!config.apiKey) {
       throw new ProviderError('Anthropic API key is required');
     }
-    
+
     this.client = new Anthropic({
       apiKey: config.apiKey,
-      baseURL: config.baseUrl === 'https://api.anthropic.com' ? undefined : config.baseUrl
+      baseURL:
+        config.baseUrl === 'https://api.anthropic.com'
+          ? undefined
+          : config.baseUrl,
     });
   }
 
   async chat(messages: Message[]): Promise<Response> {
     try {
-      const { system, messages: anthropicMessages } = this.convertMessagesToAnthropicFormat(messages);
-      
+      const { system, messages: anthropicMessages } =
+        this.convertMessagesToAnthropicFormat(messages);
+
       const requestOptions: Anthropic.Messages.MessageCreateParams = {
         model: this.model,
         messages: anthropicMessages,
-        max_tokens: this.config.maxTokens || this.config.anthropic?.maxTokens || 4096,
-        ...(system && { system })
+        max_tokens:
+          this.config.maxTokens || this.config.anthropic?.maxTokens || 4096,
+        ...(system && { system }),
       };
 
       const response = await this.client.messages.create(requestOptions);
 
       const textContent = response.content
-        .filter((content): content is Anthropic.TextBlock => content.type === 'text')
+        .filter(
+          (content): content is Anthropic.TextBlock => content.type === 'text'
+        )
         .map(content => content.text)
         .join('');
 
       const result: Response = {
-        content: textContent
+        content: textContent,
       };
 
       if (response.usage.output_tokens || response.usage.input_tokens) {
-        result.tokensUsed = (response.usage.input_tokens || 0) + (response.usage.output_tokens || 0);
+        result.tokensUsed =
+          (response.usage.input_tokens || 0) +
+          (response.usage.output_tokens || 0);
       }
 
       if (response.stop_reason) {
@@ -64,16 +73,31 @@ export class AnthropicProvider extends LLMProvider {
       return result;
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
+        if (
+          error.message.includes('model') &&
+          error.message.includes('not found')
+        ) {
           throw new ModelNotFoundError(this.model);
         }
-        if (error.message.includes('authentication') || error.message.includes('api_key')) {
+        if (
+          error.message.includes('authentication') ||
+          error.message.includes('api_key')
+        ) {
           throw new ProviderError('Invalid Anthropic API key', error);
         }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to Anthropic API', error);
+        if (
+          error.message.includes('network') ||
+          error.message.includes('connection')
+        ) {
+          throw new ConnectionError(
+            'Failed to connect to Anthropic API',
+            error
+          );
         }
-        throw new ProviderError(`Anthropic chat failed: ${error.message}`, error);
+        throw new ProviderError(
+          `Anthropic chat failed: ${error.message}`,
+          error
+        );
       }
       throw new ProviderError('Unknown error occurred during chat');
     }
@@ -81,14 +105,16 @@ export class AnthropicProvider extends LLMProvider {
 
   async *stream(messages: Message[]): AsyncGenerator<StreamResponse> {
     try {
-      const { system, messages: anthropicMessages } = this.convertMessagesToAnthropicFormat(messages);
-      
+      const { system, messages: anthropicMessages } =
+        this.convertMessagesToAnthropicFormat(messages);
+
       const requestOptions: Anthropic.Messages.MessageCreateParams = {
         model: this.model,
         messages: anthropicMessages,
-        max_tokens: this.config.maxTokens || this.config.anthropic?.maxTokens || 4096,
+        max_tokens:
+          this.config.maxTokens || this.config.anthropic?.maxTokens || 4096,
         stream: true,
-        ...(system && { system })
+        ...(system && { system }),
       };
 
       const stream = this.client.messages.stream(requestOptions);
@@ -102,7 +128,7 @@ export class AnthropicProvider extends LLMProvider {
             if (chunk.delta.type === 'text_delta') {
               yield {
                 content: chunk.delta.text,
-                done: false
+                done: false,
               };
             }
             break;
@@ -123,7 +149,7 @@ export class AnthropicProvider extends LLMProvider {
             yield {
               content: '',
               done: true,
-              tokensUsed: totalInputTokens + totalOutputTokens
+              tokensUsed: totalInputTokens + totalOutputTokens,
             };
             return;
         }
@@ -133,21 +159,35 @@ export class AnthropicProvider extends LLMProvider {
       yield {
         content: '',
         done: true,
-        tokensUsed: totalInputTokens + totalOutputTokens
+        tokensUsed: totalInputTokens + totalOutputTokens,
       };
-
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('model') && error.message.includes('not found')) {
+        if (
+          error.message.includes('model') &&
+          error.message.includes('not found')
+        ) {
           throw new ModelNotFoundError(this.model);
         }
-        if (error.message.includes('authentication') || error.message.includes('api_key')) {
+        if (
+          error.message.includes('authentication') ||
+          error.message.includes('api_key')
+        ) {
           throw new ProviderError('Invalid Anthropic API key', error);
         }
-        if (error.message.includes('network') || error.message.includes('connection')) {
-          throw new ConnectionError('Failed to connect to Anthropic API', error);
+        if (
+          error.message.includes('network') ||
+          error.message.includes('connection')
+        ) {
+          throw new ConnectionError(
+            'Failed to connect to Anthropic API',
+            error
+          );
         }
-        throw new ProviderError(`Anthropic streaming failed: ${error.message}`, error);
+        throw new ProviderError(
+          `Anthropic streaming failed: ${error.message}`,
+          error
+        );
       }
       throw new ProviderError('Unknown error occurred during streaming');
     }
@@ -166,17 +206,24 @@ export class AnthropicProvider extends LLMProvider {
   async getModelInfo(): Promise<ModelInfo> {
     try {
       const capabilities = this.getModelCapabilities(this.model);
-      
+
       return {
         name: this.model,
         contextLength: capabilities.contextLength,
-        supportedFeatures: ['chat', 'streaming', 'thinking', 'function-calling'],
+        supportedFeatures: [
+          'chat',
+          'streaming',
+          'thinking',
+          'function-calling',
+        ],
         capabilities: {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: true, // Claude supports thinking tags
-          ...(capabilities.costPerToken && { costPerToken: capabilities.costPerToken })
-        }
+          ...(capabilities.costPerToken && {
+            costPerToken: capabilities.costPerToken,
+          }),
+        },
       };
     } catch (error) {
       throw new ProviderError(`Failed to get model info: ${error}`);
@@ -193,7 +240,7 @@ export class AnthropicProvider extends LLMProvider {
       await this.client.messages.create({
         model: this.model,
         messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 1
+        max_tokens: 1,
       });
       return true;
     } catch {
@@ -209,7 +256,7 @@ export class AnthropicProvider extends LLMProvider {
       'claude-3-5-haiku-20241022',
       'claude-3-opus-20240229',
       'claude-3-sonnet-20240229',
-      'claude-3-haiku-20240307'
+      'claude-3-haiku-20240307',
     ];
   }
 
@@ -218,7 +265,7 @@ export class AnthropicProvider extends LLMProvider {
       await this.client.messages.create({
         model: this.model,
         messages: [{ role: 'user', content: 'Hi' }],
-        max_tokens: 1
+        max_tokens: 1,
       });
       return true;
     } catch (error) {
@@ -237,7 +284,7 @@ export class AnthropicProvider extends LLMProvider {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
       supportsThinking: true, // Claude supports thinking
-      maxTokens: capabilities.contextLength
+      maxTokens: capabilities.contextLength,
     };
   }
 
@@ -259,18 +306,21 @@ export class AnthropicProvider extends LLMProvider {
         // Convert tool messages to user messages with context
         conversationMessages.push({
           role: 'user',
-          content: `Tool result: ${msg.content}`
+          content: `Tool result: ${msg.content}`,
         });
       } else {
         conversationMessages.push({
           role: msg.role as 'user' | 'assistant',
-          content: msg.content
+          content: msg.content,
         });
       }
     }
 
-    const result: { system?: string; messages: Anthropic.Messages.MessageParam[] } = {
-      messages: conversationMessages
+    const result: {
+      system?: string;
+      messages: Anthropic.Messages.MessageParam[];
+    } = {
+      messages: conversationMessages,
     };
 
     if (systemMessages.length > 0) {
@@ -280,7 +330,9 @@ export class AnthropicProvider extends LLMProvider {
     return result;
   }
 
-  private mapStopReason(reason: string): 'stop' | 'length' | 'tool_calls' | undefined {
+  private mapStopReason(
+    reason: string
+  ): 'stop' | 'length' | 'tool_calls' | undefined {
     switch (reason) {
       case 'end_turn':
         return 'stop';
@@ -305,32 +357,32 @@ export class AnthropicProvider extends LLMProvider {
         contextLength: 200000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.003, output: 0.015 }
+        costPerToken: { input: 0.003, output: 0.015 },
       },
       'claude-3-5-haiku': {
         contextLength: 200000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.00025, output: 0.00125 }
+        costPerToken: { input: 0.00025, output: 0.00125 },
       },
       'claude-3-opus': {
         contextLength: 200000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.015, output: 0.075 }
+        costPerToken: { input: 0.015, output: 0.075 },
       },
       'claude-3-sonnet': {
         contextLength: 200000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.003, output: 0.015 }
+        costPerToken: { input: 0.003, output: 0.015 },
       },
       'claude-3-haiku': {
         contextLength: 200000,
         supportsVision: true,
         supportsFunctionCalling: true,
-        costPerToken: { input: 0.00025, output: 0.00125 }
-      }
+        costPerToken: { input: 0.00025, output: 0.00125 },
+      },
     };
 
     // Find best match
@@ -342,9 +394,10 @@ export class AnthropicProvider extends LLMProvider {
 
     // Default fallback
     return {
-      contextLength: this.config.maxTokens || this.config.anthropic?.maxTokens || 200000,
+      contextLength:
+        this.config.maxTokens || this.config.anthropic?.maxTokens || 200000,
       supportsVision: true,
-      supportsFunctionCalling: true
+      supportsFunctionCalling: true,
     };
   }
 }

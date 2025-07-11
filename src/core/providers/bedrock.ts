@@ -1,19 +1,19 @@
 /** This has not yet been fully tested. */
-import { 
-  BedrockRuntimeClient, 
-  InvokeModelCommand, 
-  InvokeModelWithResponseStreamCommand
+import {
+  BedrockRuntimeClient,
+  InvokeModelCommand,
+  InvokeModelWithResponseStreamCommand,
 } from '@aws-sdk/client-bedrock-runtime';
-import { 
-  LLMProvider, 
-  Message, 
-  Response, 
-  StreamResponse, 
-  ModelInfo, 
-  ConnectionError, 
+import {
+  LLMProvider,
+  Message,
+  Response,
+  StreamResponse,
+  ModelInfo,
+  ConnectionError,
   ModelNotFoundError,
   ProviderError,
-  ProviderConfig
+  ProviderConfig,
 } from './base.js';
 
 export class BedrockProvider extends LLMProvider {
@@ -23,52 +23,67 @@ export class BedrockProvider extends LLMProvider {
 
   constructor(config: ProviderConfig) {
     super(config);
-    
+
     this.region = config.bedrock?.region || 'us-east-1';
     this.modelId = config.model;
-    
+
     // Initialize AWS Bedrock client
     this.client = new BedrockRuntimeClient({
       region: this.region,
-      ...(config.bedrock?.accessKeyId && config.bedrock?.secretAccessKey && {
-        credentials: {
-          accessKeyId: config.bedrock.accessKeyId,
-          secretAccessKey: config.bedrock.secretAccessKey,
-          ...(config.bedrock.sessionToken && { sessionToken: config.bedrock.sessionToken })
-        }
-      })
+      ...(config.bedrock?.accessKeyId &&
+        config.bedrock?.secretAccessKey && {
+          credentials: {
+            accessKeyId: config.bedrock.accessKeyId,
+            secretAccessKey: config.bedrock.secretAccessKey,
+            ...(config.bedrock.sessionToken && {
+              sessionToken: config.bedrock.sessionToken,
+            }),
+          },
+        }),
     });
   }
 
   async chat(messages: Message[]): Promise<Response> {
     try {
       const requestBody = this.formatRequestBody(messages);
-      
+
       const command = new InvokeModelCommand({
         modelId: this.modelId,
         contentType: 'application/json',
         accept: 'application/json',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       });
 
       const response = await this.client.send(command);
-      
+
       if (!response.body) {
         throw new ProviderError('Empty response body from Bedrock');
       }
 
       const responseBody = JSON.parse(new TextDecoder().decode(response.body));
-      
+
       return this.parseResponse(responseBody);
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('UnknownOperationException') || error.message.includes('ValidationException')) {
+        if (
+          error.message.includes('UnknownOperationException') ||
+          error.message.includes('ValidationException')
+        ) {
           throw new ModelNotFoundError(this.modelId);
         }
-        if (error.message.includes('AccessDeniedException') || error.message.includes('UnauthorizedOperation')) {
-          throw new ProviderError('AWS authentication failed or insufficient permissions', error);
+        if (
+          error.message.includes('AccessDeniedException') ||
+          error.message.includes('UnauthorizedOperation')
+        ) {
+          throw new ProviderError(
+            'AWS authentication failed or insufficient permissions',
+            error
+          );
         }
-        if (error.message.includes('network') || error.message.includes('connection')) {
+        if (
+          error.message.includes('network') ||
+          error.message.includes('connection')
+        ) {
           throw new ConnectionError('Failed to connect to AWS Bedrock', error);
         }
         throw new ProviderError(`Bedrock chat failed: ${error.message}`, error);
@@ -80,40 +95,42 @@ export class BedrockProvider extends LLMProvider {
   async *stream(messages: Message[]): AsyncGenerator<StreamResponse> {
     try {
       const requestBody = this.formatRequestBody(messages);
-      
+
       const command = new InvokeModelWithResponseStreamCommand({
         modelId: this.modelId,
         contentType: 'application/json',
         accept: 'application/json',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       });
 
       const response = await this.client.send(command);
-      
+
       if (!response.body) {
         throw new ProviderError('Empty response body from Bedrock streaming');
       }
 
-      let totalTokens = 0;
-      
+      const totalTokens = 0;
+
       for await (const chunk of response.body) {
         if (chunk.chunk?.bytes) {
-          const chunkData = JSON.parse(new TextDecoder().decode(chunk.chunk.bytes));
-          
+          const chunkData = JSON.parse(
+            new TextDecoder().decode(chunk.chunk.bytes)
+          );
+
           if (this.isClaudeModel()) {
             // Handle Claude streaming response
             if (chunkData.completion) {
               yield {
                 content: chunkData.completion,
-                done: false
+                done: false,
               };
             }
-            
+
             if (chunkData.stop_reason) {
               yield {
                 content: '',
                 done: true,
-                tokensUsed: totalTokens
+                tokensUsed: totalTokens,
               };
               return;
             }
@@ -122,15 +139,15 @@ export class BedrockProvider extends LLMProvider {
             if (chunkData.outputText) {
               yield {
                 content: chunkData.outputText,
-                done: false
+                done: false,
               };
             }
-            
+
             if (chunkData.completionReason) {
               yield {
                 content: '',
                 done: true,
-                tokensUsed: totalTokens
+                tokensUsed: totalTokens,
               };
               return;
             }
@@ -142,21 +159,35 @@ export class BedrockProvider extends LLMProvider {
       yield {
         content: '',
         done: true,
-        tokensUsed: totalTokens
+        tokensUsed: totalTokens,
       };
-
     } catch (error) {
       if (error instanceof Error) {
-        if (error.message.includes('UnknownOperationException') || error.message.includes('ValidationException')) {
+        if (
+          error.message.includes('UnknownOperationException') ||
+          error.message.includes('ValidationException')
+        ) {
           throw new ModelNotFoundError(this.modelId);
         }
-        if (error.message.includes('AccessDeniedException') || error.message.includes('UnauthorizedOperation')) {
-          throw new ProviderError('AWS authentication failed or insufficient permissions', error);
+        if (
+          error.message.includes('AccessDeniedException') ||
+          error.message.includes('UnauthorizedOperation')
+        ) {
+          throw new ProviderError(
+            'AWS authentication failed or insufficient permissions',
+            error
+          );
         }
-        if (error.message.includes('network') || error.message.includes('connection')) {
+        if (
+          error.message.includes('network') ||
+          error.message.includes('connection')
+        ) {
           throw new ConnectionError('Failed to connect to AWS Bedrock', error);
         }
-        throw new ProviderError(`Bedrock streaming failed: ${error.message}`, error);
+        throw new ProviderError(
+          `Bedrock streaming failed: ${error.message}`,
+          error
+        );
       }
       throw new ProviderError('Unknown error occurred during streaming');
     }
@@ -182,7 +213,7 @@ export class BedrockProvider extends LLMProvider {
   async getModelInfo(): Promise<ModelInfo> {
     try {
       const capabilities = this.getModelCapabilities();
-      
+
       return {
         name: this.modelId,
         contextLength: capabilities.contextLength,
@@ -191,8 +222,10 @@ export class BedrockProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: capabilities.supportsThinking,
-          ...(capabilities.costPerToken && { costPerToken: capabilities.costPerToken })
-        }
+          ...(capabilities.costPerToken && {
+            costPerToken: capabilities.costPerToken,
+          }),
+        },
       };
     } catch (error) {
       throw new ProviderError(`Failed to get model info: ${error}`);
@@ -207,12 +240,12 @@ export class BedrockProvider extends LLMProvider {
     try {
       const testMessage = [{ role: 'user' as const, content: 'Hi' }];
       const requestBody = this.formatRequestBody(testMessage);
-      
+
       const command = new InvokeModelCommand({
         modelId: this.modelId,
         contentType: 'application/json',
         accept: 'application/json',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       });
 
       await this.client.send(command);
@@ -244,7 +277,7 @@ export class BedrockProvider extends LLMProvider {
       // AI21 models
       'ai21.jamba-1-5-large-v1:0',
       'ai21.jamba-1-5-mini-v1:0',
-      'ai21.jamba-instruct-v1:0'
+      'ai21.jamba-instruct-v1:0',
     ];
   }
 
@@ -252,12 +285,12 @@ export class BedrockProvider extends LLMProvider {
     try {
       const testMessage = [{ role: 'user' as const, content: 'Hi' }];
       const requestBody = this.formatRequestBody(testMessage);
-      
+
       const command = new InvokeModelCommand({
         modelId: this.modelId,
         contentType: 'application/json',
         accept: 'application/json',
-        body: JSON.stringify(requestBody)
+        body: JSON.stringify(requestBody),
       });
 
       await this.client.send(command);
@@ -278,7 +311,7 @@ export class BedrockProvider extends LLMProvider {
       supportsVision: capabilities.supportsVision,
       supportsFunctionCalling: capabilities.supportsFunctionCalling,
       supportsThinking: capabilities.supportsThinking,
-      maxTokens: capabilities.contextLength
+      maxTokens: capabilities.contextLength,
     };
   }
 
@@ -309,15 +342,17 @@ export class BedrockProvider extends LLMProvider {
     }
 
     // Add system messages as context
-    const systemContext = systemMessages.length > 0 ? systemMessages.join('\n\n') + '\n\n' : '';
-    const prompt = systemContext + conversationMessages.join('\n\n') + '\n\nAssistant:';
+    const systemContext =
+      systemMessages.length > 0 ? systemMessages.join('\n\n') + '\n\n' : '';
+    const prompt =
+      systemContext + conversationMessages.join('\n\n') + '\n\nAssistant:';
 
     return {
       prompt,
       max_tokens_to_sample: this.config.maxTokens || 4096,
       temperature: 0.7,
       top_p: 0.9,
-      stop_sequences: ['Human:', 'Assistant:']
+      stop_sequences: ['Human:', 'Assistant:'],
     };
   }
 
@@ -333,8 +368,8 @@ export class BedrockProvider extends LLMProvider {
         maxTokenCount: this.config.maxTokens || 4096,
         temperature: 0.7,
         topP: 0.9,
-        stopSequences: ['user:', 'assistant:']
-      }
+        stopSequences: ['user:', 'assistant:'],
+      },
     };
   }
 
@@ -349,14 +384,14 @@ export class BedrockProvider extends LLMProvider {
       parameters: {
         max_tokens: this.config.maxTokens || 4096,
         temperature: 0.7,
-        top_p: 0.9
-      }
+        top_p: 0.9,
+      },
     };
   }
 
   private parseResponse(responseBody: any): Response {
     const result: Response = {
-      content: ''
+      content: '',
     };
 
     if (this.isClaudeModel()) {
@@ -370,20 +405,28 @@ export class BedrockProvider extends LLMProvider {
     } else if (this.isTitanModel()) {
       result.content = responseBody.outputText || '';
       if (responseBody.completionReason) {
-        const finishReason = this.mapTitanStopReason(responseBody.completionReason);
+        const finishReason = this.mapTitanStopReason(
+          responseBody.completionReason
+        );
         if (finishReason) {
           result.finishReason = finishReason;
         }
       }
     } else {
       // Generic response parsing
-      result.content = responseBody.outputText || responseBody.completion || responseBody.text || '';
+      result.content =
+        responseBody.outputText ||
+        responseBody.completion ||
+        responseBody.text ||
+        '';
     }
 
     return result;
   }
 
-  private mapClaudeStopReason(reason: string): 'stop' | 'length' | 'tool_calls' | undefined {
+  private mapClaudeStopReason(
+    reason: string
+  ): 'stop' | 'length' | 'tool_calls' | undefined {
     switch (reason) {
       case 'stop_sequence':
         return 'stop';
@@ -394,7 +437,9 @@ export class BedrockProvider extends LLMProvider {
     }
   }
 
-  private mapTitanStopReason(reason: string): 'stop' | 'length' | 'tool_calls' | undefined {
+  private mapTitanStopReason(
+    reason: string
+  ): 'stop' | 'length' | 'tool_calls' | undefined {
     switch (reason) {
       case 'FINISH':
         return 'stop';
@@ -428,8 +473,13 @@ export class BedrockProvider extends LLMProvider {
         supportsVision: this.modelId.includes('claude-3'),
         supportsFunctionCalling: this.modelId.includes('claude-3'),
         supportsThinking: true,
-        supportedFeatures: ['chat', 'streaming', 'thinking', 'function-calling'],
-        costPerToken: this.getClaudeCostPerToken()
+        supportedFeatures: [
+          'chat',
+          'streaming',
+          'thinking',
+          'function-calling',
+        ],
+        costPerToken: this.getClaudeCostPerToken(),
       };
     } else if (this.isTitanModel()) {
       return {
@@ -438,7 +488,7 @@ export class BedrockProvider extends LLMProvider {
         supportsFunctionCalling: false,
         supportsThinking: false,
         supportedFeatures: ['chat', 'streaming'],
-        costPerToken: { input: 0.0008, output: 0.0016 }
+        costPerToken: { input: 0.0008, output: 0.0016 },
       };
     } else {
       // Default for other models
@@ -447,7 +497,7 @@ export class BedrockProvider extends LLMProvider {
         supportsVision: false,
         supportsFunctionCalling: false,
         supportsThinking: false,
-        supportedFeatures: ['chat', 'streaming']
+        supportedFeatures: ['chat', 'streaming'],
       };
     }
   }

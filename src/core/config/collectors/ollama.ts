@@ -12,7 +12,10 @@ export class OllamaCollector extends BaseProviderCollector {
   }
 
   async collectConfig(): Promise<ExtendedProviderConfig> {
-    return CapabilityManager.getDefaultConfig('ollama', this.options.existingConfig);
+    return CapabilityManager.getDefaultConfig(
+      'ollama',
+      this.options.existingConfig
+    );
   }
 
   async validateConfig(config: ExtendedProviderConfig): Promise<boolean> {
@@ -28,14 +31,16 @@ export class OllamaCollector extends BaseProviderCollector {
     return true;
   }
 
-  async testConnection(config: ExtendedProviderConfig): Promise<ConnectionTestResult> {
+  async testConnection(
+    config: ExtendedProviderConfig
+  ): Promise<ConnectionTestResult> {
     if (!this.options.skipValidation) {
       const isValid = await this.validateConfig(config);
       if (!isValid) {
         return {
           success: false,
           error: 'Invalid configuration',
-          suggestions: ['Check model name and base URL']
+          suggestions: ['Check model name and base URL'],
         };
       }
     }
@@ -43,8 +48,13 @@ export class OllamaCollector extends BaseProviderCollector {
     return this.connectionTester.testOllama(config);
   }
 
-  async getAvailableModels(config: Partial<ExtendedProviderConfig>): Promise<string[]> {
-    return await CapabilityManager.getAvailableModelsWithFetching('ollama', config);
+  async getAvailableModels(
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]> {
+    return await CapabilityManager.getAvailableModelsWithFetching(
+      'ollama',
+      config
+    );
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {
@@ -55,7 +65,7 @@ export class OllamaCollector extends BaseProviderCollector {
     return CapabilityManager.getHelpText('ollama');
   }
 
-  getContextLengthOptions(): Array<{label: string; value: number}> {
+  getContextLengthOptions(): Array<{ label: string; value: number }> {
     return CapabilityManager.getContextLengthOptions('ollama');
   }
 
