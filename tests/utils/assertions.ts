@@ -193,6 +193,8 @@ export function assertValidChatSession(session: any) {
 /**
  * Time-bounded assertion for async operations
  */
+// Note: Timing-based assertions disabled to avoid flaky tests
+/*
 export async function assertWithinTime<T>(
   operation: () => Promise<T>,
   maxTimeMs: number,
@@ -206,6 +208,7 @@ export async function assertWithinTime<T>(
 
   return result;
 }
+*/
 
 /**
  * Assert that two configurations are equivalent

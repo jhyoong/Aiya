@@ -91,12 +91,9 @@ export class MockOllamaProvider extends BaseMockProvider {
 
   async listModels(): Promise<MockModel[]> {
     return this.recordCall('listModels', [], async () => {
-      // Simulate some models being available
-      return MockOllamaProvider.OLLAMA_MODELS.filter(
-        model =>
-          // Randomly make some models unavailable to test error handling
-          Math.random() > 0.1
-      );
+      // Return all models for consistent testing
+      // Random filtering should be done explicitly in specific test scenarios
+      return [...MockOllamaProvider.OLLAMA_MODELS];
     });
   }
 
