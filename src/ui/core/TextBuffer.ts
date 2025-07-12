@@ -9,7 +9,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
+import { useState, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import {
   toCodePoints,
   cpLen,
@@ -21,6 +21,7 @@ import {
   memoizedCalculateVisualLayout,
 } from '../utils/visualLayout.js';
 import { isWordChar } from '../utils/textProcessing.js';
+import { ResourceCleanup } from '../utils/memoryManagement.js';
 
 export type Direction =
   | 'left'
@@ -840,6 +841,8 @@ export function useTextBuffer({
   isValidPath,
   shellModeActive = false,
 }: UseTextBufferProps): TextBuffer {
+  const cleanupRef = useRef(new ResourceCleanup());
+  
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -1121,6 +1124,14 @@ export function useTextBuffer({
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
     [visualLines, visualScrollRow, viewport.height]
   );
+
+  // Cleanup effect for memory management
+  useEffect(() => {
+    return () => {
+      // Perform all registered cleanup tasks
+      cleanupRef.current.cleanup();
+    };
+  }, []);
 
   const replaceRange = useCallback(
     (

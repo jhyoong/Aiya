@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
 import { TextBuffer } from '../core/TextBuffer.js';
+import { 
+  BoundedArray, 
+  ContentSizeLimiter, 
+  SubscriptionManager,
+  MEMORY_LIMITS 
+} from '../utils/memoryManagement.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -69,7 +75,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   currentProvider,
   onProviderChange,
 }) => {
+  const messagesRef = useRef(new BoundedArray<Message>(MEMORY_LIMITS.MAX_MESSAGE_HISTORY));
   const [messages, setMessages] = useState<Message[]>([]);
+  const streamingContentRef = useRef(new ContentSizeLimiter());
+  const subscriptionManagerRef = useRef(new SubscriptionManager());
   const [status, setStatus] = useState<
     'idle' | 'processing' | 'error' | 'success'
   >('idle');
@@ -135,6 +144,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   }, [initialMessage]);
 
+  // Cleanup effect for memory management
+  useEffect(() => {
+    return () => {
+      // Clean up all subscriptions
+      subscriptionManagerRef.current.unsubscribeAll();
+      
+      // Clear streaming content
+      streamingContentRef.current.clear();
+      
+      // Clear message history if needed (optional - may want to preserve)
+      // messagesRef.current.clear();
+    };
+  }, []);
+
   const handleMessage = async (input: string) => {
     if (!input.trim()) return;
 
@@ -158,7 +181,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       ...(currentProvider && { provider: currentProvider }),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    messagesRef.current.push(userMessage);
+    setMessages([...messagesRef.current.getAll()]);
     setStatus('processing');
     setStatusMessage('Generating response...');
     setCurrentThinking('');
@@ -173,6 +197,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         let currentPhaseContent = '';
         let currentPhaseThinking = '';
         let lastChunkType: 'thinking' | 'content' | null = null;
+        
+        // Reset streaming content limiter for new message
+        streamingContentRef.current.clear();
 
         for await (const chunk of onMessageStream(input)) {
           if (chunk.thinking) {
@@ -186,23 +213,35 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 ...(currentPhaseThinking && { thinking: currentPhaseThinking }),
               };
 
-              setMessages(prev => [...prev, phaseMessage]);
+              messagesRef.current.push(phaseMessage);
+              setMessages([...messagesRef.current.getAll()]);
 
               // Reset for new phase
               currentPhaseContent = '';
               currentPhaseThinking = '';
               setCurrentContent('');
+              streamingContentRef.current.clear();
             }
 
-            currentPhaseThinking += chunk.thinking;
-            setCurrentThinking(currentPhaseThinking);
+            // Use content limiter for thinking content as well
+            if (chunk.thinking.length < MEMORY_LIMITS.MAX_STREAMING_CONTENT_SIZE) {
+              currentPhaseThinking += chunk.thinking;
+              setCurrentThinking(currentPhaseThinking);
+            }
             lastChunkType = 'thinking';
           }
 
           if (chunk.content) {
-            currentPhaseContent += chunk.content;
+            // Use streaming content limiter to prevent unbounded accumulation
+            streamingContentRef.current.append(chunk.content);
+            currentPhaseContent = streamingContentRef.current.getContent();
             setCurrentContent(currentPhaseContent);
             lastChunkType = 'content';
+            
+            // Warn if content is getting too large
+            if (streamingContentRef.current.isNearLimit) {
+              console.warn('[ChatInterface] Streaming content approaching size limit');
+            }
           }
 
           if (chunk.done) {
@@ -221,7 +260,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 handleProviderSwitchResponse(currentPhaseContent);
               }
 
-              setMessages(prev => [...prev, finalMessage]);
+              messagesRef.current.push(finalMessage);
+              setMessages([...messagesRef.current.getAll()]);
             }
 
             setCurrentThinking('');
@@ -247,7 +287,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           handleProviderSwitchResponse(response);
         }
 
-        setMessages(prev => [...prev, assistantMessage]);
+        messagesRef.current.push(assistantMessage);
+        setMessages([...messagesRef.current.getAll()]);
         setStatus('success');
         setStatusMessage('Response generated');
       }
