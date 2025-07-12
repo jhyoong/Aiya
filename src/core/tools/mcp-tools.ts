@@ -4,16 +4,35 @@ import {
   ToolResult as MCPToolResult,
 } from '../mcp/base.js';
 import { ToolCall, ToolResult } from '../providers/base.js';
+import { ToolArguments } from '../../types/ProviderTypes.js';
+import { JsonValue } from '../../types/UtilityTypes.js';
 
 /**
- * Tool definition for LLM consumption
+ * JSON Schema property definition for tool parameters
+ */
+export interface JsonSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  description?: string;
+  enum?: JsonValue[];
+  items?: JsonSchemaProperty;
+  properties?: Record<string, JsonSchemaProperty>;
+  required?: string[];
+  default?: JsonValue;
+  minimum?: number;
+  maximum?: number;
+  minLength?: number;
+  maxLength?: number;
+}
+
+/**
+ * Tool definition for LLM consumption with proper JSON Schema typing
  */
 export interface LLMTool {
   name: string;
   description: string;
   parameters: {
     type: 'object';
-    properties: Record<string, any>;
+    properties: Record<string, JsonSchemaProperty>;
     required?: string[];
   };
 }
@@ -96,9 +115,12 @@ export class MCPToolService {
       // Extract the original tool name (remove client prefix)
       const originalToolName = tool.name;
 
+      // Validate tool arguments before calling
+      const validatedArgs = this.validateToolArguments(toolCall.arguments, tool.inputSchema);
+      
       const mcpResult = await client.callTool(
         originalToolName,
-        toolCall.arguments
+        validatedArgs
       );
 
       // Convert MCP result to tool result
@@ -116,6 +138,27 @@ export class MCPToolService {
         isError: true,
       };
     }
+  }
+
+  /**
+   * Validate tool arguments against the input schema
+   */
+  private validateToolArguments(args: ToolArguments, schema: any): ToolArguments {
+    // Basic validation - in a production system, you'd use a JSON Schema validator
+    if (!args || typeof args !== 'object') {
+      throw new Error('Tool arguments must be an object');
+    }
+
+    // Check required fields if they exist in schema
+    if (schema.required) {
+      for (const requiredField of schema.required) {
+        if (!(requiredField in args)) {
+          throw new Error(`Required field '${requiredField}' is missing from tool arguments`);
+        }
+      }
+    }
+
+    return args;
   }
 
   /**

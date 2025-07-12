@@ -1,22 +1,12 @@
-export enum ProviderErrorType {
-  CONNECTION_FAILED = 'connection_failed',
-  MODEL_NOT_FOUND = 'model_not_found',
-  AUTHENTICATION_FAILED = 'authentication_failed',
-  RATE_LIMITED = 'rate_limited',
-  INVALID_REQUEST = 'invalid_request',
-  SERVER_ERROR = 'server_error',
-  TIMEOUT = 'timeout',
-  UNKNOWN = 'unknown',
-}
+import { 
+  ProviderErrorType, 
+  ErrorContext, 
+  isStructuredError,
+  DEFAULT_ERROR_PATTERNS
+} from '../../types/ErrorTypes.js';
 
-export interface ErrorContext {
-  provider: string;
-  operation: string;
-  model?: string;
-  endpoint?: string;
-  statusCode?: number;
-  originalError?: any;
-}
+// Re-export types for backward compatibility
+export { ProviderErrorType, ErrorContext } from '../../types/ErrorTypes.js';
 
 export interface ProviderError {
   success: false;
@@ -36,70 +26,73 @@ export abstract class BaseProviderErrorHandler {
   /**
    * Classify an error based on the error object and context
    */
-  static classifyError(error: any, context: ErrorContext): ProviderErrorType {
-    // Check for timeout errors
-    if (error.name === 'AbortError' || error.message?.includes('timeout')) {
-      return ProviderErrorType.TIMEOUT;
+  static classifyError(error: unknown, context: ErrorContext): ProviderErrorType {
+    // If it's already a structured error, return its type
+    if (isStructuredError(error)) {
+      return error.type;
+    }
+    // Use structured error classification patterns
+    const errorMessage = this.extractErrorMessage(error);
+    
+    for (const pattern of DEFAULT_ERROR_PATTERNS) {
+      if (this.matchesPattern(errorMessage, pattern.messagePatterns)) {
+        return pattern.errorType;
+      }
     }
 
-    // Check for connection errors
-    if (
-      error.message?.includes('ECONNREFUSED') ||
-      error.message?.includes('connection') ||
-      error.message?.includes('Connection refused')
-    ) {
-      return ProviderErrorType.CONNECTION_FAILED;
-    }
-
-    // Check for authentication errors based on HTTP status
-    if (
-      context.statusCode === 401 ||
-      error.message?.includes('401') ||
-      error.message?.includes('Unauthorized') ||
-      error.message?.includes('Invalid API key')
-    ) {
-      return ProviderErrorType.AUTHENTICATION_FAILED;
-    }
-
-    // Check for rate limiting
-    if (
-      context.statusCode === 429 ||
-      error.message?.includes('rate limit') ||
-      error.message?.includes('Too Many Requests')
-    ) {
-      return ProviderErrorType.RATE_LIMITED;
-    }
-
-    // Check for model not found errors
-    if (
-      error.message?.includes('model') &&
-      (error.message?.includes('not found') ||
-        error.message?.includes('does not exist') ||
-        error.message?.includes('not available'))
-    ) {
-      return ProviderErrorType.MODEL_NOT_FOUND;
-    }
-
-    // Check for invalid request errors
-    if (
-      context.statusCode === 400 ||
-      error.message?.includes('400') ||
-      error.message?.includes('Bad Request') ||
-      error.message?.includes('Invalid request')
-    ) {
-      return ProviderErrorType.INVALID_REQUEST;
-    }
-
-    // Check for server errors
-    if (
-      (context.statusCode && context.statusCode >= 500) ||
-      error.message?.includes('500') ||
-      error.message?.includes('Internal Server Error')
-    ) {
-      return ProviderErrorType.SERVER_ERROR;
+    // Additional status code-based classification
+    if (context.statusCode) {
+      switch (context.statusCode) {
+        case 400:
+          return ProviderErrorType.INVALID_REQUEST;
+        case 401:
+        case 403:
+          return ProviderErrorType.AUTHENTICATION_FAILED;
+        case 404:
+          return ProviderErrorType.MODEL_NOT_FOUND;
+        case 408:
+        case 504:
+          return ProviderErrorType.TIMEOUT;
+        case 429:
+          return ProviderErrorType.RATE_LIMITED;
+        case 500:
+        case 502:
+        case 503:
+          return ProviderErrorType.SERVER_ERROR;
+        default:
+          return ProviderErrorType.UNKNOWN;
+      }
     }
 
     return ProviderErrorType.UNKNOWN;
+  }
+
+  /**
+   * Extract error message from unknown error object
+   */
+  private static extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+      return (error as any).message;
+    }
+    return String(error);
+  }
+
+  /**
+   * Check if error message matches any of the patterns
+   */
+  private static matchesPattern(message: string, patterns: (string | RegExp)[]): boolean {
+    return patterns.some(pattern => {
+      if (typeof pattern === 'string') {
+        return message.toLowerCase().includes(pattern.toLowerCase());
+      }
+      return pattern.test(message);
+    });
   }
 
   /**

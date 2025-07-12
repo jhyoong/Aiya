@@ -1,7 +1,12 @@
+import { 
+  UsageMetadata, 
+  ToolArguments
+} from '../../types/ProviderTypes.js';
+
 export interface ToolCall {
   id: string;
   name: string;
-  arguments: Record<string, any>;
+  arguments: ToolArguments;
 }
 
 export interface ToolResult {
@@ -29,8 +34,8 @@ export interface StreamResponse {
   done: boolean;
   tokensUsed?: number;
   toolCalls?: ToolCall[];
-  usage?: any; // OpenAI usage metadata
-  usageMetadata?: any; // Gemini usage metadata
+  usage?: UsageMetadata; // Structured usage metadata
+  usageMetadata?: UsageMetadata; // Alternative usage metadata field
 }
 
 export interface ModelInfo {
@@ -51,7 +56,39 @@ export interface ProviderConfig {
   baseUrl: string;
   apiKey?: string;
   maxTokens?: number;
-  [key: string]: any; // Allow provider-specific config
+  // Provider-specific configurations with proper typing
+  azure?: {
+    deploymentName?: string;
+    apiVersion?: string;
+  };
+  anthropic?: {
+    maxTokens?: number;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    stopSequences?: string[];
+    version?: string;
+  };
+  gemini?: {
+    projectId?: string;
+    location?: string;
+    temperature?: number;
+    topP?: number;
+    topK?: number;
+    maxOutputTokens?: number;
+    candidateCount?: number;
+    stopSequences?: string[];
+    maxTokens?: number;
+    thinkingBudget?: number;
+    includeThoughts?: boolean;
+  };
+  bedrock?: {
+    region: string;
+    accessKeyId?: string;
+    secretAccessKey?: string;
+    sessionToken?: string;
+    modelId?: string;
+  };
 }
 
 export abstract class LLMProvider {

@@ -64,6 +64,7 @@ export class GeminiProvider extends LLMProvider {
       operation,
       model: this.model,
       endpoint: 'https://generativelanguage.googleapis.com/v1',
+      timestamp: new Date(),
     };
 
     const result = GeminiErrorMapper.handleGeminiError(error, context);

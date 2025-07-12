@@ -9,6 +9,7 @@ import {
   ErrorContext,
   ProviderErrorType,
 } from '../errors/index.js';
+import { isObject, hasProperty } from '../../types/UtilityTypes.js';
 
 export class ConnectionTester {
   private static readonly TIMEOUT_MS = 10000; // 10 seconds
@@ -57,8 +58,8 @@ export class ConnectionTester {
       const data = await response.json();
 
       // Check if the specified model exists
-      const modelExists = data.models?.some(
-        (m: any) => m.name === config.model
+      const modelExists = Array.isArray(data.models) && data.models.some(
+        (m: unknown) => isObject(m) && hasProperty(m, 'name') && m.name === config.model
       );
 
       if (!modelExists) {
@@ -67,6 +68,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: config.baseUrl,
+          timestamp: new Date(),
         };
 
         const result = OllamaErrorMapper.createOllamaError(
@@ -79,12 +81,13 @@ export class ConnectionTester {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const context: ErrorContext = {
         provider: 'ollama',
         operation: 'connection_test',
         model: config.model,
         endpoint: config.baseUrl,
+          timestamp: new Date(),
       };
 
       const result = OllamaErrorMapper.handleOllamaError(error, context);
@@ -105,6 +108,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: config.baseUrl,
+          timestamp: new Date(),
         };
 
         const result = OpenAIErrorMapper.createOpenAIError(
@@ -144,6 +148,7 @@ export class ConnectionTester {
           model: config.model,
           endpoint: baseUrl,
           statusCode: response.status,
+          timestamp: new Date(),
         };
 
         const result = OpenAIErrorMapper.handleOpenAIError(error, context);
@@ -153,7 +158,9 @@ export class ConnectionTester {
       const data = await response.json();
 
       // Check if the specified model exists
-      const modelExists = data.data?.some((m: any) => m.id === config.model);
+      const modelExists = Array.isArray(data.data) && data.data.some(
+        (m: unknown) => isObject(m) && hasProperty(m, 'id') && m.id === config.model
+      );
 
       if (!modelExists) {
         const context: ErrorContext = {
@@ -161,6 +168,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: baseUrl,
+          timestamp: new Date(),
         };
 
         const result = OpenAIErrorMapper.createOpenAIError(
@@ -173,12 +181,13 @@ export class ConnectionTester {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const context: ErrorContext = {
         provider: 'openai',
         operation: 'connection_test',
         model: config.model,
         endpoint: config.baseUrl,
+          timestamp: new Date(),
       };
 
       const result = OpenAIErrorMapper.handleOpenAIError(error, context);
@@ -199,6 +208,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: 'https://generativelanguage.googleapis.com/v1',
+          timestamp: new Date(),
         };
 
         const result = GeminiErrorMapper.createGeminiError(
@@ -236,6 +246,7 @@ export class ConnectionTester {
           model: config.model,
           endpoint: 'https://generativelanguage.googleapis.com/v1',
           statusCode: response.status,
+          timestamp: new Date(),
         };
 
         const result = GeminiErrorMapper.handleGeminiError(error, context);
@@ -246,8 +257,12 @@ export class ConnectionTester {
 
       // Check if the specified model exists
       const modelExists = data.models?.some(
-        (m: any) =>
-          m.name.includes(config.model) || m.displayName === config.model
+        (m: unknown) => {
+          if (!isObject(m)) return false;
+          const hasName = hasProperty(m, 'name') && typeof m.name === 'string';
+          const hasDisplayName = hasProperty(m, 'displayName') && typeof m.displayName === 'string';
+          return (hasName && (m.name as string).includes(config.model)) || (hasDisplayName && (m.displayName as string) === config.model);
+        }
       );
 
       if (!modelExists) {
@@ -256,6 +271,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: 'https://generativelanguage.googleapis.com/v1',
+          timestamp: new Date(),
         };
 
         const result = GeminiErrorMapper.createGeminiError(
@@ -268,12 +284,13 @@ export class ConnectionTester {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const context: ErrorContext = {
         provider: 'gemini',
         operation: 'connection_test',
         model: config.model,
         endpoint: 'https://generativelanguage.googleapis.com/v1',
+        timestamp: new Date(),
       };
 
       const result = GeminiErrorMapper.handleGeminiError(error, context);
@@ -294,6 +311,7 @@ export class ConnectionTester {
           operation: 'connection_test',
           model: config.model,
           endpoint: 'https://api.anthropic.com/v1',
+          timestamp: new Date(),
         };
 
         const result = BaseProviderErrorHandler.createError(
@@ -359,6 +377,7 @@ export class ConnectionTester {
           model: config.model,
           endpoint: 'https://api.anthropic.com/v1',
           statusCode: response.status,
+          timestamp: new Date(),
         };
 
         const result = BaseProviderErrorHandler.createError(
@@ -370,12 +389,13 @@ export class ConnectionTester {
       }
 
       return { success: true };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const context: ErrorContext = {
         provider: 'anthropic',
         operation: 'connection_test',
         model: config.model,
         endpoint: 'https://api.anthropic.com/v1',
+        timestamp: new Date(),
       };
 
       const result = BaseProviderErrorHandler.standardizeError(error, context);
