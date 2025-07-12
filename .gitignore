@@ -140,3 +140,5 @@ vite.config.ts.timestamp-*
 
 # memory context
 memory*
+
+.aiya.yaml
