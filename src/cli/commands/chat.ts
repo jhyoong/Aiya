@@ -93,6 +93,18 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
 
     // Also update context length
     setContextLength(props.session.tokenCounter.getContextLength());
+
+    // Listen for token update events
+    const handleTokenUpdate = () => {
+      updateTokenUsage();
+    };
+
+    props.session.tokenCounter.on('tokenUpdate', handleTokenUpdate);
+
+    // Cleanup event listener
+    return () => {
+      props.session.tokenCounter.off('tokenUpdate', handleTokenUpdate);
+    };
   }, [props.session.tokenCounter]);
 
   // Handle provider changes from ChatInterface

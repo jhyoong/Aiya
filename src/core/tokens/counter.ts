@@ -1,5 +1,6 @@
 import { LLMProvider } from '../providers/base.js';
 import { TokenLogger } from './logger.js';
+import { EventEmitter } from 'events';
 
 export interface TokenUsage {
   input: number;
@@ -20,7 +21,7 @@ export interface SessionStats {
   estimatedCost?: number;
 }
 
-export class TokenCounter {
+export class TokenCounter extends EventEmitter {
   private provider: LLMProvider;
   private sessionUsage: TokenUsage = { input: 0, output: 0, total: 0 };
   private messageHistory: MessageTokenUsage[] = [];
@@ -33,6 +34,7 @@ export class TokenCounter {
     model: string,
     contextLimit?: number
   ) {
+    super();
     this.provider = provider;
     this.contextLimit = contextLimit || 4096;
     this.logger = new TokenLogger(providerType, model);
@@ -75,6 +77,12 @@ export class TokenCounter {
 
     this.messageHistory.push(messageUsage);
     this.logger.logTokenUsage(inputTokens, outputTokens, estimated);
+
+    // Emit event to notify React components of token update
+    this.emit('tokenUpdate', {
+      messageUsage,
+      sessionUsage: this.getUsage(),
+    });
 
     return messageUsage;
   }
