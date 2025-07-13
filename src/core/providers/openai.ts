@@ -131,11 +131,11 @@ export class OpenAIProvider extends LLMProvider {
             done: true,
             tokensUsed: totalTokens,
           };
-          
+
           if (chunk.usage) {
             result.usage = chunk.usage as UsageMetadata;
           }
-          
+
           yield result;
           break;
         }

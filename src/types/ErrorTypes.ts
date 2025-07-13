@@ -1,6 +1,6 @@
 /**
  * Error Type Definitions
- * 
+ *
  * Structured error handling types that replace `any` usage throughout the application.
  * This module provides comprehensive error classification, context, and handling patterns.
  */
@@ -45,28 +45,28 @@ export enum HttpStatusCode {
 export interface ErrorContext {
   /** The provider where the error occurred */
   provider: string;
-  
+
   /** The operation that was being performed */
   operation: string;
-  
+
   /** The model being used (if applicable) */
   model?: string;
-  
+
   /** The API endpoint that was called */
   endpoint?: string;
-  
+
   /** HTTP status code (if applicable) */
   statusCode?: HttpStatusCode;
-  
+
   /** Request ID for tracing (if available) */
   requestId?: string;
-  
+
   /** Timestamp when the error occurred */
   timestamp: Date;
-  
+
   /** Additional metadata specific to the error */
   metadata?: Record<string, string | number | boolean>;
-  
+
   /** Original error object for debugging */
   originalError?: unknown;
 }
@@ -77,19 +77,19 @@ export interface ErrorContext {
 export interface BaseError {
   /** Human-readable error message */
   message: string;
-  
+
   /** Error classification type */
   type: ProviderErrorType;
-  
+
   /** Error context information */
   context: ErrorContext;
-  
+
   /** Suggested actions for resolving the error */
   suggestions: string[];
-  
+
   /** Whether this error is retryable */
   retryable: boolean;
-  
+
   /** Unique error code for programmatic handling */
   code?: string;
 }
@@ -98,7 +98,10 @@ export interface BaseError {
  * Network-related error details.
  */
 export interface NetworkError extends BaseError {
-  type: ProviderErrorType.NETWORK_ERROR | ProviderErrorType.CONNECTION_FAILED | ProviderErrorType.TIMEOUT;
+  type:
+    | ProviderErrorType.NETWORK_ERROR
+    | ProviderErrorType.CONNECTION_FAILED
+    | ProviderErrorType.TIMEOUT;
   networkDetails: {
     /** DNS resolution status */
     dnsResolved: boolean;
@@ -161,11 +164,11 @@ export interface ConfigurationError extends BaseError {
 /**
  * Union type of all structured error types.
  */
-export type StructuredError = 
-  | NetworkError 
-  | AuthenticationError 
-  | RateLimitError 
-  | ConfigurationError 
+export type StructuredError =
+  | NetworkError
+  | AuthenticationError
+  | RateLimitError
+  | ConfigurationError
   | BaseError;
 
 /**
@@ -213,14 +216,18 @@ export function isStructuredError(value: unknown): value is StructuredError {
 /**
  * Type guard to check if a result is a success.
  */
-export function isSuccessResult<T>(result: ProviderResult<T>): result is SuccessResult<T> {
+export function isSuccessResult<T>(
+  result: ProviderResult<T>
+): result is SuccessResult<T> {
   return result.success === true;
 }
 
 /**
  * Type guard to check if a result is an error.
  */
-export function isErrorResult<T>(result: ProviderResult<T>): result is ErrorResult {
+export function isErrorResult<T>(
+  result: ProviderResult<T>
+): result is ErrorResult {
   return result.success === false;
 }
 
@@ -230,13 +237,13 @@ export function isErrorResult<T>(result: ProviderResult<T>): result is ErrorResu
 export interface ErrorPattern {
   /** Regex or string patterns to match in error messages */
   messagePatterns: (string | RegExp)[];
-  
+
   /** Error type to assign when pattern matches */
   errorType: ProviderErrorType;
-  
+
   /** Whether this error type is retryable */
   retryable: boolean;
-  
+
   /** Default suggestions for this error type */
   suggestions: string[];
 }
@@ -246,33 +253,57 @@ export interface ErrorPattern {
  */
 export const DEFAULT_ERROR_PATTERNS: ErrorPattern[] = [
   {
-    messagePatterns: [/ECONNREFUSED/, /connection refused/i, /connect timeout/i],
+    messagePatterns: [
+      /ECONNREFUSED/,
+      /connection refused/i,
+      /connect timeout/i,
+    ],
     errorType: ProviderErrorType.CONNECTION_FAILED,
     retryable: true,
-    suggestions: ['Check if the service is running', 'Verify the base URL is correct', 'Check network connectivity']
+    suggestions: [
+      'Check if the service is running',
+      'Verify the base URL is correct',
+      'Check network connectivity',
+    ],
   },
   {
     messagePatterns: [/timeout/i, /ETIMEDOUT/, /request timeout/i],
     errorType: ProviderErrorType.TIMEOUT,
     retryable: true,
-    suggestions: ['Retry the request', 'Check network stability', 'Consider increasing timeout values']
+    suggestions: [
+      'Retry the request',
+      'Check network stability',
+      'Consider increasing timeout values',
+    ],
   },
   {
     messagePatterns: [/unauthorized/i, /invalid.*api.*key/i, /authentication/i],
     errorType: ProviderErrorType.AUTHENTICATION_FAILED,
     retryable: false,
-    suggestions: ['Check your API key', 'Verify authentication credentials', 'Ensure proper permissions']
+    suggestions: [
+      'Check your API key',
+      'Verify authentication credentials',
+      'Ensure proper permissions',
+    ],
   },
   {
     messagePatterns: [/rate.*limit/i, /too many requests/i, /quota.*exceeded/i],
     errorType: ProviderErrorType.RATE_LIMITED,
     retryable: true,
-    suggestions: ['Wait before retrying', 'Check rate limit status', 'Consider upgrading your plan']
+    suggestions: [
+      'Wait before retrying',
+      'Check rate limit status',
+      'Consider upgrading your plan',
+    ],
   },
   {
     messagePatterns: [/model.*not.*found/i, /model.*does not exist/i],
     errorType: ProviderErrorType.MODEL_NOT_FOUND,
     retryable: false,
-    suggestions: ['Check the model name', 'Verify model availability', 'Use a different model']
+    suggestions: [
+      'Check the model name',
+      'Verify model availability',
+      'Use a different model',
+    ],
   },
 ];

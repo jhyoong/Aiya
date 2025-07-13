@@ -6,9 +6,7 @@ import { AzureOpenAIProvider } from './azure.js';
 import { GeminiProvider } from './gemini.js';
 import { BedrockProvider } from './bedrock.js';
 import { ExtendedProviderConfig } from '../config/manager.js';
-import { 
-  ConfigValidationResult
-} from '../../types/ProviderTypes.js';
+import { ConfigValidationResult } from '../../types/ProviderTypes.js';
 
 export class ProviderFactory {
   private static providers: Map<
@@ -35,7 +33,9 @@ export class ProviderFactory {
     // Validate configuration before processing
     const validationResult = this.validateConfig(config);
     if (!validationResult.valid) {
-      const errorMessages = validationResult.errors.map(err => `${err.field}: ${err.message}`).join(', ');
+      const errorMessages = validationResult.errors
+        .map(err => `${err.field}: ${err.message}`)
+        .join(', ');
       throw new Error(`Invalid provider configuration: ${errorMessages}`);
     }
 
@@ -48,17 +48,28 @@ export class ProviderFactory {
   /**
    * Validates provider configuration structure and required fields.
    */
-  static validateConfig(config: ExtendedProviderConfig): ConfigValidationResult {
+  static validateConfig(
+    config: ExtendedProviderConfig
+  ): ConfigValidationResult {
     const errors: Array<{ field: string; message: string; code: string }> = [];
-    const warnings: Array<{ field: string; message: string; code: string }> = [];
+    const warnings: Array<{ field: string; message: string; code: string }> =
+      [];
 
     // Basic validation - only validate truly required fields
     if (!config.type) {
-      errors.push({ field: 'type', message: 'Provider type is required', code: 'REQUIRED' });
+      errors.push({
+        field: 'type',
+        message: 'Provider type is required',
+        code: 'REQUIRED',
+      });
     }
 
     if (!config.model) {
-      errors.push({ field: 'model', message: 'Model name is required', code: 'REQUIRED' });
+      errors.push({
+        field: 'model',
+        message: 'Model name is required',
+        code: 'REQUIRED',
+      });
     }
 
     // baseUrl is not always required - some providers have defaults
@@ -69,7 +80,11 @@ export class ProviderFactory {
       case 'bedrock':
         // Bedrock absolutely requires region for AWS client initialization
         if (!config.bedrock?.region) {
-          errors.push({ field: 'bedrock.region', message: 'AWS region is required for Bedrock', code: 'REQUIRED' });
+          errors.push({
+            field: 'bedrock.region',
+            message: 'AWS region is required for Bedrock',
+            code: 'REQUIRED',
+          });
         }
         break;
 
@@ -86,7 +101,9 @@ export class ProviderFactory {
   /**
    * Converts ExtendedProviderConfig to base ProviderConfig with type safety.
    */
-  private static convertToBaseConfig(config: ExtendedProviderConfig): ProviderConfig {
+  private static convertToBaseConfig(
+    config: ExtendedProviderConfig
+  ): ProviderConfig {
     const baseConfig: ProviderConfig = {
       type: config.type,
       model: config.model,

@@ -3,7 +3,7 @@ import React from 'react';
 import { render } from 'ink';
 import { ConfigManager } from '../../core/config/manager.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
-import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
+import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { SearchResults } from '../../ui/components/SearchResults.js';
 
 interface SearchResult {
@@ -27,7 +27,7 @@ export const searchCommand = new Command('search')
         config.security.maxFileSize
       );
 
-      const mcpClient = new EnhancedFilesystemMCPClient(security);
+      const mcpClient = new FilesystemMCPClient(security);
       await mcpClient.connect();
 
       // Perform the search
@@ -58,39 +58,34 @@ export const searchCommand = new Command('search')
   });
 
 async function performSearch(
-  mcpClient: EnhancedFilesystemMCPClient,
+  mcpClient: FilesystemMCPClient,
   query: string
 ): Promise<SearchResult[]> {
   try {
-    // Get all files in the workspace
-    const result = await mcpClient.callTool('search_files', {
-      pattern: '**/*',
+    // Search for the query pattern in file contents using SearchFiles tool
+    const result = await mcpClient.callTool('SearchFiles', {
+      pattern: query,
+      options: {
+        searchType: 'literal',
+        includeGlobs: ['**/*'],
+        maxResults: 50,
+      },
     });
 
     if (result.isError) {
       throw new Error(result.content[0]?.text || 'Search failed');
     }
 
-    const allFiles = JSON.parse(result.content[0]?.text || '[]') as string[];
+    const searchResponse = JSON.parse(result.content[0]?.text || '{}');
+    const searchResults = searchResponse.results || [];
 
-    // Simple fuzzy matching - check if query chars appear in order
-    const matches = allFiles
-      .map(file => ({
-        file,
-        score: calculateFuzzyScore(file, query),
-      }))
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 20);
-
-    // Convert to SearchResult format
-    return matches.map((match, index) => ({
+    // Convert SearchFiles results to our SearchResult format
+    return searchResults.map((match: any, index: number) => ({
       file: match.file,
-      line: 1,
-      content: `Match score: ${match.score}`,
-      context: [
-        `File ${index + 1} of ${matches.length}`,
-        `Score: ${match.score}/100`,
+      line: match.line || 1,
+      content: match.match || `File match: ${match.file}`,
+      context: match.context?.before?.concat(match.context?.after || []) || [
+        `Result ${index + 1} of ${searchResults.length}`,
       ],
     }));
   } catch (error) {
@@ -98,32 +93,4 @@ async function performSearch(
       `Search error: ${error instanceof Error ? error.message : 'Unknown error'}`
     );
   }
-}
-
-function calculateFuzzyScore(filename: string, query: string): number {
-  const lowerFilename = filename.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-
-  // Exact match gets highest score
-  if (lowerFilename.includes(lowerQuery)) {
-    return 100;
-  }
-
-  // Check if all query characters appear in order
-  let queryIndex = 0;
-  let score = 0;
-
-  for (
-    let i = 0;
-    i < lowerFilename.length && queryIndex < lowerQuery.length;
-    i++
-  ) {
-    if (lowerFilename[i] === lowerQuery[queryIndex]) {
-      queryIndex++;
-      score += 1;
-    }
-  }
-
-  // Return score only if all query characters were found
-  return queryIndex === lowerQuery.length ? score : 0;
 }

@@ -25,13 +25,15 @@ export const CORE_COMMANDS: CommandDefinition[] = [
           return 'Usage: /read <file_path>';
         }
 
-        const readResult = await context.mcpClient.callTool('read_file', {
+        const readResult = await context.mcpClient.callTool('ReadFile', {
           path: args[0],
         });
         if (readResult.isError) {
           return `Error: ${readResult.content[0]?.text}`;
         } else {
-          return `File: ${args[0]}\n${readResult.content[0]?.text}`;
+          const readResponse = JSON.parse(readResult.content[0]?.text || '{}');
+          const fileContent = readResponse.content || '';
+          return `File: ${args[0]}\n${fileContent}`;
         }
       },
     },
@@ -54,13 +56,14 @@ export const CORE_COMMANDS: CommandDefinition[] = [
           return 'Usage: /add <file_path>';
         }
 
-        const addResult = await context.mcpClient.callTool('read_file', {
+        const addResult = await context.mcpClient.callTool('ReadFile', {
           path: args[0],
         });
         if (addResult.isError) {
           return `Error: ${addResult.content[0]?.text}`;
         } else {
-          const fileContent = addResult.content[0]?.text || '';
+          const addResponse = JSON.parse(addResult.content[0]?.text || '{}');
+          const fileContent = addResponse.content || '';
           const formattedContent = `File: ${args[0]}\n\`\`\`\n${fileContent}\n\`\`\``;
           context.session.addedFiles.push(formattedContent);
           return `Added ${args[0]} to context for the next prompt`;
@@ -90,14 +93,24 @@ export const CORE_COMMANDS: CommandDefinition[] = [
           return 'Usage: /search <pattern>';
         }
 
-        const searchResult = await context.mcpClient.callTool('search_files', {
+        const searchResult = await context.mcpClient.callTool('SearchFiles', {
           pattern: args[0],
+          options: {
+            searchType: 'literal',
+            maxResults: 50,
+          },
         });
         if (searchResult.isError) {
           return `Error: ${searchResult.content[0]?.text}`;
         } else {
-          const files = JSON.parse(searchResult.content[0]?.text || '[]');
-          return `Found ${files.length} files:\n${files.map((f: string) => `  ${f}`).join('\n')}`;
+          const searchResponse = JSON.parse(
+            searchResult.content[0]?.text || '{}'
+          );
+          const results = searchResponse.results || [];
+          if (results.length === 0) {
+            return `No matches found for pattern: ${args[0]}`;
+          }
+          return `Found ${results.length} matches:\n${results.map((match: any) => `  ${match.file}:${match.line} - ${match.match}`).join('\n')}`;
         }
       },
     },

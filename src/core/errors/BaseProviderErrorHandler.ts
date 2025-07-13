@@ -1,8 +1,8 @@
-import { 
-  ProviderErrorType, 
-  ErrorContext, 
+import {
+  ProviderErrorType,
+  ErrorContext,
   isStructuredError,
-  DEFAULT_ERROR_PATTERNS
+  DEFAULT_ERROR_PATTERNS,
 } from '../../types/ErrorTypes.js';
 
 // Re-export types for backward compatibility
@@ -26,14 +26,17 @@ export abstract class BaseProviderErrorHandler {
   /**
    * Classify an error based on the error object and context
    */
-  static classifyError(error: unknown, context: ErrorContext): ProviderErrorType {
+  static classifyError(
+    error: unknown,
+    context: ErrorContext
+  ): ProviderErrorType {
     // If it's already a structured error, return its type
     if (isStructuredError(error)) {
       return error.type;
     }
     // Use structured error classification patterns
     const errorMessage = this.extractErrorMessage(error);
-    
+
     for (const pattern of DEFAULT_ERROR_PATTERNS) {
       if (this.matchesPattern(errorMessage, pattern.messagePatterns)) {
         return pattern.errorType;
@@ -77,7 +80,12 @@ export abstract class BaseProviderErrorHandler {
     if (typeof error === 'string') {
       return error;
     }
-    if (error && typeof error === 'object' && 'message' in error && typeof (error as any).message === 'string') {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      typeof (error as any).message === 'string'
+    ) {
       return (error as any).message;
     }
     return String(error);
@@ -86,7 +94,10 @@ export abstract class BaseProviderErrorHandler {
   /**
    * Check if error message matches any of the patterns
    */
-  private static matchesPattern(message: string, patterns: (string | RegExp)[]): boolean {
+  private static matchesPattern(
+    message: string,
+    patterns: (string | RegExp)[]
+  ): boolean {
     return patterns.some(pattern => {
       if (typeof pattern === 'string') {
         return message.toLowerCase().includes(pattern.toLowerCase());

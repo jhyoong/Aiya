@@ -105,3 +105,19 @@ export class MCPResourceError extends MCPError {
     this.cause = cause;
   }
 }
+
+export class FileSystemError extends Error {
+  constructor(
+    message: string,
+    public code:
+      | 'PERMISSION_DENIED'
+      | 'FILE_NOT_FOUND'
+      | 'PATH_TRAVERSAL'
+      | 'DISK_FULL',
+    public path: string,
+    public suggestion?: string
+  ) {
+    super(message);
+    this.name = 'FileSystemError';
+  }
+}

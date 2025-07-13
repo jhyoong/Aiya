@@ -58,9 +58,12 @@ export class ConnectionTester {
       const data = await response.json();
 
       // Check if the specified model exists
-      const modelExists = Array.isArray(data.models) && data.models.some(
-        (m: unknown) => isObject(m) && hasProperty(m, 'name') && m.name === config.model
-      );
+      const modelExists =
+        Array.isArray(data.models) &&
+        data.models.some(
+          (m: unknown) =>
+            isObject(m) && hasProperty(m, 'name') && m.name === config.model
+        );
 
       if (!modelExists) {
         const context: ErrorContext = {
@@ -87,7 +90,7 @@ export class ConnectionTester {
         operation: 'connection_test',
         model: config.model,
         endpoint: config.baseUrl,
-          timestamp: new Date(),
+        timestamp: new Date(),
       };
 
       const result = OllamaErrorMapper.handleOllamaError(error, context);
@@ -158,9 +161,12 @@ export class ConnectionTester {
       const data = await response.json();
 
       // Check if the specified model exists
-      const modelExists = Array.isArray(data.data) && data.data.some(
-        (m: unknown) => isObject(m) && hasProperty(m, 'id') && m.id === config.model
-      );
+      const modelExists =
+        Array.isArray(data.data) &&
+        data.data.some(
+          (m: unknown) =>
+            isObject(m) && hasProperty(m, 'id') && m.id === config.model
+        );
 
       if (!modelExists) {
         const context: ErrorContext = {
@@ -187,7 +193,7 @@ export class ConnectionTester {
         operation: 'connection_test',
         model: config.model,
         endpoint: config.baseUrl,
-          timestamp: new Date(),
+        timestamp: new Date(),
       };
 
       const result = OpenAIErrorMapper.handleOpenAIError(error, context);
@@ -256,14 +262,16 @@ export class ConnectionTester {
       const data = await response.json();
 
       // Check if the specified model exists
-      const modelExists = data.models?.some(
-        (m: unknown) => {
-          if (!isObject(m)) return false;
-          const hasName = hasProperty(m, 'name') && typeof m.name === 'string';
-          const hasDisplayName = hasProperty(m, 'displayName') && typeof m.displayName === 'string';
-          return (hasName && (m.name as string).includes(config.model)) || (hasDisplayName && (m.displayName as string) === config.model);
-        }
-      );
+      const modelExists = data.models?.some((m: unknown) => {
+        if (!isObject(m)) return false;
+        const hasName = hasProperty(m, 'name') && typeof m.name === 'string';
+        const hasDisplayName =
+          hasProperty(m, 'displayName') && typeof m.displayName === 'string';
+        return (
+          (hasName && (m.name as string).includes(config.model)) ||
+          (hasDisplayName && (m.displayName as string) === config.model)
+        );
+      });
 
       if (!modelExists) {
         const context: ErrorContext = {

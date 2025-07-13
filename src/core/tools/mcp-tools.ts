@@ -116,12 +116,12 @@ export class MCPToolService {
       const originalToolName = tool.name;
 
       // Validate tool arguments before calling
-      const validatedArgs = this.validateToolArguments(toolCall.arguments, tool.inputSchema);
-      
-      const mcpResult = await client.callTool(
-        originalToolName,
-        validatedArgs
+      const validatedArgs = this.validateToolArguments(
+        toolCall.arguments,
+        tool.inputSchema
       );
+
+      const mcpResult = await client.callTool(originalToolName, validatedArgs);
 
       // Convert MCP result to tool result
       const result = this.formatMCPResult(mcpResult);
@@ -143,7 +143,10 @@ export class MCPToolService {
   /**
    * Validate tool arguments against the input schema
    */
-  private validateToolArguments(args: ToolArguments, schema: any): ToolArguments {
+  private validateToolArguments(
+    args: ToolArguments,
+    schema: any
+  ): ToolArguments {
     // Basic validation - in a production system, you'd use a JSON Schema validator
     if (!args || typeof args !== 'object') {
       throw new Error('Tool arguments must be an object');
@@ -153,7 +156,9 @@ export class MCPToolService {
     if (schema.required) {
       for (const requiredField of schema.required) {
         if (!(requiredField in args)) {
-          throw new Error(`Required field '${requiredField}' is missing from tool arguments`);
+          throw new Error(
+            `Required field '${requiredField}' is missing from tool arguments`
+          );
         }
       }
     }

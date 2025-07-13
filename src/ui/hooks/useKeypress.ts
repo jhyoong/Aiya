@@ -25,7 +25,7 @@ export function useKeypress(
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
   const timeoutManagerRef = useRef<TimeoutManager>(new TimeoutManager());
-  
+
   // State to track Shift+Enter sequence detection
   const shiftEnterStateRef = useRef<{
     expectingReturn: boolean;
@@ -87,7 +87,7 @@ export function useKeypress(
           // Handle Shift+Enter sequence detection for terminals that send it as two events
           const state = shiftEnterStateRef.current;
           const timeoutManager = timeoutManagerRef.current;
-          
+
           // Clear any existing timeout using TimeoutManager
           if (state.activeTimeout) {
             timeoutManager.clear(state.activeTimeout);
@@ -108,7 +108,11 @@ export function useKeypress(
           }
 
           // Check if this is the second part of Shift+Enter (return after backslash)
-          if (state.expectingReturn && key.name === 'return' && key.sequence === '\r') {
+          if (
+            state.expectingReturn &&
+            key.name === 'return' &&
+            key.sequence === '\r'
+          ) {
             state.expectingReturn = false;
             // Convert to Shift+Enter
             key.name = 'shift+return';
@@ -123,11 +127,11 @@ export function useKeypress(
           }
 
           // Standard Shift+Enter detection for other terminals
-          const isStandardShiftEnter = 
+          const isStandardShiftEnter =
             // Method 1: Direct shift flag detection (most reliable)
             (key.name === 'return' && key.shift) ||
             // Method 2: Common escape sequence for Shift+Enter in many terminals
-            (key.sequence === '\x1B\r');
+            key.sequence === '\x1B\r';
 
           if (isStandardShiftEnter) {
             key.name = 'shift+return';
@@ -149,7 +153,7 @@ export function useKeypress(
       // Clean up all timeouts using TimeoutManager
       const timeoutManager = timeoutManagerRef.current;
       timeoutManager.clearAll();
-      
+
       // Reset Shift+Enter detection state
       const state = shiftEnterStateRef.current;
       state.expectingReturn = false;

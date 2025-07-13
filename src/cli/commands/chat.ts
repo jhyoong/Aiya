@@ -4,7 +4,7 @@ import { render, useStdin } from 'ink';
 import { ConfigManager } from '../../core/config/manager.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
-import { EnhancedFilesystemMCPClient } from '../../core/mcp/enhanced-filesystem.js';
+import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { Message } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
@@ -230,7 +230,7 @@ export const chatCommand = new Command('chat')
         config.security.allowedExtensions,
         config.security.maxFileSize
       );
-      const mcpClient = new EnhancedFilesystemMCPClient(security);
+      const mcpClient = new FilesystemMCPClient(security);
       await mcpClient.connect();
       showLoader('MCP client connected successfully');
 
@@ -330,7 +330,7 @@ export const chatCommand = new Command('chat')
 async function* handleMessageStream(
   input: string,
   session: ChatSession,
-  mcpClient: EnhancedFilesystemMCPClient
+  mcpClient: FilesystemMCPClient
 ): AsyncGenerator<
   { content: string; thinking?: string; done: boolean },
   void,
@@ -518,7 +518,7 @@ async function* handleMessageStream(
 async function handleMessage(
   input: string,
   session: ChatSession,
-  mcpClient: EnhancedFilesystemMCPClient,
+  mcpClient: FilesystemMCPClient,
   useStreaming: boolean
 ): Promise<string> {
   const trimmed = input.trim();
@@ -655,7 +655,7 @@ async function handleMessage(
 async function handleSlashCommand(
   command: string,
   session: ChatSession,
-  mcpClient: EnhancedFilesystemMCPClient
+  mcpClient: FilesystemMCPClient
 ): Promise<string> {
   // Create command context
   const context: CommandContext = {

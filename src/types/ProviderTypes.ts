@@ -1,6 +1,6 @@
 /**
  * Provider Type Definitions
- * 
+ *
  * Comprehensive type definitions for AI provider configurations, capabilities,
  * and responses. This module replaces `any` usage in provider-related code
  * with properly structured and validated types.
@@ -14,16 +14,16 @@ import { StructuredError } from './ErrorTypes.js';
 export interface BaseProviderConfig {
   /** Provider type identifier */
   type: string;
-  
+
   /** Model name to use */
   model: string;
-  
+
   /** Base URL for the provider's API */
   baseUrl: string;
-  
+
   /** API key for authentication (optional for some providers) */
   apiKey?: string;
-  
+
   /** Maximum tokens for requests */
   maxTokens?: number;
 }
@@ -116,12 +116,12 @@ export interface OllamaConfig extends BaseProviderConfig {
 /**
  * Union type of all provider configurations.
  */
-export type ProviderConfig = 
-  | OpenAIConfig 
-  | AnthropicConfig 
-  | AzureConfig 
-  | GeminiConfig 
-  | BedrockConfig 
+export type ProviderConfig =
+  | OpenAIConfig
+  | AnthropicConfig
+  | AzureConfig
+  | GeminiConfig
+  | BedrockConfig
   | OllamaConfig;
 
 /**
@@ -130,26 +130,26 @@ export type ProviderConfig =
 export interface ProviderCapabilities {
   /** Whether the provider supports vision/image inputs */
   supportsVision: boolean;
-  
+
   /** Whether the provider supports function calling */
   supportsFunctionCalling: boolean;
-  
+
   /** Whether the provider supports thinking/reasoning tokens */
   supportsThinking: boolean;
-  
+
   /** Maximum context length in tokens */
   maxTokens: number;
-  
+
   /** Whether streaming is supported */
   supportsStreaming: boolean;
-  
+
   /** Cost per token (if known) */
   costPerToken?: {
     input: number;
     output: number;
     reasoning?: number;
   };
-  
+
   /** Additional provider-specific capabilities */
   extensions?: Record<string, boolean | number | string>;
 }
@@ -196,16 +196,22 @@ export interface AnthropicUsageMetadata {
 /**
  * Union type for all usage metadata formats.
  */
-export type UsageMetadata = 
-  | OpenAIUsageMetadata 
-  | GeminiUsageMetadata 
+export type UsageMetadata =
+  | OpenAIUsageMetadata
+  | GeminiUsageMetadata
   | AnthropicUsageMetadata;
 
 /**
  * Tool call arguments with proper typing.
  */
 export interface ToolArguments {
-  [key: string]: string | number | boolean | null | ToolArguments | ToolArguments[];
+  [key: string]:
+    | string
+    | number
+    | boolean
+    | null
+    | ToolArguments
+    | ToolArguments[];
 }
 
 /**
@@ -322,7 +328,9 @@ export function isOpenAIConfig(config: ProviderConfig): config is OpenAIConfig {
   return config.type === 'openai';
 }
 
-export function isAnthropicConfig(config: ProviderConfig): config is AnthropicConfig {
+export function isAnthropicConfig(
+  config: ProviderConfig
+): config is AnthropicConfig {
   return config.type === 'anthropic';
 }
 
@@ -334,7 +342,9 @@ export function isGeminiConfig(config: ProviderConfig): config is GeminiConfig {
   return config.type === 'gemini';
 }
 
-export function isBedrockConfig(config: ProviderConfig): config is BedrockConfig {
+export function isBedrockConfig(
+  config: ProviderConfig
+): config is BedrockConfig {
   return config.type === 'bedrock';
 }
 
@@ -345,14 +355,20 @@ export function isOllamaConfig(config: ProviderConfig): config is OllamaConfig {
 /**
  * Type guards for usage metadata.
  */
-export function isOpenAIUsage(usage: UsageMetadata): usage is OpenAIUsageMetadata {
+export function isOpenAIUsage(
+  usage: UsageMetadata
+): usage is OpenAIUsageMetadata {
   return 'prompt_tokens' in usage && 'completion_tokens' in usage;
 }
 
-export function isGeminiUsage(usage: UsageMetadata): usage is GeminiUsageMetadata {
+export function isGeminiUsage(
+  usage: UsageMetadata
+): usage is GeminiUsageMetadata {
   return 'promptTokenCount' in usage && 'candidatesTokenCount' in usage;
 }
 
-export function isAnthropicUsage(usage: UsageMetadata): usage is AnthropicUsageMetadata {
+export function isAnthropicUsage(
+  usage: UsageMetadata
+): usage is AnthropicUsageMetadata {
   return 'input_tokens' in usage && 'output_tokens' in usage;
 }

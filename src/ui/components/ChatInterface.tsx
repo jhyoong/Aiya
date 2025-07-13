@@ -4,11 +4,11 @@ import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
 import { TextBuffer } from '../core/TextBuffer.js';
-import { 
-  BoundedArray, 
-  ContentSizeLimiter, 
+import {
+  BoundedArray,
+  ContentSizeLimiter,
   SubscriptionManager,
-  MEMORY_LIMITS 
+  MEMORY_LIMITS,
 } from '../utils/memoryManagement.js';
 
 interface Message {
@@ -75,7 +75,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   currentProvider,
   onProviderChange,
 }) => {
-  const messagesRef = useRef(new BoundedArray<Message>(MEMORY_LIMITS.MAX_MESSAGE_HISTORY));
+  const messagesRef = useRef(
+    new BoundedArray<Message>(MEMORY_LIMITS.MAX_MESSAGE_HISTORY)
+  );
   const [messages, setMessages] = useState<Message[]>([]);
   const streamingContentRef = useRef(new ContentSizeLimiter());
   const subscriptionManagerRef = useRef(new SubscriptionManager());
@@ -86,11 +88,11 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [currentThinking, setCurrentThinking] = useState<string>('');
   const [currentContent, setCurrentContent] = useState<string>('');
   const [suggestionEngine] = useState(new SuggestionEngine());
-  
+
   // Add scroll detection state
   const [isUserScrolling, setIsUserScrolling] = useState<boolean>(false);
   const lastMessageCountRef = useRef<number>(0);
-  
+
   // Convert streaming content to refs to prevent re-renders during streaming
   const currentThinkingRef = useRef<string>('');
   const currentContentRef = useRef<string>('');
@@ -173,10 +175,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     return () => {
       // Clean up all subscriptions
       subscriptionManagerRef.current.unsubscribeAll();
-      
+
       // Clear streaming content
       streamingContentRef.current.clear();
-      
+
       // Clear message history if needed (optional - may want to preserve)
       // messagesRef.current.clear();
     };
@@ -206,13 +208,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     };
 
     messagesRef.current.push(userMessage);
-    
+
     // Only update messages state if not scrolling or if it's a new message
     const isNewMessage = detectMessageChange();
     if (isNewMessage || !isUserScrolling) {
       setMessages([...messagesRef.current.getAll()]);
     }
-    
+
     setStatus('processing');
     setStatusMessage('Generating response...');
     currentThinkingRef.current = '';
@@ -229,7 +231,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         let currentPhaseContent = '';
         let currentPhaseThinking = '';
         let lastChunkType: 'thinking' | 'content' | null = null;
-        
+
         // Reset streaming content limiter for new message
         streamingContentRef.current.clear();
 
@@ -256,7 +258,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             }
 
             // Use content limiter for thinking content as well
-            if (chunk.thinking.length < MEMORY_LIMITS.MAX_STREAMING_CONTENT_SIZE) {
+            if (
+              chunk.thinking.length < MEMORY_LIMITS.MAX_STREAMING_CONTENT_SIZE
+            ) {
               currentPhaseThinking += chunk.thinking;
               currentThinkingRef.current = currentPhaseThinking;
               if (!isUserScrolling) {
@@ -275,10 +279,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               setCurrentContent(currentPhaseContent);
             }
             lastChunkType = 'content';
-            
+
             // Warn if content is getting too large
             if (streamingContentRef.current.isNearLimit) {
-              console.warn('[ChatInterface] Streaming content approaching size limit');
+              console.warn(
+                '[ChatInterface] Streaming content approaching size limit'
+              );
             }
           }
 
@@ -388,7 +394,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         {(currentThinking || currentThinkingRef.current) && (
           <Box marginBottom={1}>
             <Text color='grey' dimColor>
-              {formatThinkingContent(isUserScrolling ? currentThinkingRef.current : currentThinking)}
+              {formatThinkingContent(
+                isUserScrolling ? currentThinkingRef.current : currentThinking
+              )}
             </Text>
           </Box>
         )}
@@ -403,7 +411,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </Text>
               )}
             </Box>
-            <Text>{isUserScrolling ? currentContentRef.current : currentContent}</Text>
+            <Text>
+              {isUserScrolling ? currentContentRef.current : currentContent}
+            </Text>
             <Text color='gray' dimColor>
               streaming...
             </Text>

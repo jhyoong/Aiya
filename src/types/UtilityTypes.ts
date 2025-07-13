@@ -1,6 +1,6 @@
 /**
  * Utility Type Definitions
- * 
+ *
  * Shared utility types and type helpers used throughout the application.
  * This module provides reusable type patterns and eliminates the need for
  * `any` types in common scenarios.
@@ -21,7 +21,8 @@ export type RequireFields<T, K extends keyof T> = T & Required<Pick<T, K>>;
 /**
  * Makes specific properties of a type optional.
  */
-export type OptionalFields<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+export type OptionalFields<T, K extends keyof T> = Omit<T, K> &
+  Partial<Pick<T, K>>;
 
 /**
  * Creates a type where all properties are strings (useful for environment variables).
@@ -38,12 +39,12 @@ export type ConfigObject<T = Record<string, unknown>> = T & {
 /**
  * Type for JSON-serializable values (replaces `any` in JSON contexts).
  */
-export type JsonValue = 
-  | string 
-  | number 
-  | boolean 
-  | null 
-  | JsonObject 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonObject
   | JsonArray;
 
 export interface JsonObject {
@@ -55,7 +56,9 @@ export interface JsonArray extends Array<JsonValue> {}
 /**
  * Type for callback functions with unknown parameters (safer than Function).
  */
-export type CallbackFunction<T extends unknown[] = unknown[], R = unknown> = (...args: T) => R;
+export type CallbackFunction<T extends unknown[] = unknown[], R = unknown> = (
+  ...args: T
+) => R;
 
 /**
  * Type for event handlers.
@@ -66,8 +69,7 @@ export type EventHandler<T = unknown> = (event: T) => void;
  * Type for async operations that may fail.
  */
 export type AsyncResult<T, E = Error> = Promise<
-  | { success: true; data: T }
-  | { success: false; error: E }
+  { success: true; data: T } | { success: false; error: E }
 >;
 
 /**

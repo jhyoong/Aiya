@@ -1,6 +1,6 @@
 /**
  * Type Definitions Index
- * 
+ *
  * Central export point for all type definitions used throughout the application.
  * This module provides a single import point for type-safe code across the codebase.
  */

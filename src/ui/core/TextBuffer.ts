@@ -9,7 +9,14 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import {
   toCodePoints,
   cpLen,
@@ -182,7 +189,7 @@ function calculateVisualLayout(
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
-    
+
     const { visualChunks, visualCursor } = processLogicalLine(
       logLine,
       logIndex,
@@ -190,11 +197,11 @@ function calculateVisualLayout(
       viewportWidth
     );
 
-    visualChunks.forEach((chunk) => {
+    visualChunks.forEach(chunk => {
       if (chunk) {
         // Update chunk with correct visual line index
         const actualVisualLineIndex = currentVisualLineIndex;
-        
+
         if (!logicalToVisualMap[logIndex]) {
           logicalToVisualMap[logIndex] = [];
         }
@@ -204,7 +211,7 @@ function calculateVisualLayout(
         ]);
         visualToLogicalMap.push([logIndex, chunk.startPosInLogicalLine]);
         visualLines.push(chunk.content);
-        
+
         currentVisualLineIndex++;
       }
     });
@@ -212,7 +219,8 @@ function calculateVisualLayout(
     // Update cursor position if it was found in this logical line
     if (visualCursor) {
       // Adjust the visual cursor row to account for the global visual line index
-      const adjustedVisualRow = visualCursor[0] + (currentVisualLineIndex - visualChunks.length);
+      const adjustedVisualRow =
+        visualCursor[0] + (currentVisualLineIndex - visualChunks.length);
       currentVisualCursor = [adjustedVisualRow, visualCursor[1]];
     }
   });
@@ -842,7 +850,7 @@ export function useTextBuffer({
   shellModeActive = false,
 }: UseTextBufferProps): TextBuffer {
   const cleanupRef = useRef(new ResourceCleanup());
-  
+
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -869,7 +877,11 @@ export function useTextBuffer({
 
   const visualLayout = useMemo(
     () =>
-      memoizedCalculateVisualLayout(lines, [cursorRow, cursorCol], state.viewportWidth),
+      memoizedCalculateVisualLayout(
+        lines,
+        [cursorRow, cursorCol],
+        state.viewportWidth
+      ),
     [lines, cursorRow, cursorCol, state.viewportWidth]
   );
 

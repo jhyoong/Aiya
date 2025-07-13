@@ -1,7 +1,4 @@
-import { 
-  UsageMetadata, 
-  ToolArguments
-} from '../../types/ProviderTypes.js';
+import { UsageMetadata, ToolArguments } from '../../types/ProviderTypes.js';
 
 export interface ToolCall {
   id: string;

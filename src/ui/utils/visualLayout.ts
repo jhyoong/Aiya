@@ -1,6 +1,6 @@
 /**
  * Visual Layout Utilities
- * 
+ *
  * Utilities for handling text layout, word wrapping, and cursor mapping
  * in visual text display contexts. Extracted from TextBuffer.ts for better
  * maintainability and testability.
@@ -36,7 +36,11 @@ const layoutCache = new Map<string, LayoutCacheEntry>();
 /**
  * Generates a cache key from content and viewport parameters.
  */
-function generateCacheKey(content: string, viewportWidth: number, cursorPos?: [number, number]): string {
+function generateCacheKey(
+  content: string,
+  viewportWidth: number,
+  cursorPos?: [number, number]
+): string {
   const cursorKey = cursorPos ? `_${cursorPos[0]}_${cursorPos[1]}` : '';
   return `${content.length}_${viewportWidth}_${hashString(content)}${cursorKey}`;
 }
@@ -49,7 +53,7 @@ function hashString(str: string): string {
   if (str.length === 0) return hash.toString();
   for (let i = 0; i < str.length; i++) {
     const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32-bit integer
   }
   return Math.abs(hash).toString(16);
@@ -58,12 +62,14 @@ function hashString(str: string): string {
 /**
  * Cleans up old cache entries to prevent memory leaks.
  */
-function cleanupCache<T extends { lastAccessed: number }>(cache: Map<string, T>): void {
+function cleanupCache<T extends { lastAccessed: number }>(
+  cache: Map<string, T>
+): void {
   if (cache.size <= CACHE_SIZE_LIMIT) return;
-  
+
   const entries = Array.from(cache.entries());
   entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
-  
+
   // Remove oldest 25% of entries
   const toRemove = Math.floor(entries.length * 0.25);
   for (let i = 0; i < toRemove; i++) {
@@ -88,12 +94,12 @@ function memoizedProcessLogicalLine(
 } {
   const cacheKey = generateCacheKey(logLine, viewportWidth);
   const now = Date.now();
-  
+
   // Check cache
   const cached = wrapCache.get(cacheKey);
   if (cached) {
     cached.lastAccessed = now;
-    
+
     // Re-calculate cursor for this specific request (cursor position can vary)
     let visualCursor: [number, number] | null = null;
     for (let i = 0; i < cached.chunks.length; i++) {
@@ -112,22 +118,27 @@ function memoizedProcessLogicalLine(
         }
       }
     }
-    
+
     return { visualChunks: cached.chunks, visualCursor };
   }
-  
+
   // Not in cache, calculate fresh
-  const result = processLogicalLine(logLine, logIndex, logicalCursor, viewportWidth);
-  
+  const result = processLogicalLine(
+    logLine,
+    logIndex,
+    logicalCursor,
+    viewportWidth
+  );
+
   // Cache the result
   wrapCache.set(cacheKey, {
     chunks: result.visualChunks,
-    lastAccessed: now
+    lastAccessed: now,
   });
-  
+
   // Cleanup if needed
   cleanupCache(wrapCache);
-  
+
   return result;
 }
 
@@ -146,10 +157,10 @@ export interface VisualChunk {
 
 /**
  * Calculates word wrapping for a single logical line.
- * 
+ *
  * This function handles the complex logic of breaking text into visual chunks
  * that fit within the viewport width, respecting word boundaries when possible.
- * 
+ *
  * @param codePointsInLogLine - Array of code points representing the logical line
  * @param viewportWidth - Maximum width for each visual line
  * @param startPosInLogLine - Starting position within the logical line
@@ -189,15 +200,12 @@ export function calculateWordWrapping(
         return {
           chunk: currentChunk,
           numCodePoints: numCodePointsInChunk,
-          hasWordBreak: true
+          hasWordBreak: true,
         };
       } else {
         // No word break, or word break is at the start of this potential chunk, or word break leads to empty chunk.
         // Hard break: take characters up to viewportWidth, or just the current char if it alone is too wide.
-        if (
-          numCodePointsInChunk === 0 &&
-          charVisualWidth > viewportWidth
-        ) {
+        if (numCodePointsInChunk === 0 && charVisualWidth > viewportWidth) {
           // Single character is wider than viewport, take it anyway
           currentChunk = char;
           numCodePointsInChunk = 1;
@@ -253,13 +261,13 @@ export function calculateWordWrapping(
   return {
     chunk: currentChunk,
     numCodePoints: numCodePointsInChunk,
-    hasWordBreak: false
+    hasWordBreak: false,
   };
 }
 
 /**
  * Maps logical cursor position to visual cursor coordinates.
- * 
+ *
  * @param logicalCursor - [row, col] logical cursor position
  * @param logIndex - Current logical line index
  * @param currentPosInLogLine - Current position within the logical line
@@ -279,22 +287,14 @@ export function mapCursorToVisual(
   }
 
   const cursorLogCol = logicalCursor[1];
-  
+
   if (
     cursorLogCol >= currentPosInLogLine &&
     cursorLogCol < currentPosInLogLine + numCodePointsInChunk
   ) {
-    return [
-      visualLineIndex,
-      cursorLogCol - currentPosInLogLine,
-    ];
-  } else if (
-    cursorLogCol === currentPosInLogLine + numCodePointsInChunk
-  ) {
-    return [
-      visualLineIndex,
-      numCodePointsInChunk,
-    ];
+    return [visualLineIndex, cursorLogCol - currentPosInLogLine];
+  } else if (cursorLogCol === currentPosInLogLine + numCodePointsInChunk) {
+    return [visualLineIndex, numCodePointsInChunk];
   }
 
   return null; // Cursor not in this chunk
@@ -302,7 +302,7 @@ export function mapCursorToVisual(
 
 /**
  * Processes a single logical line into visual chunks.
- * 
+ *
  * @param logLine - The logical line content
  * @param logIndex - Index of the logical line
  * @param logicalCursor - Logical cursor position [row, col]
@@ -321,21 +321,21 @@ export function processLogicalLine(
   const visualChunks: VisualChunk[] = [];
   let visualCursor: [number, number] | null = null;
   let visualLineIndex = 0; // This will be updated by the caller
-  
+
   if (logLine.length === 0) {
     // Handle empty logical line
     const chunk: VisualChunk = {
       content: '',
       startPosInLogicalLine: 0,
       numCodePoints: 0,
-      visualLineIndex: visualLineIndex
+      visualLineIndex: visualLineIndex,
     };
     visualChunks.push(chunk);
-    
+
     if (logIndex === logicalCursor[0] && logicalCursor[1] === 0) {
       visualCursor = [visualLineIndex, 0];
     }
-    
+
     return { visualChunks, visualCursor };
   }
 
@@ -354,7 +354,7 @@ export function processLogicalLine(
       content: wrapResult.chunk,
       startPosInLogicalLine: currentPosInLogLine,
       numCodePoints: wrapResult.numCodePoints,
-      visualLineIndex: visualLineIndex
+      visualLineIndex: visualLineIndex,
     };
     visualChunks.push(chunk);
 
@@ -366,7 +366,7 @@ export function processLogicalLine(
       wrapResult.numCodePoints,
       visualLineIndex
     );
-    
+
     if (cursorMapping) {
       visualCursor = cursorMapping;
     }
@@ -408,7 +408,7 @@ export function processLogicalLine(
 
 /**
  * Memoized version of calculateVisualLayout with full layout caching.
- * 
+ *
  * This provides the main performance optimization by caching complete layout
  * calculations based on content hash and viewport dimensions.
  */
@@ -425,14 +425,14 @@ export function memoizedCalculateVisualLayout(
   const allText = logicalLines.join('\n');
   const cacheKey = generateCacheKey(allText, viewportWidth, logicalCursor);
   const now = Date.now();
-  
+
   // Check full layout cache
   const cached = layoutCache.get(cacheKey);
   if (cached) {
     cached.lastAccessed = now;
     return cached.result;
   }
-  
+
   // Calculate fresh layout using the regular function
   const visualLines: string[] = [];
   const logicalToVisualMap: Array<Array<[number, number]>> = [];
@@ -442,7 +442,7 @@ export function memoizedCalculateVisualLayout(
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
-    
+
     const { visualChunks, visualCursor } = memoizedProcessLogicalLine(
       logLine,
       logIndex,
@@ -450,10 +450,10 @@ export function memoizedCalculateVisualLayout(
       viewportWidth
     );
 
-    visualChunks.forEach((chunk) => {
+    visualChunks.forEach(chunk => {
       if (chunk) {
         const actualVisualLineIndex = currentVisualLineIndex;
-        
+
         if (!logicalToVisualMap[logIndex]) {
           logicalToVisualMap[logIndex] = [];
         }
@@ -463,13 +463,14 @@ export function memoizedCalculateVisualLayout(
         ]);
         visualToLogicalMap.push([logIndex, chunk.startPosInLogicalLine]);
         visualLines.push(chunk.content);
-        
+
         currentVisualLineIndex++;
       }
     });
 
     if (visualCursor) {
-      const adjustedVisualRow = visualCursor[0] + (currentVisualLineIndex - visualChunks.length);
+      const adjustedVisualRow =
+        visualCursor[0] + (currentVisualLineIndex - visualChunks.length);
       currentVisualCursor = [adjustedVisualRow, visualCursor[1]];
     }
   });
@@ -486,8 +487,7 @@ export function memoizedCalculateVisualLayout(
       visualToLogicalMap.push([0, 0]);
     }
     currentVisualCursor = [0, 0];
-  }
-  else if (
+  } else if (
     logicalCursor[0] === logicalLines.length - 1 &&
     logicalCursor[1] === cpLen(logicalLines[logicalLines.length - 1] || '') &&
     visualLines.length > 0
@@ -509,9 +509,9 @@ export function memoizedCalculateVisualLayout(
   // Cache the result
   layoutCache.set(cacheKey, {
     result,
-    lastAccessed: now
+    lastAccessed: now,
   });
-  
+
   // Cleanup if needed
   cleanupCache(layoutCache);
 

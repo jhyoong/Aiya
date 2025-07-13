@@ -301,7 +301,9 @@ describe('Provider Testing Validation', () => {
       const provider = MockProviderFactory.create(TEST_CONFIGS.ollama.basic);
       provider.setLatency(100);
 
-      const response = await provider.chat([{ role: 'user', content: 'Performance test' }]);
+      const response = await provider.chat([
+        { role: 'user', content: 'Performance test' },
+      ]);
 
       expect(response.content).toBeDefined();
       expect(response.content.length).toBeGreaterThan(0);
@@ -542,7 +544,9 @@ describe('Provider Testing Validation', () => {
         expect(response.usage!.output).toBeGreaterThan(10);
 
         // Verify second call works consistently
-        const secondResponse = await provider.chat([{ role: 'user', content: testCase }]);
+        const secondResponse = await provider.chat([
+          { role: 'user', content: testCase },
+        ]);
         assertValidProviderResponse(secondResponse);
       }
     });
