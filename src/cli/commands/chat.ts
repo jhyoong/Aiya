@@ -9,6 +9,7 @@ import { Message } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ChatInterface } from '../../ui/components/ChatInterface.js';
+import { StartupLoader } from '../../ui/components/StartupLoader.js';
 import { ThinkingParser } from '../../utils/thinking-parser.js';
 import { useTextBuffer } from '../../ui/core/TextBuffer.js';
 import { useTerminalSize } from '../../ui/hooks/useTerminalSize.js';
@@ -121,7 +122,7 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
   const isValidPath = React.useCallback((filePath: string): boolean => {
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
-    } catch (_e) {
+    } catch {
       return false;
     }
   }, []);
@@ -157,8 +158,51 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
 export const chatCommand = new Command('chat')
   .description('Start an interactive chat session')
   .action(async () => {
+    // Create startup state management
+    let updateStep: ((step: string) => void) | null = null;
+    let completeLoading: (() => void) | null = null;
+
+    // Create the startup component with state management
+    const StartupManager = () => {
+      const [currentStep, setCurrentStep] = React.useState(
+        'Starting chat session...'
+      );
+      const [isLoading, setIsLoading] = React.useState(true);
+
+      React.useEffect(() => {
+        updateStep = setCurrentStep;
+        completeLoading = () => setIsLoading(false);
+      }, []);
+
+      if (!isLoading) {
+        return null;
+      }
+
+      // Check if this is a completion message (starts with "Chat started")
+      const isComplete = currentStep.startsWith('Chat started');
+
+      return React.createElement(StartupLoader, {
+        currentStep,
+        isVisible: true,
+        isComplete,
+      });
+    };
+
+    // Start the UI render
+    const { unmount } = render(React.createElement(StartupManager));
+
+    // Helper functions
+    const showLoader = (step: string) => {
+      if (updateStep) updateStep(step);
+    };
+
+    const hideLoader = () => {
+      if (completeLoading) completeLoading();
+    };
+
     try {
-      console.log('🚀 Starting chat session...');
+      // Small delay to ensure the component is mounted
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       // Initialize command system for slash commands
       initializeCommandSystem();
@@ -171,15 +215,15 @@ export const chatCommand = new Command('chat')
 
       const configManager = new ConfigManager();
       const config = await configManager.load();
-      console.log('✅ Configuration loaded successfully');
+      showLoader('Configuration loaded successfully');
 
       const currentProvider = configManager.getCurrentProvider();
-      console.log(
-        `🔧 Current provider: ${currentProvider.type} - ${currentProvider.model} @ ${currentProvider.baseUrl || 'default'}`
+      showLoader(
+        `Setting up ${currentProvider.type} - ${currentProvider.model}`
       );
 
       const provider = ProviderFactory.create(currentProvider);
-      console.log('✅ Provider created successfully');
+      showLoader('Provider created successfully');
 
       const security = new WorkspaceSecurity(
         process.cwd(),
@@ -188,29 +232,30 @@ export const chatCommand = new Command('chat')
       );
       const mcpClient = new EnhancedFilesystemMCPClient(security);
       await mcpClient.connect();
-      console.log('✅ MCP client connected successfully');
+      showLoader('MCP client connected successfully');
 
       // Verify connection
-      console.log('🔍 Verifying provider health...');
+      showLoader('Verifying provider health...');
       if (!(await provider.isHealthy())) {
+        hideLoader();
         throw new Error('Cannot connect to provider server');
       }
-      console.log('✅ Provider health check passed');
+      showLoader('Provider health check passed');
 
       // Initialize MCP tool service
       const toolService = new MCPToolService([mcpClient]);
       await toolService.initialize();
-      console.log('✅ MCP tool service initialized');
+      showLoader('MCP tool service initialized');
 
       const toolExecutor = new ToolExecutor(
         toolService,
         process.env.AIYA_VERBOSE === 'true'
       );
-      console.log('✅ Tool executor created');
+      showLoader('Tool executor created');
 
       // Get model information for context length
       const modelInfo = await provider.getModelInfo();
-      console.log('✅ Model information retrieved');
+      showLoader('Model information retrieved');
 
       const currentProviderConfig = configManager.getCurrentProvider();
       const currentProviderName = config.current_provider || 'default';
@@ -231,7 +276,7 @@ export const chatCommand = new Command('chat')
         provider,
         currentProviderName,
       };
-      console.log('✅ Chat session initialized');
+      showLoader('Chat session initialized');
 
       // Add system message with tool definitions
       const toolsSystemMessage = toolService.generateToolsSystemMessage();
@@ -242,9 +287,17 @@ export const chatCommand = new Command('chat')
         });
       }
 
-      // Render the Ink-based chat interface
-      console.log('🎨 Starting chat interface...');
-      const { unmount } = render(
+      // Show completion message with checkmark
+      showLoader(
+        `Chat started with ${currentProvider.type} - ${currentProvider.model}`
+      );
+
+      // Small delay to show the completion message
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      hideLoader();
+      unmount(); // Clean up the startup loader
+      const { unmount: chatUnmount } = render(
         React.createElement(ChatWrapper, {
           onMessage: (message: string) =>
             handleMessage(message, session, mcpClient, config.ui.streaming),
@@ -254,7 +307,7 @@ export const chatCommand = new Command('chat')
             : undefined,
           onExit: () => {
             session.tokenCounter.endSession();
-            unmount();
+            chatUnmount();
             // Don't call process.exit(0) immediately - let the process naturally exit
           },
           provider: currentProviderConfig.type,
@@ -267,6 +320,8 @@ export const chatCommand = new Command('chat')
         })
       );
     } catch (error) {
+      hideLoader();
+      if (unmount) unmount(); // Clean up startup loader on error
       console.error('❌ Chat session failed:', error);
       throw error; // Let the parent handle the error instead of force-exit
     }
