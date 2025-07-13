@@ -309,7 +309,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             setCurrentThinking('');
             setCurrentContent('');
             setStatus('success');
-            setStatusMessage('Response generated');
+            setStatusMessage('Completed');
             break;
           }
         }
@@ -334,7 +334,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           setMessages([...messagesRef.current.getAll()]);
         }
         setStatus('success');
-        setStatusMessage('Response generated');
+        setStatusMessage('Completed');
       }
     } catch (error) {
       setStatus('error');
@@ -423,9 +423,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           focus={true}
           showSuggestions={true}
         />
-      ) : (
-        <Text color='yellow'>Processing your message...</Text>
-      )}
+      ) : null}
 
       <SimpleStatusBar
         status={status}
