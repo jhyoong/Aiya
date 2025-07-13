@@ -86,6 +86,30 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [currentThinking, setCurrentThinking] = useState<string>('');
   const [currentContent, setCurrentContent] = useState<string>('');
   const [suggestionEngine] = useState(new SuggestionEngine());
+  
+  // Add scroll detection state
+  const [isUserScrolling, setIsUserScrolling] = useState<boolean>(false);
+  const lastMessageCountRef = useRef<number>(0);
+  
+  // Convert streaming content to refs to prevent re-renders during streaming
+  const currentThinkingRef = useRef<string>('');
+  const currentContentRef = useRef<string>('');
+
+  // Function to detect if new messages were added (vs user scrolling)
+  const detectMessageChange = () => {
+    const currentMessageCount = messagesRef.current.getAll().length;
+    const isNewMessage = currentMessageCount > lastMessageCountRef.current;
+    lastMessageCountRef.current = currentMessageCount;
+    return isNewMessage;
+  };
+
+  // Reset user scrolling state when new messages arrive
+  React.useEffect(() => {
+    // When new messages arrive, assume user wants to see them
+    if (detectMessageChange()) {
+      setIsUserScrolling(false);
+    }
+  }, [messages.length]);
 
   const formatThinkingContent = (content: string): string => {
     if (!content.trim()) return '';
@@ -182,9 +206,17 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     };
 
     messagesRef.current.push(userMessage);
-    setMessages([...messagesRef.current.getAll()]);
+    
+    // Only update messages state if not scrolling or if it's a new message
+    const isNewMessage = detectMessageChange();
+    if (isNewMessage || !isUserScrolling) {
+      setMessages([...messagesRef.current.getAll()]);
+    }
+    
     setStatus('processing');
     setStatusMessage('Generating response...');
+    currentThinkingRef.current = '';
+    currentContentRef.current = '';
     setCurrentThinking('');
     setCurrentContent('');
 
@@ -226,7 +258,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             // Use content limiter for thinking content as well
             if (chunk.thinking.length < MEMORY_LIMITS.MAX_STREAMING_CONTENT_SIZE) {
               currentPhaseThinking += chunk.thinking;
-              setCurrentThinking(currentPhaseThinking);
+              currentThinkingRef.current = currentPhaseThinking;
+              if (!isUserScrolling) {
+                setCurrentThinking(currentPhaseThinking);
+              }
             }
             lastChunkType = 'thinking';
           }
@@ -235,7 +270,10 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
             // Use streaming content limiter to prevent unbounded accumulation
             streamingContentRef.current.append(chunk.content);
             currentPhaseContent = streamingContentRef.current.getContent();
-            setCurrentContent(currentPhaseContent);
+            currentContentRef.current = currentPhaseContent;
+            if (!isUserScrolling) {
+              setCurrentContent(currentPhaseContent);
+            }
             lastChunkType = 'content';
             
             // Warn if content is getting too large
@@ -261,9 +299,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
               }
 
               messagesRef.current.push(finalMessage);
-              setMessages([...messagesRef.current.getAll()]);
+              if (!isUserScrolling) {
+                setMessages([...messagesRef.current.getAll()]);
+              }
             }
 
+            currentThinkingRef.current = '';
+            currentContentRef.current = '';
             setCurrentThinking('');
             setCurrentContent('');
             setStatus('success');
@@ -288,7 +330,9 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
 
         messagesRef.current.push(assistantMessage);
-        setMessages([...messagesRef.current.getAll()]);
+        if (!isUserScrolling) {
+          setMessages([...messagesRef.current.getAll()]);
+        }
         setStatus('success');
         setStatusMessage('Response generated');
       }
@@ -297,6 +341,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       setStatusMessage(
         `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
+      currentThinkingRef.current = '';
+      currentContentRef.current = '';
       setCurrentThinking('');
       setCurrentContent('');
     }
@@ -311,7 +357,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <Box flexDirection='column' paddingY={1}>
         {messages.length > 0 && (
           <Box flexDirection='column' marginBottom={1}>
-            {messages.slice(-10).map((message: Message, index: number) => (
+            {messages.map((message: Message, index: number) => (
               <Box key={index} flexDirection='column' marginBottom={1}>
                 <Box flexDirection='row' gap={1}>
                   <Text color={message.role === 'user' ? 'blue' : 'green'}>
@@ -339,15 +385,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </Box>
         )}
 
-        {currentThinking && (
+        {(currentThinking || currentThinkingRef.current) && (
           <Box marginBottom={1}>
             <Text color='grey' dimColor>
-              {formatThinkingContent(currentThinking)}
+              {formatThinkingContent(isUserScrolling ? currentThinkingRef.current : currentThinking)}
             </Text>
           </Box>
         )}
 
-        {currentContent && (
+        {(currentContent || currentContentRef.current) && (
           <Box marginBottom={1}>
             <Box flexDirection='row' gap={1}>
               <Text color='green'>Aiya</Text>
@@ -357,7 +403,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 </Text>
               )}
             </Box>
-            <Text>{currentContent}</Text>
+            <Text>{isUserScrolling ? currentContentRef.current : currentContent}</Text>
             <Text color='gray' dimColor>
               streaming...
             </Text>

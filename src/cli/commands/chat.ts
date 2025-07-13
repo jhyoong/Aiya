@@ -93,10 +93,6 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
 
     // Also update context length
     setContextLength(props.session.tokenCounter.getContextLength());
-
-    // Update every second to keep it reactive
-    const interval = setInterval(updateTokenUsage, 1000);
-    return () => clearInterval(interval);
   }, [props.session.tokenCounter]);
 
   // Handle provider changes from ChatInterface
