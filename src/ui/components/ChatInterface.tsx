@@ -9,7 +9,7 @@ import {
   ContentSizeLimiter,
   SubscriptionManager,
   MEMORY_LIMITS,
-} from '../utils/memoryManagement.js';
+} from '../utils/memoryManagement';
 
 interface Message {
   role: 'user' | 'assistant';

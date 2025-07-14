@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
-import { TimeoutManager } from '../utils/memoryManagement.js';
+import { TimeoutManager } from '../utils/memoryManagement';
 
 export interface Key {
   name: string;
