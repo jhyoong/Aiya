@@ -28,7 +28,7 @@ import {
   memoizedCalculateVisualLayout,
 } from '../utils/visualLayout.js';
 import { isWordChar } from '../utils/textProcessing.js';
-import { ResourceCleanup } from '../utils/memoryManagement';
+import { ResourceCleanup } from '../utils/memoryManagement.js';
 
 export type Direction =
   | 'left'
