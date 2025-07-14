@@ -156,7 +156,6 @@ describe('Testing Infrastructure Foundation', () => {
         provider.chat([{ role: 'user', content: 'Test' }])
       ).rejects.toThrow('Connection failed');
     });
-
   });
 
   describe('Custom Assertions', () => {

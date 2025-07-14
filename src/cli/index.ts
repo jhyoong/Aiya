@@ -3,7 +3,6 @@
 import { Command } from 'commander';
 import { initCommand } from './commands/init.js';
 import { chatCommand } from './commands/chat.js';
-import { searchCommand } from './commands/search.js';
 
 const program = new Command();
 
@@ -15,7 +14,6 @@ program
 // Add commands
 program.addCommand(initCommand);
 program.addCommand(chatCommand); // Ink-based chat interface
-program.addCommand(searchCommand); // Ink-based search interface
 
 // Global options
 program

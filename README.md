@@ -2,19 +2,14 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-**Version 1.2.0** - Multi-provider support and init function flow added.
+**Version 1.3.0** - Reworked MCP tools system and added some docs.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- **Multi-Provider Support**: Ideally, seamless integration with Ollama, OpenAI, and Google Gemini
-- **Reactive Interface**: Slash command suggestions with smart tab completion and autocomplete
-- **Interactive Chat Sessions**: AI conversations with streaming responses and thinking display
-- **Context Management**: Add files to conversation context with visual feedback
-- **Secure File Operations**: Workspace-restricted file access with configurable security
-- **Simple Model Configuration**: YAML-based configuration with environment variable support
+- Aiya.. this is just a budget version of all the other fancy LLM tools out there. Building this just for myself to test Ollama models.
 
 ## Prerequisites
 
@@ -23,8 +18,6 @@ Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI
   - **Ollama**: Local models (qwen2.5-coder:7b, qwen3:8b, etc.)
   - **OpenAI**: API key for GPT-4, GPT-4 Turbo, etc.
   - **Google Gemini**: API key for Gemini 1.5 Pro/Flash models
-
-**Multi-Provider Support**: Aiya now supports multiple AI providers with seamless switching between them during conversations.
 
 ## Installation
 
@@ -53,12 +46,6 @@ aiya init
 aiya chat
 ```
 
-3. Search for files (will probably remove this):
-```bash
-aiya search something
-aiya search config
-```
-
 ## Global Options
 
 These options are available on all commands:
@@ -67,13 +54,8 @@ These options are available on all commands:
 
 ## Commands
 
-### `aiya init [options]`
-Initialize Aiya configuration for the current project.
-
-Options:
-- `-m, --model <model>` - Specify the Ollama model to use (default: qwen3:8b)
-- `--base-url <url>` - Ollama server endpoint (default: http://localhost:11434)
-- `--check-connection` - Verify connection to Ollama server
+### `aiya init`
+Initialize Aiya configuration for the current project through an interactive setup wizard that guides you through provider configuration and connection testing.
 
 ### `aiya chat`
 Start an interactive chat session with the AI featuring a modern terminal interface built with React/Ink.
@@ -84,7 +66,7 @@ Start an interactive chat session with the AI featuring a modern terminal interf
 - **Command Suggestions**: Type `/` to see available commands with grey text hints. Press Tab to quickly select commands.
 - `/read <file>` - Read and display file content in the terminal
 - `/add <file>` - Add file content to context for the next prompt (silent)
-- `/search <pattern>` - Search for files matching the pattern
+- `/search <pattern>` - Search for files by name (default) or content with options
 - `/tokens` - Show token usage statistics for the current session
 - `/thinking` - Toggle thinking mode display (on/off/auto)
 - `/model-switch` - Switch between configured AI providers mid-conversation
@@ -121,12 +103,23 @@ Switched to OpenAI GPT-4o-mini
 > [!NOTE]
 > Performance depends on your config settings and for local models, context window size
 
-### `aiya search <query>`
-> [!NOTE]
-> Will probably remove this next - to be integrated into slash command instead.
-Fuzzy search for files in the workspace.
+### Search Examples with `/search`
 
-The search uses simple fuzzy matching - it finds files where the query characters appear in order within the filename. Exact matches are ranked higher than partial matches.
+The `/search` command supports two modes:
+
+**Filename Search (Default):**
+```bash
+💬 You: /search component     # Finds files with "component" in filename
+💬 You: /search utils.ts      # Finds files with "utils.ts" in filename
+```
+
+**Content Search (Advanced):**
+```bash
+💬 You: /search "import React" --searchType literal --maxResults 5
+💬 You: /search error --includeGlobs "*.ts" "*.js" --excludeGlobs "*.test.*"
+💬 You: /search "class.*Component" --searchType regex --contextLines 3
+```
+Refer to [slash-commands](/docs/SLASH-COMMANDS.md) for more details.
 
 ## Configuration
 
@@ -144,15 +137,7 @@ You can override configuration using environment variables:
 - `AIYA_VERBOSE` - Enable verbose logging (true/false)
 - `AIYA_CONFIG_PATH` - Custom config file path
 
-Example `.aiya.yaml` (single provider):
-```yaml
-provider: ollama
-model: qwen3:8b
-endpoint: http://localhost:11434
-workspace: ./
-max_tokens: 32768
-```
-
+### Example `.aiya.yaml` 
 Multi-provider configuration example:
 ```yaml
 providers:
@@ -185,6 +170,7 @@ ui:
   showTokens: true
   thinking: 'auto'
 ```
+Refer to [init process](/docs/INIT-PROCESS.md) for more details.
 
 ## MCP Tool System
 
@@ -192,20 +178,11 @@ Aiya includes a built-in Model Context Protocol (MCP) tool system that enables f
 
 ### Available Tools
 
-#### Basic File Operations
-- **File I/O**: `read_file`, `write_file` - Read and write files within the workspace
-- **Directory Listing**: `list_directory` - Browse directory contents
-- **File Search**: `search_files` - Search for files using glob patterns
-
-#### Advanced File Manipulation
-- **Preview Changes**: `preview_diff` - Preview file changes before applying them
-- **Atomic Operations**: `atomic_write`, `atomic_edit` - Safe file operations with automatic backup
-- **Pattern Replacement**: `pattern_replace` - Regex-based content replacement with advanced options
-- **File Recovery**: `rollback_file` - Rollback files to previous backup versions
-
-#### Queue Management
-- **Batch Operations**: `queue_operation` - Queue multiple file operations for batch processing
-- **Queue Execution**: `execute_queue` - Execute all queued operations with optional preview
+#### Core File Operations
+- **ReadFile**: Read file contents with encoding options and line range selection
+- **WriteFile**: Write content to file with safety features and mode options (overwrite/create-only/append)
+- **EditFile**: Apply targeted edits using replace/insert/delete operations with fuzzy matching
+- **SearchFiles**: Search files with literal and regex patterns, including context lines
 
 ### Tool Usage
 The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, and batch processing for complex file manipulation tasks.
@@ -246,6 +223,7 @@ npm run format:check      # Check code formatting
 
 ## Changelog
 
+- **Version 1.3.0** - Reworked MCP tools system with improved file operations and better error handling. Also added more documentation.
 - **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), vitest setup, and improved setup wizard.
 - **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.
 - **Version 1.0.0** - Basic terminal tool with Ollama support and filesystem MCP tooling.

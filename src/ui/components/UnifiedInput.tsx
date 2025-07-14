@@ -4,6 +4,7 @@ import { TextBuffer } from '../core/TextBuffer.js';
 import { SuggestionEngine, SuggestionResult } from '../../cli/suggestions.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
 import { useKeypress } from '../hooks/useKeypress.js';
+import { Key } from '../../types/KeyboardTypes.js';
 import chalk from 'chalk';
 import stringWidth from 'string-width';
 
@@ -68,11 +69,10 @@ export function UnifiedInput({
 
   // Handle keyboard input using useKeypress hook
   const handleKeypress = useCallback(
-    (key: any) => {
+    (key: Key) => {
       if (!focus) {
         return;
       }
-
 
       // Detect potential paste operations (fallback for terminals without bracketed paste)
       const isPotentialPaste =

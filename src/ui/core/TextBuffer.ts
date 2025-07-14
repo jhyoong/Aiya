@@ -9,14 +9,26 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import pathMod from 'path';
-import { useState, useCallback, useEffect, useMemo, useReducer } from 'react';
-import stringWidth from 'string-width';
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+} from 'react';
 import {
   toCodePoints,
   cpLen,
   cpSlice,
   unescapePath,
 } from '../utils/textUtils.js';
+import {
+  processLogicalLine,
+  memoizedCalculateVisualLayout,
+} from '../utils/visualLayout.js';
+import { isWordChar } from '../utils/textProcessing.js';
+import { ResourceCleanup } from '../utils/memoryManagement.js';
 
 export type Direction =
   | 'left'
@@ -27,14 +39,6 @@ export type Direction =
   | 'wordRight'
   | 'home'
   | 'end';
-
-// Simple helper for word-wise ops.
-function isWordChar(ch: string | undefined): boolean {
-  if (ch === undefined) {
-    return false;
-  }
-  return !/[\s,.;!?]/.test(ch);
-}
 
 /**
  * Strip characters that can break terminal rendering.
@@ -181,170 +185,43 @@ function calculateVisualLayout(
   const logicalToVisualMap: Array<Array<[number, number]>> = [];
   const visualToLogicalMap: Array<[number, number]> = [];
   let currentVisualCursor: [number, number] = [0, 0];
+  let currentVisualLineIndex = 0;
 
   logicalLines.forEach((logLine, logIndex) => {
     logicalToVisualMap[logIndex] = [];
-    if (logLine.length === 0) {
-      // Handle empty logical line
-      logicalToVisualMap[logIndex].push([visualLines.length, 0]);
-      visualToLogicalMap.push([logIndex, 0]);
-      visualLines.push('');
-      if (logIndex === logicalCursor[0] && logicalCursor[1] === 0) {
-        currentVisualCursor = [visualLines.length - 1, 0];
-      }
-    } else {
-      // Non-empty logical line
-      let currentPosInLogLine = 0; // Tracks position within the current logical line (code point index)
-      const codePointsInLogLine = toCodePoints(logLine);
 
-      while (currentPosInLogLine < codePointsInLogLine.length) {
-        let currentChunk = '';
-        let currentChunkVisualWidth = 0;
-        let numCodePointsInChunk = 0;
-        let lastWordBreakPoint = -1; // Index in codePointsInLogLine for word break
-        let numCodePointsAtLastWordBreak = 0;
+    const { visualChunks, visualCursor } = processLogicalLine(
+      logLine,
+      logIndex,
+      logicalCursor,
+      viewportWidth
+    );
 
-        // Iterate through code points to build the current visual line (chunk)
-        for (let i = currentPosInLogLine; i < codePointsInLogLine.length; i++) {
-          const char = codePointsInLogLine[i] || '';
-          const charVisualWidth = stringWidth(char);
+    visualChunks.forEach(chunk => {
+      if (chunk) {
+        // Update chunk with correct visual line index
+        const actualVisualLineIndex = currentVisualLineIndex;
 
-          if (currentChunkVisualWidth + charVisualWidth > viewportWidth) {
-            // Character would exceed viewport width
-            if (
-              lastWordBreakPoint !== -1 &&
-              numCodePointsAtLastWordBreak > 0 &&
-              currentPosInLogLine + numCodePointsAtLastWordBreak < i
-            ) {
-              // We have a valid word break point to use, and it's not the start of the current segment
-              currentChunk = codePointsInLogLine
-                .slice(
-                  currentPosInLogLine,
-                  currentPosInLogLine + numCodePointsAtLastWordBreak
-                )
-                .join('');
-              numCodePointsInChunk = numCodePointsAtLastWordBreak;
-            } else {
-              // No word break, or word break is at the start of this potential chunk, or word break leads to empty chunk.
-              // Hard break: take characters up to viewportWidth, or just the current char if it alone is too wide.
-              if (
-                numCodePointsInChunk === 0 &&
-                charVisualWidth > viewportWidth
-              ) {
-                // Single character is wider than viewport, take it anyway
-                currentChunk = char;
-                numCodePointsInChunk = 1;
-              } else if (
-                numCodePointsInChunk === 0 &&
-                charVisualWidth <= viewportWidth
-              ) {
-                // This case should ideally be caught by the next iteration if the char fits.
-                // If it doesn't fit (because currentChunkVisualWidth was already > 0 from a previous char that filled the line),
-                // then numCodePointsInChunk would not be 0.
-                // This branch means the current char *itself* doesn't fit an empty line, which is handled by the above.
-                // If we are here, it means the loop should break and the current chunk (which is empty) is finalized.
-              }
-            }
-            break; // Break from inner loop to finalize this chunk
-          }
-
-          currentChunk += char;
-          currentChunkVisualWidth += charVisualWidth;
-          numCodePointsInChunk++;
-
-          // Check for word break opportunity (space)
-          if (char === ' ') {
-            lastWordBreakPoint = i; // Store code point index of the space
-            // Store the state *before* adding the space, if we decide to break here.
-            numCodePointsAtLastWordBreak = numCodePointsInChunk - 1; // Chars *before* the space
-          }
+        if (!logicalToVisualMap[logIndex]) {
+          logicalToVisualMap[logIndex] = [];
         }
-
-        // If the inner loop completed without breaking (i.e., remaining text fits)
-        // or if the loop broke but numCodePointsInChunk is still 0 (e.g. first char too wide for empty line)
-        if (
-          numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
-        ) {
-          // This can happen if the very first character considered for a new visual line is wider than the viewport.
-          // In this case, we take that single character.
-          const firstChar = codePointsInLogLine[currentPosInLogLine] || '';
-          currentChunk = firstChar;
-          numCodePointsInChunk = 1; // Ensure we advance
-        }
-
-        // If after everything, numCodePointsInChunk is still 0 but we haven't processed the whole logical line,
-        // it implies an issue, like viewportWidth being 0 or less. Avoid infinite loop.
-        if (
-          numCodePointsInChunk === 0 &&
-          currentPosInLogLine < codePointsInLogLine.length
-        ) {
-          // Force advance by one character to prevent infinite loop if something went wrong
-          currentChunk = codePointsInLogLine[currentPosInLogLine] || '';
-          numCodePointsInChunk = 1;
-        }
-
-        logicalToVisualMap[logIndex].push([
-          visualLines.length,
-          currentPosInLogLine,
+        logicalToVisualMap[logIndex]!.push([
+          actualVisualLineIndex,
+          chunk.startPosInLogicalLine,
         ]);
-        visualToLogicalMap.push([logIndex, currentPosInLogLine]);
-        visualLines.push(currentChunk);
+        visualToLogicalMap.push([logIndex, chunk.startPosInLogicalLine]);
+        visualLines.push(chunk.content);
 
-        // Cursor mapping logic
-        if (logIndex === logicalCursor[0]) {
-          const cursorLogCol = logicalCursor[1];
-          if (
-            cursorLogCol >= currentPosInLogLine &&
-            cursorLogCol < currentPosInLogLine + numCodePointsInChunk
-          ) {
-            currentVisualCursor = [
-              visualLines.length - 1,
-              cursorLogCol - currentPosInLogLine,
-            ];
-          } else if (
-            cursorLogCol ===
-            currentPosInLogLine + numCodePointsInChunk
-          ) {
-            currentVisualCursor = [
-              visualLines.length - 1,
-              numCodePointsInChunk,
-            ];
-          }
-        }
-
-        const logicalStartOfThisChunk = currentPosInLogLine;
-        currentPosInLogLine += numCodePointsInChunk;
-
-        // If the chunk processed did not consume the entire logical line,
-        // and the character immediately following the chunk is a space,
-        // advance past this space as it acted as a delimiter for word wrapping.
-        if (
-          logicalStartOfThisChunk + numCodePointsInChunk <
-            codePointsInLogLine.length &&
-          currentPosInLogLine < codePointsInLogLine.length && // Redundant if previous is true, but safe
-          codePointsInLogLine[currentPosInLogLine] === ' '
-        ) {
-          currentPosInLogLine++;
-        }
+        currentVisualLineIndex++;
       }
-      // After all chunks of a non-empty logical line are processed,
-      // if the cursor is at the very end of this logical line, update visual cursor.
-      if (
-        logIndex === logicalCursor[0] &&
-        logicalCursor[1] === codePointsInLogLine.length // Cursor at end of logical line
-      ) {
-        const lastVisualLineIdx = visualLines.length - 1;
-        if (
-          lastVisualLineIdx >= 0 &&
-          visualLines[lastVisualLineIdx] !== undefined
-        ) {
-          currentVisualCursor = [
-            lastVisualLineIdx,
-            cpLen(visualLines[lastVisualLineIdx] || ''), // Cursor at end of last visual line for this logical line
-          ];
-        }
-      }
+    });
+
+    // Update cursor position if it was found in this logical line
+    if (visualCursor) {
+      // Adjust the visual cursor row to account for the global visual line index
+      const adjustedVisualRow =
+        visualCursor[0] + (currentVisualLineIndex - visualChunks.length);
+      currentVisualCursor = [adjustedVisualRow, visualCursor[1]];
     }
   });
 
@@ -362,7 +239,6 @@ function calculateVisualLayout(
     currentVisualCursor = [0, 0];
   }
   // Handle cursor at the very end of the text (after all processing)
-  // This case might be covered by the loop end condition now, but kept for safety.
   else if (
     logicalCursor[0] === logicalLines.length - 1 &&
     logicalCursor[1] === cpLen(logicalLines[logicalLines.length - 1] || '') &&
@@ -973,6 +849,8 @@ export function useTextBuffer({
   isValidPath,
   shellModeActive = false,
 }: UseTextBufferProps): TextBuffer {
+  const cleanupRef = useRef(new ResourceCleanup());
+
   const initialState = useMemo((): TextBufferState => {
     const lines = initialText.split('\n');
     const [initialCursorRow, initialCursorCol] = calculateInitialCursorPosition(
@@ -999,7 +877,11 @@ export function useTextBuffer({
 
   const visualLayout = useMemo(
     () =>
-      calculateVisualLayout(lines, [cursorRow, cursorCol], state.viewportWidth),
+      memoizedCalculateVisualLayout(
+        lines,
+        [cursorRow, cursorCol],
+        state.viewportWidth
+      ),
     [lines, cursorRow, cursorCol, state.viewportWidth]
   );
 
@@ -1254,6 +1136,14 @@ export function useTextBuffer({
     () => visualLines.slice(visualScrollRow, visualScrollRow + viewport.height),
     [visualLines, visualScrollRow, viewport.height]
   );
+
+  // Cleanup effect for memory management
+  useEffect(() => {
+    return () => {
+      // Perform all registered cleanup tasks
+      cleanupRef.current.cleanup();
+    };
+  }, []);
 
   const replaceRange = useCallback(
     (

@@ -31,7 +31,7 @@ export class MockOllamaProvider extends BaseMockProvider {
         functionCalling: true,
         thinking: false,
       },
-    }
+    },
   ];
 
   constructor(config: ExtendedProviderConfig) {

@@ -32,6 +32,7 @@ export class OllamaProvider extends LLMProvider {
       operation,
       model: this.model,
       endpoint: this.baseUrl,
+      timestamp: new Date(),
     };
 
     const result = OllamaErrorMapper.handleOllamaError(error, context);

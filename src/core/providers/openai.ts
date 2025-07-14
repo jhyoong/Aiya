@@ -10,6 +10,7 @@ import {
   ProviderError,
   ProviderConfig,
 } from './base.js';
+import { UsageMetadata } from '../../types/ProviderTypes.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
 import { OpenAIErrorMapper, ErrorContext } from '../errors/index.js';
 
@@ -41,6 +42,7 @@ export class OpenAIProvider extends LLMProvider {
       operation,
       model: this.model,
       endpoint: this.baseUrl,
+      timestamp: new Date(),
     };
 
     const result = OpenAIErrorMapper.handleOpenAIError(error, context);
@@ -124,12 +126,17 @@ export class OpenAIProvider extends LLMProvider {
             totalTokens = chunk.usage.total_tokens;
           }
 
-          yield {
+          const result: StreamResponse = {
             content: '',
             done: true,
             tokensUsed: totalTokens,
-            usage: chunk.usage, // Include full usage metadata
           };
+
+          if (chunk.usage) {
+            result.usage = chunk.usage as UsageMetadata;
+          }
+
+          yield result;
           break;
         }
       }

@@ -47,6 +47,12 @@ export class WorkspaceSecurity {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+
+    // Allow directories (which have no extension)
+    if (ext === '') {
+      return;
+    }
+
     if (!this.allowedExtensions.has(ext)) {
       throw new SecurityError(`File extension '${ext}' is not allowed`);
     }

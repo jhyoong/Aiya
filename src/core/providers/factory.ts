@@ -6,6 +6,7 @@ import { AzureOpenAIProvider } from './azure.js';
 import { GeminiProvider } from './gemini.js';
 import { BedrockProvider } from './bedrock.js';
 import { ExtendedProviderConfig } from '../config/manager.js';
+import { ConfigValidationResult } from '../../types/ProviderTypes.js';
 
 export class ProviderFactory {
   private static providers: Map<
@@ -29,11 +30,84 @@ export class ProviderFactory {
       );
     }
 
-    // Convert ExtendedProviderConfig to base ProviderConfig
+    // Validate configuration before processing
+    const validationResult = this.validateConfig(config);
+    if (!validationResult.valid) {
+      const errorMessages = validationResult.errors
+        .map(err => `${err.field}: ${err.message}`)
+        .join(', ');
+      throw new Error(`Invalid provider configuration: ${errorMessages}`);
+    }
+
+    // Convert ExtendedProviderConfig to base ProviderConfig with proper validation
+    const baseConfig: ProviderConfig = this.convertToBaseConfig(config);
+
+    return new ProviderClass(baseConfig);
+  }
+
+  /**
+   * Validates provider configuration structure and required fields.
+   */
+  static validateConfig(
+    config: ExtendedProviderConfig
+  ): ConfigValidationResult {
+    const errors: Array<{ field: string; message: string; code: string }> = [];
+    const warnings: Array<{ field: string; message: string; code: string }> =
+      [];
+
+    // Basic validation - only validate truly required fields
+    if (!config.type) {
+      errors.push({
+        field: 'type',
+        message: 'Provider type is required',
+        code: 'REQUIRED',
+      });
+    }
+
+    if (!config.model) {
+      errors.push({
+        field: 'model',
+        message: 'Model name is required',
+        code: 'REQUIRED',
+      });
+    }
+
+    // baseUrl is not always required - some providers have defaults
+    // Empty string baseUrl is acceptable (means use provider defaults)
+
+    // Provider-specific validation - only validate truly critical fields that would cause runtime failures
+    switch (config.type) {
+      case 'bedrock':
+        // Bedrock absolutely requires region for AWS client initialization
+        if (!config.bedrock?.region) {
+          errors.push({
+            field: 'bedrock.region',
+            message: 'AWS region is required for Bedrock',
+            code: 'REQUIRED',
+          });
+        }
+        break;
+
+      // For other providers, let them handle their own validation in constructors
+      // This preserves existing behavior and allows for more flexible configurations
+      default:
+        // No additional validation - providers can handle their own requirements
+        break;
+    }
+
+    return { valid: errors.length === 0, errors, warnings };
+  }
+
+  /**
+   * Converts ExtendedProviderConfig to base ProviderConfig with type safety.
+   */
+  private static convertToBaseConfig(
+    config: ExtendedProviderConfig
+  ): ProviderConfig {
     const baseConfig: ProviderConfig = {
       type: config.type,
       model: config.model,
-      baseUrl: config.baseUrl,
+      baseUrl: config.baseUrl || '', // Provide default empty string if not specified
       ...(config.apiKey && { apiKey: config.apiKey }),
       ...(config.capabilities?.maxTokens && {
         maxTokens: config.capabilities.maxTokens,
@@ -41,14 +115,23 @@ export class ProviderFactory {
       ...(config.anthropic?.maxTokens && {
         maxTokens: config.anthropic.maxTokens,
       }),
-      // Include any additional provider-specific config
-      ...(config.azure && { azure: config.azure }),
-      ...(config.anthropic && { anthropic: config.anthropic }),
-      ...(config.gemini && { gemini: config.gemini }),
-      ...(config.bedrock && { bedrock: config.bedrock }),
     };
 
-    return new ProviderClass(baseConfig);
+    // Add provider-specific configurations with type safety
+    if (config.azure) {
+      (baseConfig as any).azure = config.azure;
+    }
+    if (config.anthropic) {
+      (baseConfig as any).anthropic = config.anthropic;
+    }
+    if (config.gemini) {
+      (baseConfig as any).gemini = config.gemini;
+    }
+    if (config.bedrock) {
+      (baseConfig as any).bedrock = config.bedrock;
+    }
+
+    return baseConfig;
   }
 
   static getAvailableProviders(): string[] {

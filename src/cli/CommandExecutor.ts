@@ -8,7 +8,7 @@ import { TokenCounter } from '../core/tokens/counter.js';
 import { ConfigManager } from '../core/config/manager.js';
 import { MCPToolService } from '../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../core/tools/executor.js';
-import { EnhancedFilesystemMCPClient } from '../core/mcp/enhanced-filesystem.js';
+import { FilesystemMCPClient } from '../core/mcp/filesystem.js';
 
 /**
  * Chat session state containing messages, context, and provider information
@@ -36,7 +36,7 @@ export interface CommandContext {
   sessionId?: string;
   // Add session data for chat commands
   session?: ChatSession;
-  mcpClient?: EnhancedFilesystemMCPClient;
+  mcpClient?: FilesystemMCPClient;
 }
 
 /**

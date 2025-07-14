@@ -2,6 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useStdin } from 'ink';
 import readline from 'readline';
+import { TimeoutManager } from '../utils/memoryManagement.js';
 
 export interface Key {
   name: string;
@@ -23,12 +24,13 @@ export function useKeypress(
 ) {
   const { stdin, setRawMode } = useStdin();
   const onKeypressRef = useRef(onKeypress);
-  
+  const timeoutManagerRef = useRef<TimeoutManager>(new TimeoutManager());
+
   // State to track Shift+Enter sequence detection
   const shiftEnterStateRef = useRef<{
     expectingReturn: boolean;
-    timeout: NodeJS.Timeout | null;
-  }>({ expectingReturn: false, timeout: null });
+    activeTimeout: NodeJS.Timeout | null;
+  }>({ expectingReturn: false, activeTimeout: null });
 
   useEffect(() => {
     onKeypressRef.current = onKeypress;
@@ -84,19 +86,21 @@ export function useKeypress(
         } else {
           // Handle Shift+Enter sequence detection for terminals that send it as two events
           const state = shiftEnterStateRef.current;
-          
-          // Clear any existing timeout
-          if (state.timeout) {
-            clearTimeout(state.timeout);
-            state.timeout = null;
+          const timeoutManager = timeoutManagerRef.current;
+
+          // Clear any existing timeout using TimeoutManager
+          if (state.activeTimeout) {
+            timeoutManager.clear(state.activeTimeout);
+            state.activeTimeout = null;
           }
 
           // Check if this is the first part of Shift+Enter (backslash)
           if (key.sequence === '\\' && !key.name) {
             state.expectingReturn = true;
             // Set timeout to reset state if return doesn't come quickly
-            state.timeout = setTimeout(() => {
+            state.activeTimeout = timeoutManager.create(() => {
               state.expectingReturn = false;
+              state.activeTimeout = null;
               // Send the backslash as regular text since no return followed
               onKeypressRef.current({ ...key, paste: isPaste });
             }, 50); // 50ms should be enough for the sequence
@@ -104,7 +108,11 @@ export function useKeypress(
           }
 
           // Check if this is the second part of Shift+Enter (return after backslash)
-          if (state.expectingReturn && key.name === 'return' && key.sequence === '\r') {
+          if (
+            state.expectingReturn &&
+            key.name === 'return' &&
+            key.sequence === '\r'
+          ) {
             state.expectingReturn = false;
             // Convert to Shift+Enter
             key.name = 'shift+return';
@@ -119,11 +127,11 @@ export function useKeypress(
           }
 
           // Standard Shift+Enter detection for other terminals
-          const isStandardShiftEnter = 
+          const isStandardShiftEnter =
             // Method 1: Direct shift flag detection (most reliable)
             (key.name === 'return' && key.shift) ||
             // Method 2: Common escape sequence for Shift+Enter in many terminals
-            (key.sequence === '\x1B\r');
+            key.sequence === '\x1B\r';
 
           if (isStandardShiftEnter) {
             key.name = 'shift+return';
@@ -142,12 +150,14 @@ export function useKeypress(
       // Disable bracketed paste mode before cleanup
       process.stdout.write('\x1b[?2004l');
 
-      // Clean up Shift+Enter detection timeout
+      // Clean up all timeouts using TimeoutManager
+      const timeoutManager = timeoutManagerRef.current;
+      timeoutManager.clearAll();
+
+      // Reset Shift+Enter detection state
       const state = shiftEnterStateRef.current;
-      if (state.timeout) {
-        clearTimeout(state.timeout);
-        state.timeout = null;
-      }
+      state.expectingReturn = false;
+      state.activeTimeout = null;
 
       stdin.removeListener('keypress', handleKeypress);
       rl.close();
