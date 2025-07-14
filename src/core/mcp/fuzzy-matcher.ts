@@ -155,7 +155,6 @@ export class FuzzyMatcher {
     };
   }
 
-
   /**
    * Find best substring match using simple algorithm
    */

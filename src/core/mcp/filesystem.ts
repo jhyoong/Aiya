@@ -253,7 +253,8 @@ export class FilesystemMCPClient extends MCPClient {
                 searchType: {
                   type: 'string',
                   enum: ['literal', 'regex', 'fuzzy', 'ast', 'filename'],
-                  description: 'Type of search to perform (default: literal). Use "filename" to search for files by name pattern rather than content.',
+                  description:
+                    'Type of search to perform (default: literal). Use "filename" to search for files by name pattern rather than content.',
                   default: 'literal',
                 },
               },
@@ -1252,8 +1253,12 @@ export class FilesystemMCPClient extends MCPClient {
           if (searchType === 'filename') {
             // Search by filename
             const fileName = path.basename(filePath);
-            const fileMatches = this.searchInFilename(fileName, pattern, searchType);
-            
+            const fileMatches = this.searchInFilename(
+              fileName,
+              pattern,
+              searchType
+            );
+
             for (const match of fileMatches) {
               if (resultCount >= maxResults) {
                 break;
@@ -1266,7 +1271,7 @@ export class FilesystemMCPClient extends MCPClient {
                 match: match.text,
                 context: {
                   before: [],
-                  after: []
+                  after: [],
                 },
               };
 
@@ -1516,28 +1521,28 @@ export class FilesystemMCPClient extends MCPClient {
     text: string;
   }> {
     const matches: Array<{ line: number; column: number; text: string }> = [];
-    
+
     // For filename search, we use case-insensitive literal matching by default
     const searchText = fileName.toLowerCase();
     const searchPattern = pattern.toLowerCase();
-    
+
     let searchIndex = 0;
-    
+
     while (true) {
       const foundIndex = searchText.indexOf(searchPattern, searchIndex);
       if (foundIndex === -1) {
         break;
       }
-      
+
       matches.push({
         line: 1, // Filenames are always "line 1"
         column: foundIndex + 1, // Convert to 1-based indexing
         text: fileName.substring(foundIndex, foundIndex + pattern.length),
       });
-      
+
       searchIndex = foundIndex + 1;
     }
-    
+
     return matches;
   }
 

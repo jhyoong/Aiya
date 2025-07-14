@@ -2,6 +2,94 @@ import { CommandDefinition, CommandRegistry } from '../CommandRegistry.js';
 import { CommandContext } from '../CommandExecutor.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { TokenCounter } from '../../core/tokens/counter.js';
+import { glob } from 'glob';
+
+/**
+ * Parse search command arguments to determine search mode and options
+ */
+function parseSearchArgs(args: string[]): {
+  query: string;
+  options: any;
+  useContentSearch: boolean;
+} {
+  const query = args[0] || '';
+  const options: any = {
+    searchType: 'fuzzy',
+    maxResults: 50,
+    contextLines: 2,
+  };
+
+  let useContentSearch = false;
+
+  // Check if any arguments start with '--' (CLI flags)
+  const hasFlags = args.some(arg => arg && arg.startsWith('--'));
+
+  if (hasFlags) {
+    useContentSearch = true;
+    options.searchType = 'literal'; // Default for content search
+
+    // Parse flag-value pairs
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i];
+
+      if (arg && arg.startsWith('--')) {
+        const flag = arg.slice(2);
+        const nextArg = args[i + 1];
+
+        switch (flag) {
+          case 'searchType':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.searchType = nextArg;
+              i++; // Skip next arg as it's the value
+            }
+            break;
+          case 'maxResults':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.maxResults = parseInt(nextArg, 10) || 50;
+              i++; // Skip next arg as it's the value
+            }
+            break;
+          case 'contextLines':
+            if (nextArg && !nextArg.startsWith('--')) {
+              options.contextLines = parseInt(nextArg, 10) || 2;
+              i++; // Skip next arg as it's the value
+            }
+            break;
+          case 'includeGlobs': {
+            // Collect all non-flag arguments following this flag
+            const includeGlobs = [];
+            let j = i + 1;
+            while (j < args.length && args[j] && !args[j]!.startsWith('--')) {
+              includeGlobs.push(args[j]);
+              j++;
+            }
+            if (includeGlobs.length > 0) {
+              options.includeGlobs = includeGlobs;
+              i = j - 1; // Set i to last consumed argument
+            }
+            break;
+          }
+          case 'excludeGlobs': {
+            // Collect all non-flag arguments following this flag
+            const excludeGlobs = [];
+            let k = i + 1;
+            while (k < args.length && args[k] && !args[k]!.startsWith('--')) {
+              excludeGlobs.push(args[k]);
+              k++;
+            }
+            if (excludeGlobs.length > 0) {
+              options.excludeGlobs = excludeGlobs;
+              i = k - 1; // Set i to last consumed argument
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  return { query, options, useContentSearch };
+}
 
 /**
  * Core slash command definitions for the Aiya CLI
@@ -73,14 +161,15 @@ export const CORE_COMMANDS: CommandDefinition[] = [
   },
   {
     name: 'search',
-    description: 'Search for files matching pattern',
-    usage: '/search <pattern>',
+    description: 'Search for files by name (default) or content with options',
+    usage: '/search <pattern> [--flags]',
     category: 'core',
-    parameters: ['<pattern>'],
+    parameters: ['<pattern>', '[--flags]'],
     examples: [
-      '/search *.ts',
-      '/search components/',
-      '/search "class Component"',
+      '/search component',
+      '/search utils.ts',
+      '/search "import React" --searchType literal --maxResults 10',
+      '/search error --includeGlobs "*.ts" "*.js" --excludeGlobs "*.test.*"',
     ],
     requiresConfig: false,
     handler: {
@@ -90,27 +179,71 @@ export const CORE_COMMANDS: CommandDefinition[] = [
         }
 
         if (args.length === 0) {
-          return 'Usage: /search <pattern>';
+          return 'Usage: /search <pattern> [--flags]\n\nExamples:\n  /search component (filename search)\n  /search "class" --searchType literal (content search)';
         }
 
-        const searchResult = await context.mcpClient.callTool('SearchFiles', {
-          pattern: args[0],
-          options: {
-            searchType: 'literal',
-            maxResults: 50,
-          },
-        });
-        if (searchResult.isError) {
-          return `Error: ${searchResult.content[0]?.text}`;
-        } else {
+        // Parse arguments to detect if CLI flags are used
+        const { query, options, useContentSearch } = parseSearchArgs(args);
+
+        if (useContentSearch) {
+          // Advanced mode: Use MCP SearchFiles tool for content search
+          const searchResult = await context.mcpClient.callTool('SearchFiles', {
+            pattern: query,
+            options: options,
+          });
+
+          if (searchResult.isError) {
+            return `Error: ${searchResult.content[0]?.text}`;
+          }
+
           const searchResponse = JSON.parse(
             searchResult.content[0]?.text || '{}'
           );
           const results = searchResponse.results || [];
+
           if (results.length === 0) {
-            return `No matches found for pattern: ${args[0]}`;
+            return `No content matches found for pattern: ${query}`;
           }
-          return `Found ${results.length} matches:\n${results.map((match: any) => `  ${match.file}:${match.line} - ${match.match}`).join('\n')}`;
+
+          return `Found ${results.length} content matches:\n${results.map((match: any) => `  ${match.file}:${match.line} - ${match.match}`).join('\n')}`;
+        } else {
+          // Default mode: Fuzzy search filenames
+          try {
+            const workspaceRoot = context.workingDirectory || process.cwd();
+            const pattern = `**/*${query}*`;
+
+            const files = await glob(pattern, {
+              cwd: workspaceRoot,
+              ignore: [
+                '**/node_modules/**',
+                '**/.git/**',
+                '**/dist/**',
+                '**/build/**',
+              ],
+              nodir: true,
+              maxDepth: 10,
+            });
+
+            if (files.length === 0) {
+              return `No files found matching: ${query}`;
+            }
+
+            // Limit results for readability
+            const maxResults = options.maxResults || 20;
+            const displayFiles = files.slice(0, maxResults);
+            const truncated = files.length > maxResults;
+
+            let result = `Found ${files.length} file${files.length === 1 ? '' : 's'} matching "${query}":\n`;
+            result += displayFiles.map(file => `  ${file}`).join('\n');
+
+            if (truncated) {
+              result += `\n... and ${files.length - maxResults} more files`;
+            }
+
+            return result;
+          } catch (error) {
+            return `Error searching files: ${error instanceof Error ? error.message : 'Unknown error'}`;
+          }
         }
       },
     },
