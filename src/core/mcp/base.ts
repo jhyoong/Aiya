@@ -72,37 +72,39 @@ export abstract class MCPClient {
 }
 
 export class MCPError extends Error {
+  public code?: number | undefined;
+  public override cause?: Error | undefined;
+  
   constructor(
     message: string,
-    public code?: number,
-    public cause?: Error
+    code?: number | undefined,
+    cause?: Error | undefined
   ) {
     super(message);
     this.name = 'MCPError';
+    this.code = code;
+    this.cause = cause;
   }
 }
 
 export class MCPConnectionError extends MCPError {
-  constructor(serverName: string, cause?: Error) {
-    super(`Failed to connect to MCP server: ${serverName}`);
+  constructor(serverName: string, cause?: Error | undefined) {
+    super(`Failed to connect to MCP server: ${serverName}`, undefined, cause);
     this.name = 'MCPConnectionError';
-    this.cause = cause;
   }
 }
 
 export class MCPToolError extends MCPError {
-  constructor(toolName: string, message: string, cause?: Error) {
-    super(`Tool '${toolName}' error: ${message}`);
+  constructor(toolName: string, message: string, cause?: Error | undefined) {
+    super(`Tool '${toolName}' error: ${message}`, undefined, cause);
     this.name = 'MCPToolError';
-    this.cause = cause;
   }
 }
 
 export class MCPResourceError extends MCPError {
-  constructor(uri: string, message: string, cause?: Error) {
-    super(`Resource '${uri}' error: ${message}`);
+  constructor(uri: string, message: string, cause?: Error | undefined) {
+    super(`Resource '${uri}' error: ${message}`, undefined, cause);
     this.name = 'MCPResourceError';
-    this.cause = cause;
   }
 }
 

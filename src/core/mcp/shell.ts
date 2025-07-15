@@ -239,18 +239,6 @@ export class DangerousCommandDetector {
  * Command Input Sanitization and Validation System
  */
 export class CommandSanitizer {
-  private static readonly DANGEROUS_CHARS = [
-    // Command injection characters
-    '`', '$(',
-    // Command chaining (will be handled with special logic)
-    ';', '&&', '||',
-    // Redirections that could be dangerous
-    '>', '<', '>>',
-    // Background processes
-    '&',
-    // Pipes (need careful handling)
-    '|',
-  ];
 
   private static readonly SHELL_EXPANSION_PATTERNS = [
     // Command substitution
@@ -529,7 +517,7 @@ export class WorkspaceBoundaryEnforcer {
     if (!pathCheck.safe) {
       return {
         allowed: false,
-        reason: pathCheck.reason
+        reason: pathCheck.reason || 'Path traversal detected'
       };
     }
 
@@ -538,7 +526,7 @@ export class WorkspaceBoundaryEnforcer {
     if (!pathValidation.valid) {
       return {
         allowed: false,
-        reason: pathValidation.reason
+        reason: pathValidation.reason || 'Path validation failed'
       };
     }
 
@@ -547,7 +535,7 @@ export class WorkspaceBoundaryEnforcer {
     if (!cwdValidation.valid) {
       return {
         allowed: false,
-        reason: cwdValidation.reason
+        reason: cwdValidation.reason || 'Working directory validation failed'
       };
     }
 
@@ -799,7 +787,7 @@ export class CommandFilter {
     return false;
   }
 
-  private isCommandWhitelisted(commandName: string, fullCommand: string): boolean {
+  private isCommandWhitelisted(commandName: string, _fullCommand: string): boolean {
     // Check exact command name matches
     if (this.config.allowedCommands.includes(commandName)) {
       return true;
@@ -877,10 +865,10 @@ export interface ShellSecurityEvent {
   eventType: 'COMMAND_BLOCKED' | 'COMMAND_ALLOWED' | 'PATH_TRAVERSAL' | 'INPUT_VALIDATION' | 'WORKSPACE_VIOLATION' | 'DANGEROUS_COMMAND' | 'SANITIZATION';
   command: string;
   workingDirectory: string;
-  reason?: string;
-  riskScore?: number;
-  userContext?: string;
-  details?: Record<string, any>;
+  reason?: string | undefined;
+  riskScore?: number | undefined;
+  userContext?: string | undefined;
+  details?: Record<string, any> | undefined;
 }
 
 export interface ShellExecutionLog {
@@ -890,8 +878,8 @@ export interface ShellExecutionLog {
   exitCode: number;
   executionTime: number;
   success: boolean;
-  errorType?: string;
-  userId?: string;
+  errorType?: string | undefined;
+  userId?: string | undefined;
   securityEvents: ShellSecurityEvent[];
 }
 
@@ -1047,7 +1035,7 @@ export class ShellSecurityLogger {
       command,
       workingDirectory,
       reason,
-      riskScore,
+      riskScore: riskScore || undefined,
     });
   }
 
@@ -1056,7 +1044,7 @@ export class ShellSecurityLogger {
       eventType: 'COMMAND_ALLOWED',
       command,
       workingDirectory,
-      reason,
+      reason: reason || undefined,
     });
   }
 
@@ -1093,7 +1081,7 @@ export class ShellSecurityLogger {
       command,
       workingDirectory,
       reason,
-      riskScore,
+      riskScore: riskScore || undefined,
     });
   }
 
@@ -1309,7 +1297,7 @@ export class ShellMCPClient extends MCPClient {
         exitCode: result.exitCode,
         executionTime: result.executionTime,
         success: result.success,
-        errorType: result.success ? undefined : 'EXECUTION_ERROR',
+        errorType: result.success ? undefined : 'EXECUTION_ERROR' as string | undefined,
         securityEvents,
       });
 

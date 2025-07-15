@@ -235,7 +235,11 @@ export const chatCommand = new Command('chat')
       await mcpClient.connect();
       showLoader('Filesystem MCP client connected successfully');
 
-      const shellClient = new ShellMCPClient(security);
+      const shellClient = new ShellMCPClient(security, {
+        allowComplexCommands: false,
+        requireConfirmation: true,
+        maxExecutionTime: 30,
+      });
       await shellClient.connect();
       showLoader('Shell MCP client connected successfully');
 
