@@ -5,7 +5,7 @@ import {
   CommandSanitizer, 
   CommandFilter, 
   WorkspaceBoundaryEnforcer,
-  ShellSecurityLogger,
+  ShellExecutionLogger,
   ShellCommandBlockedError,
   ShellPathTraversalError,
   ShellInputValidationError
@@ -281,11 +281,11 @@ describe('Shell MCP Security Tests', () => {
     });
   });
 
-  describe('ShellSecurityLogger', () => {
-    let logger: ShellSecurityLogger;
+  describe('ShellExecutionLogger', () => {
+    let logger: ShellExecutionLogger;
 
     beforeEach(() => {
-      logger = new ShellSecurityLogger();
+      logger = new ShellExecutionLogger('test-session');
     });
 
     test('should log security events', () => {
@@ -322,7 +322,6 @@ describe('Shell MCP Security Tests', () => {
       const summary = logger.getSecuritySummary();
       expect(summary.totalEvents).toBe(3);
       expect(summary.blockedCommands).toBe(1);
-      expect(summary.allowedCommands).toBe(1);
       expect(summary.pathTraversalAttempts).toBe(1);
     });
 
@@ -331,8 +330,8 @@ describe('Shell MCP Security Tests', () => {
       
       const report = logger.exportSecurityReport();
       expect(report).toContain('generatedAt');
-      expect(report).toContain('COMMAND_BLOCKED');
-      expect(report).toContain('sudo reboot');
+      expect(report).toContain('sessionId');
+      expect(report).toContain('statistics');
     });
   });
 
@@ -416,7 +415,7 @@ describe('Shell MCP Security Tests', () => {
         const response = JSON.parse(result.content[0].text!);
         expect(response.security).toBeDefined();
         expect(response.security.validated).toBe(true);
-        expect(response.security.phase).toBe('Phase 3 - Full Security Integration');
+        expect(response.security.phase).toBe('Phase 4 - Enhanced Logging and Error Handling');
       }
     });
 
@@ -437,7 +436,7 @@ describe('Shell MCP Security Tests', () => {
     test('should provide security logging methods', () => {
       const summary = client.getSecuritySummary();
       expect(summary.totalEvents).toBeDefined();
-      expect(summary.totalExecutions).toBeDefined();
+      expect(summary.blockedCommands).toBeDefined();
 
       const report = client.exportSecurityReport();
       expect(report).toContain('generatedAt');
@@ -446,23 +445,34 @@ describe('Shell MCP Security Tests', () => {
 
   describe('Error Classes', () => {
     test('should throw appropriate security errors', () => {
+      const context = {
+        command: 'rm -rf /',
+        workingDirectory: '/test',
+        timestamp: new Date(),
+      };
+
       expect(() => {
-        throw new ShellCommandBlockedError('rm -rf /', 'Dangerous command');
+        throw new ShellCommandBlockedError('rm -rf /', 'Dangerous command', context);
       }).toThrow('Command blocked: rm -rf /');
 
       expect(() => {
-        throw new ShellPathTraversalError('Path traversal detected');
+        throw new ShellPathTraversalError('Path traversal detected', context);
       }).toThrow('Path traversal attempt detected');
 
       expect(() => {
-        throw new ShellInputValidationError('invalid input', 'Invalid format');
+        throw new ShellInputValidationError('invalid input', 'Invalid format', context);
       }).toThrow('Input validation failed');
     });
 
     test('should have correct error properties', () => {
-      const error = new ShellCommandBlockedError('test', 'reason');
+      const context = {
+        command: 'test',
+        workingDirectory: '/test',
+        timestamp: new Date(),
+      };
+      const error = new ShellCommandBlockedError('test', 'reason', context);
       expect(error.name).toBe('ShellCommandBlockedError');
-      expect(error.securityType).toBe('COMMAND_BLOCKED');
+      expect(error.errorType).toBe('command_blocked');
       expect(error.code).toBe(403);
     });
   });

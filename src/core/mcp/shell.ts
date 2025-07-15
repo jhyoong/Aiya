@@ -10,6 +10,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { performance } from 'perf_hooks';
 import * as path from 'path';
+import { randomUUID } from 'crypto';
 
 /**
  * Parameters for shell command execution
@@ -32,33 +33,943 @@ export interface ShellExecuteResult {
 }
 
 /**
- * Shell Security Error Classes
+ * Shell Error Types for comprehensive error classification
  */
-export class ShellSecurityError extends MCPError {
-  constructor(message: string, public securityType: string, cause?: Error) {
-    super(message, 403, cause);
+export enum ShellErrorType {
+  EXECUTION_ERROR = 'execution_error',
+  SECURITY_ERROR = 'security_error',
+  PERMISSION_ERROR = 'permission_error',
+  TIMEOUT_ERROR = 'timeout_error',
+  COMMAND_NOT_FOUND = 'command_not_found',
+  INPUT_VALIDATION = 'input_validation',
+  WORKSPACE_VIOLATION = 'workspace_violation',
+  PATH_TRAVERSAL = 'path_traversal',
+  COMMAND_BLOCKED = 'command_blocked',
+  DANGEROUS_COMMAND = 'dangerous_command',
+  CONFIGURATION_ERROR = 'configuration_error',
+  UNKNOWN_ERROR = 'unknown_error',
+}
+
+/**
+ * Shell Error Context for comprehensive error tracking
+ */
+export interface ShellErrorContext {
+  command: string;
+  workingDirectory: string;
+  timeout?: number;
+  exitCode?: number;
+  executionTime?: number;
+  riskScore?: number;
+  securityEvent?: string;
+  timestamp: Date;
+  userId?: string;
+  sessionId?: string;
+  originalError?: unknown;
+}
+
+/**
+ * Base Shell Execution Error extending MCPError with enhanced context
+ */
+export class ShellExecutionError extends MCPError {
+  public readonly errorType: ShellErrorType;
+  public readonly context: ShellErrorContext;
+  public readonly suggestions: string[];
+  public readonly retryable: boolean;
+
+  constructor(
+    message: string,
+    errorType: ShellErrorType,
+    context: ShellErrorContext,
+    suggestions: string[] = [],
+    retryable: boolean = false,
+    code?: number,
+    cause?: Error
+  ) {
+    super(message, code, cause);
+    this.name = 'ShellExecutionError';
+    this.errorType = errorType;
+    this.context = context;
+    this.suggestions = suggestions;
+    this.retryable = retryable;
+  }
+
+  toJSON() {
+    return {
+      name: this.name,
+      message: this.message,
+      errorType: this.errorType,
+      context: this.context,
+      suggestions: this.suggestions,
+      retryable: this.retryable,
+      code: this.code,
+      stack: this.stack,
+    };
+  }
+}
+
+/**
+ * Shell Security Error for security violations
+ */
+export class ShellSecurityError extends ShellExecutionError {
+  constructor(
+    message: string,
+    context: ShellErrorContext,
+    securityType: string,
+    suggestions: string[] = [],
+    cause?: Error
+  ) {
+    super(
+      message,
+      ShellErrorType.SECURITY_ERROR,
+      { ...context, securityEvent: securityType },
+      suggestions,
+      false, // Security errors are not retryable
+      403,
+      cause
+    );
     this.name = 'ShellSecurityError';
   }
 }
 
-export class ShellCommandBlockedError extends ShellSecurityError {
-  constructor(command: string, reason: string) {
-    super(`Command blocked: ${command}. Reason: ${reason}`, 'COMMAND_BLOCKED');
+/**
+ * Shell Command Blocked Error for blocked commands
+ */
+export class ShellCommandBlockedError extends ShellExecutionError {
+  constructor(command: string, reason: string, context: ShellErrorContext) {
+    super(
+      `Command blocked: ${command}. Reason: ${reason}`,
+      ShellErrorType.COMMAND_BLOCKED,
+      { ...context, securityEvent: 'COMMAND_BLOCKED' },
+      [
+        'Review the command for security risks',
+        'Check if the command is in the allowed commands list',
+        'Use a safer alternative command',
+        'Contact administrator if this command should be allowed'
+      ],
+      false, // Security errors are not retryable
+      403
+    );
     this.name = 'ShellCommandBlockedError';
   }
 }
 
-export class ShellPathTraversalError extends ShellSecurityError {
-  constructor(path: string) {
-    super(`Path traversal attempt detected: ${path}`, 'PATH_TRAVERSAL');
+/**
+ * Shell Path Traversal Error for path traversal attempts
+ */
+export class ShellPathTraversalError extends ShellExecutionError {
+  constructor(path: string, context: ShellErrorContext) {
+    super(
+      `Path traversal attempt detected: ${path}`,
+      ShellErrorType.PATH_TRAVERSAL,
+      { ...context, securityEvent: 'PATH_TRAVERSAL' },
+      [
+        'Use paths within the workspace directory',
+        'Avoid using ../ or absolute paths',
+        'Check file access permissions',
+        'Use relative paths from workspace root'
+      ],
+      false, // Security errors are not retryable
+      403
+    );
     this.name = 'ShellPathTraversalError';
   }
 }
 
-export class ShellInputValidationError extends ShellSecurityError {
-  constructor(input: string, reason: string) {
-    super(`Input validation failed for: ${input}. Reason: ${reason}`, 'INPUT_VALIDATION');
+/**
+ * Shell Input Validation Error for input validation failures
+ */
+export class ShellInputValidationError extends ShellExecutionError {
+  constructor(input: string, reason: string, context: ShellErrorContext) {
+    super(
+      `Input validation failed for: ${input}. Reason: ${reason}`,
+      ShellErrorType.INPUT_VALIDATION,
+      context,
+      [
+        'Check command syntax and format',
+        'Avoid special characters and control sequences',
+        'Ensure command length is within limits',
+        'Use properly escaped strings'
+      ],
+      false, // Input validation errors are not retryable
+      400
+    );
     this.name = 'ShellInputValidationError';
+  }
+}
+
+/**
+ * Shell Timeout Error for command timeouts
+ */
+export class ShellTimeoutError extends ShellExecutionError {
+  constructor(command: string, timeoutSeconds: number, context: ShellErrorContext) {
+    super(
+      `Command timed out after ${timeoutSeconds} seconds: ${command}`,
+      ShellErrorType.TIMEOUT_ERROR,
+      context,
+      [
+        'Try running the command with a longer timeout',
+        'Break down the command into smaller parts',
+        'Check if the command is stuck in an infinite loop',
+        'Optimize the command for better performance'
+      ],
+      true, // Timeout errors are retryable
+      -1
+    );
+    this.name = 'ShellTimeoutError';
+  }
+}
+
+/**
+ * Shell Permission Error for permission-related failures
+ */
+export class ShellPermissionError extends ShellExecutionError {
+  constructor(command: string, context: ShellErrorContext, cause?: Error) {
+    super(
+      `Permission denied: ${command}`,
+      ShellErrorType.PERMISSION_ERROR,
+      context,
+      [
+        'Check file and directory permissions',
+        'Ensure you have execute permissions for the command',
+        'Verify workspace access rights',
+        'Try running with appropriate permissions'
+      ],
+      false, // Permission errors are not retryable
+      126,
+      cause
+    );
+    this.name = 'ShellPermissionError';
+  }
+}
+
+/**
+ * Shell Command Not Found Error
+ */
+export class ShellCommandNotFoundError extends ShellExecutionError {
+  constructor(command: string, context: ShellErrorContext) {
+    super(
+      `Command not found: ${command}`,
+      ShellErrorType.COMMAND_NOT_FOUND,
+      context,
+      [
+        'Check if the command is installed',
+        'Verify the command name spelling',
+        'Check if the command is in your PATH',
+        'Try using the full path to the command'
+      ],
+      false, // Command not found errors are not retryable
+      127
+    );
+    this.name = 'ShellCommandNotFoundError';
+  }
+}
+
+/**
+ * Shell Workspace Violation Error
+ */
+export class ShellWorkspaceViolationError extends ShellSecurityError {
+  constructor(command: string, path: string, context: ShellErrorContext) {
+    super(
+      `Workspace violation: ${command} attempted to access ${path}`,
+      context,
+      'WORKSPACE_VIOLATION',
+      [
+        'Operations must be performed within the workspace directory',
+        'Use relative paths from the workspace root',
+        'Check workspace configuration and boundaries',
+        'Avoid accessing system directories'
+      ]
+    );
+    this.name = 'ShellWorkspaceViolationError';
+  }
+}
+
+/**
+ * Shell Dangerous Command Error
+ */
+export class ShellDangerousCommandError extends ShellSecurityError {
+  constructor(command: string, reason: string, context: ShellErrorContext) {
+    super(
+      `Dangerous command detected: ${command}. Reason: ${reason}`,
+      context,
+      'DANGEROUS_COMMAND',
+      [
+        'Use safer alternatives to accomplish the task',
+        'Review the command for potential risks',
+        'Consider breaking down into smaller, safer operations',
+        'Contact administrator if this operation is necessary'
+      ]
+    );
+    this.name = 'ShellDangerousCommandError';
+  }
+}
+
+/**
+ * Error Pattern for Shell Error Categorization
+ */
+export interface ShellErrorPattern {
+  /** Patterns to match in error messages */
+  messagePatterns: (string | RegExp)[];
+  
+  /** Patterns to match in stderr output */
+  stderrPatterns?: (string | RegExp)[];
+  
+  /** Exit codes that indicate this error type */
+  exitCodes?: number[];
+  
+  /** Error type to assign when pattern matches */
+  errorType: ShellErrorType;
+  
+  /** Whether this error type is retryable */
+  retryable: boolean;
+  
+  /** Default suggestions for this error type */
+  suggestions: string[];
+  
+  /** Priority for pattern matching (higher priority wins) */
+  priority: number;
+}
+
+/**
+ * Comprehensive Shell Error Categorization System
+ * Analyzes shell execution errors and categorizes them with appropriate suggestions
+ */
+export class ShellErrorCategorizer {
+  private static readonly ERROR_PATTERNS: ShellErrorPattern[] = [
+    // Permission errors (highest priority)
+    {
+      messagePatterns: [
+        /permission denied/i,
+        /access denied/i,
+        /operation not permitted/i,
+        /EACCES/,
+        /EPERM/,
+      ],
+      stderrPatterns: [
+        /permission denied/i,
+        /access denied/i,
+        /you don't have permission/i,
+        /not allowed/i,
+      ],
+      exitCodes: [126],
+      errorType: ShellErrorType.PERMISSION_ERROR,
+      retryable: false,
+      suggestions: [
+        'Check file and directory permissions',
+        'Ensure you have execute permissions for the command',
+        'Verify workspace access rights',
+        'Try running with appropriate permissions',
+        'Check if the file or directory exists',
+      ],
+      priority: 100,
+    },
+    
+    // Command not found errors
+    {
+      messagePatterns: [
+        /command not found/i,
+        /not found/i,
+        /ENOENT/,
+        /no such file or directory/i,
+        /cannot find/i,
+      ],
+      stderrPatterns: [
+        /command not found/i,
+        /not found/i,
+        /no such file or directory/i,
+        /cannot find/i,
+        /bad command/i,
+      ],
+      exitCodes: [127],
+      errorType: ShellErrorType.COMMAND_NOT_FOUND,
+      retryable: false,
+      suggestions: [
+        'Check if the command is installed',
+        'Verify the command name spelling',
+        'Check if the command is in your PATH',
+        'Try using the full path to the command',
+        'Install the required package or tool',
+      ],
+      priority: 90,
+    },
+    
+    // Timeout errors
+    {
+      messagePatterns: [
+        /timeout/i,
+        /timed out/i,
+        /ETIMEDOUT/,
+        /operation timed out/i,
+        /request timeout/i,
+      ],
+      stderrPatterns: [
+        /timeout/i,
+        /timed out/i,
+        /operation timed out/i,
+      ],
+      exitCodes: [-1],
+      errorType: ShellErrorType.TIMEOUT_ERROR,
+      retryable: true,
+      suggestions: [
+        'Try running the command with a longer timeout',
+        'Break down the command into smaller parts',
+        'Check if the command is stuck in an infinite loop',
+        'Optimize the command for better performance',
+        'Check network connectivity if the command involves network operations',
+      ],
+      priority: 80,
+    },
+    
+    // Path traversal and workspace violations
+    {
+      messagePatterns: [
+        /path traversal/i,
+        /outside workspace/i,
+        /workspace boundary/i,
+        /invalid path/i,
+        /security violation/i,
+      ],
+      stderrPatterns: [
+        /path traversal/i,
+        /outside workspace/i,
+        /access denied.*workspace/i,
+      ],
+      exitCodes: [403],
+      errorType: ShellErrorType.PATH_TRAVERSAL,
+      retryable: false,
+      suggestions: [
+        'Use paths within the workspace directory',
+        'Avoid using ../ or absolute paths',
+        'Check file access permissions',
+        'Use relative paths from workspace root',
+        'Review workspace security settings',
+      ],
+      priority: 95,
+    },
+    
+    // Input validation errors
+    {
+      messagePatterns: [
+        /invalid.*input/i,
+        /invalid.*command/i,
+        /invalid.*argument/i,
+        /invalid.*option/i,
+        /syntax error/i,
+        /bad.*syntax/i,
+      ],
+      stderrPatterns: [
+        /invalid.*input/i,
+        /invalid.*command/i,
+        /invalid.*argument/i,
+        /invalid.*option/i,
+        /syntax error/i,
+        /bad.*syntax/i,
+        /usage:/i,
+      ],
+      exitCodes: [400],
+      errorType: ShellErrorType.INPUT_VALIDATION,
+      retryable: false,
+      suggestions: [
+        'Check command syntax and format',
+        'Verify command arguments and options',
+        'Review command documentation',
+        'Avoid special characters without proper escaping',
+        'Use properly formatted strings',
+      ],
+      priority: 70,
+    },
+    
+    // Security and dangerous command errors
+    {
+      messagePatterns: [
+        /command blocked/i,
+        /dangerous command/i,
+        /security.*blocked/i,
+        /not allowed.*security/i,
+        /blocked.*policy/i,
+      ],
+      stderrPatterns: [
+        /command blocked/i,
+        /dangerous command/i,
+        /security.*blocked/i,
+        /not allowed.*security/i,
+      ],
+      exitCodes: [403],
+      errorType: ShellErrorType.COMMAND_BLOCKED,
+      retryable: false,
+      suggestions: [
+        'Review the command for security risks',
+        'Check if the command is in the allowed commands list',
+        'Use a safer alternative command',
+        'Contact administrator if this command should be allowed',
+        'Review security policies and restrictions',
+      ],
+      priority: 85,
+    },
+    
+    // Workspace violation errors
+    {
+      messagePatterns: [
+        /workspace.*violation/i,
+        /outside.*workspace/i,
+        /workspace.*boundary/i,
+        /access.*denied.*workspace/i,
+      ],
+      stderrPatterns: [
+        /workspace.*violation/i,
+        /outside.*workspace/i,
+        /workspace.*boundary/i,
+      ],
+      exitCodes: [403],
+      errorType: ShellErrorType.WORKSPACE_VIOLATION,
+      retryable: false,
+      suggestions: [
+        'Operations must be performed within the workspace directory',
+        'Use relative paths from the workspace root',
+        'Check workspace configuration and boundaries',
+        'Avoid accessing system directories',
+        'Review workspace access permissions',
+      ],
+      priority: 85,
+    },
+    
+    // Configuration errors
+    {
+      messagePatterns: [
+        /configuration.*error/i,
+        /config.*error/i,
+        /invalid.*configuration/i,
+        /missing.*configuration/i,
+      ],
+      stderrPatterns: [
+        /configuration.*error/i,
+        /config.*error/i,
+        /invalid.*configuration/i,
+      ],
+      exitCodes: [400],
+      errorType: ShellErrorType.CONFIGURATION_ERROR,
+      retryable: false,
+      suggestions: [
+        'Check configuration files',
+        'Verify configuration syntax',
+        'Ensure required configuration values are set',
+        'Review configuration documentation',
+        'Check for missing configuration files',
+      ],
+      priority: 60,
+    },
+    
+    // General execution errors (lowest priority)
+    {
+      messagePatterns: [
+        /error/i,
+        /failed/i,
+        /exception/i,
+        /abort/i,
+        /crash/i,
+      ],
+      stderrPatterns: [
+        /error/i,
+        /failed/i,
+        /exception/i,
+        /abort/i,
+      ],
+      exitCodes: [1, 2, 3, 4, 5],
+      errorType: ShellErrorType.EXECUTION_ERROR,
+      retryable: true,
+      suggestions: [
+        'Check the command output for specific error details',
+        'Verify command arguments and syntax',
+        'Check if required dependencies are installed',
+        'Review command documentation',
+        'Try running the command in a different environment',
+      ],
+      priority: 10,
+    },
+  ];
+
+  /**
+   * Categorize an error based on execution context
+   */
+  static categorizeError(
+    error: unknown,
+    exitCode: number,
+    stdout: string,
+    stderr: string,
+    command: string,
+    workingDirectory: string,
+    executionTime: number,
+    originalError?: unknown
+  ): {
+    errorType: ShellErrorType;
+    suggestions: string[];
+    retryable: boolean;
+    context: ShellErrorContext;
+  } {
+    const errorMessage = this.extractErrorMessage(error);
+    const allText = `${errorMessage} ${stdout} ${stderr}`.toLowerCase();
+    
+    // Find the best matching pattern
+    const matchingPattern = this.findBestMatchingPattern(
+      errorMessage,
+      stderr,
+      exitCode,
+      allText
+    );
+    
+    const context: ShellErrorContext = {
+      command,
+      workingDirectory,
+      exitCode,
+      executionTime,
+      timestamp: new Date(),
+      originalError,
+    };
+    
+    if (matchingPattern) {
+      return {
+        errorType: matchingPattern.errorType,
+        suggestions: this.enhanceSuggestions(matchingPattern.suggestions, context),
+        retryable: matchingPattern.retryable,
+        context,
+      };
+    }
+    
+    // Default to unknown error
+    return {
+      errorType: ShellErrorType.UNKNOWN_ERROR,
+      suggestions: [
+        'Check the command output for specific error details',
+        'Verify command syntax and arguments',
+        'Try running the command with different options',
+        'Check system logs for additional information',
+        'Contact support if the issue persists',
+      ],
+      retryable: false,
+      context,
+    };
+  }
+
+  /**
+   * Create appropriate error instance based on categorization
+   */
+  static createCategorizedError(
+    error: unknown,
+    exitCode: number,
+    stdout: string,
+    stderr: string,
+    command: string,
+    workingDirectory: string,
+    executionTime: number,
+    originalError?: unknown
+  ): ShellExecutionError {
+    const categorization = this.categorizeError(
+      error,
+      exitCode,
+      stdout,
+      stderr,
+      command,
+      workingDirectory,
+      executionTime,
+      originalError
+    );
+    
+    const errorMessage = this.extractErrorMessage(error);
+    const context = categorization.context;
+    
+    // Create specific error types based on categorization
+    switch (categorization.errorType) {
+      case ShellErrorType.PERMISSION_ERROR:
+        return new ShellPermissionError(command, context, originalError as Error);
+        
+      case ShellErrorType.COMMAND_NOT_FOUND:
+        return new ShellCommandNotFoundError(command, context);
+        
+      case ShellErrorType.TIMEOUT_ERROR:
+        return new ShellTimeoutError(command, context.timeout || 30, context);
+        
+      case ShellErrorType.PATH_TRAVERSAL:
+        return new ShellPathTraversalError(command, context);
+        
+      case ShellErrorType.INPUT_VALIDATION:
+        return new ShellInputValidationError(command, errorMessage, context);
+        
+      case ShellErrorType.COMMAND_BLOCKED:
+        return new ShellCommandBlockedError(command, errorMessage, context);
+        
+      case ShellErrorType.WORKSPACE_VIOLATION:
+        return new ShellWorkspaceViolationError(command, workingDirectory, context);
+        
+      case ShellErrorType.DANGEROUS_COMMAND:
+        return new ShellDangerousCommandError(command, errorMessage, context);
+        
+      case ShellErrorType.SECURITY_ERROR:
+        return new ShellSecurityError(errorMessage, context, 'SECURITY_ERROR', categorization.suggestions);
+        
+      default:
+        return new ShellExecutionError(
+          errorMessage,
+          categorization.errorType,
+          context,
+          categorization.suggestions,
+          categorization.retryable,
+          exitCode,
+          originalError as Error
+        );
+    }
+  }
+
+  /**
+   * Analyze command risk based on patterns and context
+   */
+  static analyzeCommandRisk(
+    command: string,
+    workingDirectory: string,
+    executionTime: number
+  ): {
+    riskScore: number;
+    riskFactors: string[];
+    category: string;
+  } {
+    let riskScore = 0;
+    const riskFactors: string[] = [];
+    
+    // Command-based risk factors
+    if (command.includes('rm')) {
+      riskScore += 30;
+      riskFactors.push('File deletion command');
+    }
+    
+    if (command.includes('curl') || command.includes('wget')) {
+      riskScore += 20;
+      riskFactors.push('Network download command');
+    }
+    
+    if (command.includes('sudo') || command.includes('su')) {
+      riskScore += 50;
+      riskFactors.push('Privilege escalation command');
+    }
+    
+    if (command.includes('chmod') || command.includes('chown')) {
+      riskScore += 25;
+      riskFactors.push('Permission modification command');
+    }
+    
+    if (command.includes('|') || command.includes(';') || command.includes('&&')) {
+      riskScore += 15;
+      riskFactors.push('Command chaining or piping');
+    }
+    
+    if (command.includes('*') || command.includes('?')) {
+      riskScore += 10;
+      riskFactors.push('Wildcard patterns');
+    }
+    
+    if (command.includes('..')) {
+      riskScore += 35;
+      riskFactors.push('Path traversal patterns');
+    }
+    
+    // Execution time risk factors
+    if (executionTime > 30000) {
+      riskScore += 15;
+      riskFactors.push('Long execution time');
+    }
+    
+    // Working directory risk factors
+    if (workingDirectory.includes('/tmp') || workingDirectory.includes('temp')) {
+      riskScore += 10;
+      riskFactors.push('Temporary directory usage');
+    }
+    
+    // Determine category
+    let category = 'safe';
+    if (riskScore > 70) {
+      category = 'dangerous';
+    } else if (riskScore > 30) {
+      category = 'moderate';
+    }
+    
+    return {
+      riskScore: Math.min(riskScore, 100),
+      riskFactors,
+      category,
+    };
+  }
+
+  /**
+   * Extract command metadata for enhanced logging
+   */
+  static extractCommandMetadata(command: string): {
+    category: string;
+    fileOperations: string[];
+    networkOperations: string[];
+    environmentVariables: string[];
+    tags: string[];
+  } {
+    const metadata = {
+      category: 'general',
+      fileOperations: [] as string[],
+      networkOperations: [] as string[],
+      environmentVariables: [] as string[],
+      tags: [] as string[],
+    };
+    
+    const lowerCommand = command.toLowerCase();
+    
+    // Categorize command
+    if (lowerCommand.match(/^(npm|yarn|pnpm|node|python|pip|cargo|go|dotnet)\s/)) {
+      metadata.category = 'development';
+      metadata.tags.push('development');
+    } else if (lowerCommand.match(/^(git)\s/)) {
+      metadata.category = 'version-control';
+      metadata.tags.push('git', 'version-control');
+    } else if (lowerCommand.match(/^(docker|docker-compose)\s/)) {
+      metadata.category = 'containerization';
+      metadata.tags.push('docker', 'container');
+    } else if (lowerCommand.match(/^(test|jest|mocha|pytest|phpunit)\s/)) {
+      metadata.category = 'testing';
+      metadata.tags.push('testing');
+    } else if (lowerCommand.match(/^(build|make|cmake|gcc|clang)\s/)) {
+      metadata.category = 'build';
+      metadata.tags.push('build', 'compilation');
+    } else if (lowerCommand.match(/^(ls|dir|pwd|find|grep|cat|head|tail)\s/)) {
+      metadata.category = 'file-system';
+      metadata.tags.push('file-system', 'read-only');
+    } else if (lowerCommand.match(/^(cp|mv|rm|mkdir|rmdir|touch)\s/)) {
+      metadata.category = 'file-operations';
+      metadata.tags.push('file-system', 'write');
+    } else if (lowerCommand.match(/^(curl|wget|ping|ssh|scp|rsync)\s/)) {
+      metadata.category = 'network';
+      metadata.tags.push('network');
+    }
+    
+    // Extract file operations
+    const fileOpPatterns = [
+      /\b(cp|copy|mv|move|rm|del|mkdir|rmdir|touch|ln|link)\s+([^\s;|&<>]+)/gi,
+    ];
+    
+    fileOpPatterns.forEach(pattern => {
+      const matches = command.match(pattern);
+      if (matches) {
+        metadata.fileOperations.push(...matches);
+      }
+    });
+    
+    // Extract network operations
+    const networkOpPatterns = [
+      /\b(curl|wget|ping|ssh|scp|rsync)\s+([^\s;|&<>]+)/gi,
+    ];
+    
+    networkOpPatterns.forEach(pattern => {
+      const matches = command.match(pattern);
+      if (matches) {
+        metadata.networkOperations.push(...matches);
+      }
+    });
+    
+    // Extract environment variables
+    const envVarPattern = /\$([A-Z_][A-Z0-9_]*)/gi;
+    const envMatches = command.match(envVarPattern);
+    if (envMatches) {
+      metadata.environmentVariables = envMatches.map(match => match.substring(1));
+    }
+    
+    return metadata;
+  }
+
+  // Private helper methods
+  private static extractErrorMessage(error: unknown): string {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    if (error && typeof error === 'object' && 'message' in error) {
+      return String((error as any).message);
+    }
+    return String(error);
+  }
+
+  private static findBestMatchingPattern(
+    errorMessage: string,
+    stderr: string,
+    exitCode: number,
+    allText: string
+  ): ShellErrorPattern | null {
+    let bestMatch: ShellErrorPattern | null = null;
+    let bestPriority = -1;
+    
+    for (const pattern of this.ERROR_PATTERNS) {
+      let matches = false;
+      
+      // Check message patterns
+      if (pattern.messagePatterns.some(p => this.matchesPattern(errorMessage, p))) {
+        matches = true;
+      }
+      
+      // Check stderr patterns
+      if (pattern.stderrPatterns && pattern.stderrPatterns.some(p => this.matchesPattern(stderr, p))) {
+        matches = true;
+      }
+      
+      // Check exit codes
+      if (pattern.exitCodes && pattern.exitCodes.includes(exitCode)) {
+        matches = true;
+      }
+      
+      // Check overall text for general patterns
+      if (pattern.messagePatterns.some(p => this.matchesPattern(allText, p))) {
+        matches = true;
+      }
+      
+      if (matches && pattern.priority > bestPriority) {
+        bestMatch = pattern;
+        bestPriority = pattern.priority;
+      }
+    }
+    
+    return bestMatch;
+  }
+
+  private static matchesPattern(text: string, pattern: string | RegExp): boolean {
+    if (typeof pattern === 'string') {
+      return text.toLowerCase().includes(pattern.toLowerCase());
+    }
+    return pattern.test(text);
+  }
+
+  private static enhanceSuggestions(
+    baseSuggestions: string[],
+    context: ShellErrorContext
+  ): string[] {
+    const enhanced = [...baseSuggestions];
+    
+    // Add context-specific suggestions
+    if (context.exitCode === 127) {
+      enhanced.push('Check if the command is installed in your system');
+    }
+    
+    if (context.exitCode === 126) {
+      enhanced.push('Check if the file has executable permissions');
+    }
+    
+    if (context.executionTime && context.executionTime > 30000) {
+      enhanced.push('Consider using a longer timeout for long-running commands');
+    }
+    
+    if (context.command.includes('npm') || context.command.includes('yarn')) {
+      enhanced.push('Try running with --verbose flag for more detailed output');
+      enhanced.push('Check if node_modules directory exists and has proper permissions');
+    }
+    
+    if (context.command.includes('git')) {
+      enhanced.push('Check if you are in a git repository');
+      enhanced.push('Verify git configuration and credentials');
+    }
+    
+    return enhanced;
   }
 }
 
@@ -871,29 +1782,604 @@ export interface ShellSecurityEvent {
   details?: Record<string, any> | undefined;
 }
 
+/**
+ * Enhanced Shell Execution Log for comprehensive command tracking
+ */
 export interface ShellExecutionLog {
+  /** Unique identifier for this execution */
+  id: string;
+  
+  /** Session identifier for grouping related executions */
+  sessionId?: string;
+  
+  /** User identifier */
+  userId?: string;
+  
+  /** Timestamp when the execution started */
   timestamp: Date;
+  
+  /** The command that was executed */
   command: string;
+  
+  /** Original command before any sanitization */
+  originalCommand?: string;
+  
+  /** Working directory where the command was executed */
   workingDirectory: string;
+  
+  /** Relative path from workspace root */
+  workingDirectoryRelative: string;
+  
+  /** Command execution result */
   exitCode: number;
+  
+  /** Execution time in milliseconds */
   executionTime: number;
+  
+  /** Whether the execution was successful */
   success: boolean;
-  errorType?: string | undefined;
-  userId?: string | undefined;
+  
+  /** Standard output from the command */
+  stdout?: string;
+  
+  /** Standard error from the command */
+  stderr?: string;
+  
+  /** Output size in bytes */
+  outputSize: number;
+  
+  /** Error type if execution failed */
+  errorType?: ShellErrorType;
+  
+  /** Detailed error information */
+  error?: {
+    message: string;
+    type: ShellErrorType;
+    suggestions: string[];
+    retryable: boolean;
+    code?: number;
+  };
+  
+  /** Security events associated with this execution */
   securityEvents: ShellSecurityEvent[];
+  
+  /** Performance metrics */
+  performance: {
+    /** CPU usage during execution (if available) */
+    cpuUsage?: number;
+    
+    /** Memory usage during execution (if available) */
+    memoryUsage?: number;
+    
+    /** Network activity (if available) */
+    networkActivity?: {
+      requests: number;
+      bytesTransferred: number;
+    };
+    
+    /** File system operations */
+    fileSystemOperations?: {
+      reads: number;
+      writes: number;
+      bytesRead: number;
+      bytesWritten: number;
+    };
+  };
+  
+  /** Risk assessment */
+  riskAssessment: {
+    /** Risk score (0-100) */
+    riskScore: number;
+    
+    /** Risk factors identified */
+    riskFactors: string[];
+    
+    /** Whether manual approval was required */
+    manualApprovalRequired: boolean;
+    
+    /** Whether the command was approved */
+    approved: boolean;
+  };
+  
+  /** Command metadata */
+  metadata: {
+    /** Command category (e.g., 'build', 'test', 'file', 'network') */
+    category?: string;
+    
+    /** Detected file operations */
+    fileOperations?: string[];
+    
+    /** Detected network operations */
+    networkOperations?: string[];
+    
+    /** Environment variables used */
+    environmentVariables?: string[];
+    
+    /** Command tags for categorization */
+    tags?: string[];
+  };
 }
 
-export class ShellSecurityLogger {
+/**
+ * Log Level enumeration for filtering
+ */
+export enum ShellLogLevel {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error',
+  SECURITY = 'security',
+}
+
+/**
+ * Log Query interface for filtering logs
+ */
+export interface ShellLogQuery {
+  /** Filter by date range */
+  dateRange?: {
+    start: Date;
+    end: Date;
+  };
+  
+  /** Filter by command pattern */
+  commandPattern?: string | RegExp;
+  
+  /** Filter by success status */
+  success?: boolean;
+  
+  /** Filter by error type */
+  errorType?: ShellErrorType;
+  
+  /** Filter by risk score range */
+  riskScoreRange?: {
+    min: number;
+    max: number;
+  };
+  
+  /** Filter by execution time range */
+  executionTimeRange?: {
+    min: number;
+    max: number;
+  };
+  
+  /** Filter by user ID */
+  userId?: string;
+  
+  /** Filter by session ID */
+  sessionId?: string;
+  
+  /** Filter by log level */
+  logLevel?: ShellLogLevel;
+  
+  /** Maximum number of results */
+  limit?: number;
+  
+  /** Results offset for pagination */
+  offset?: number;
+}
+
+/**
+ * Log Statistics interface for reporting
+ */
+export interface ShellLogStatistics {
+  /** Total number of executions */
+  totalExecutions: number;
+  
+  /** Number of successful executions */
+  successfulExecutions: number;
+  
+  /** Number of failed executions */
+  failedExecutions: number;
+  
+  /** Success rate percentage */
+  successRate: number;
+  
+  /** Average execution time */
+  averageExecutionTime: number;
+  
+  /** Most commonly executed commands */
+  topCommands: Array<{
+    command: string;
+    count: number;
+    successRate: number;
+  }>;
+  
+  /** Most common error types */
+  topErrors: Array<{
+    errorType: ShellErrorType;
+    count: number;
+    percentage: number;
+  }>;
+  
+  /** Risk score distribution */
+  riskScoreDistribution: {
+    low: number;    // 0-30
+    medium: number; // 31-70
+    high: number;   // 71-100
+  };
+  
+  /** Execution time distribution */
+  executionTimeDistribution: {
+    fast: number;    // < 1s
+    normal: number;  // 1-10s
+    slow: number;    // > 10s
+  };
+  
+  /** Security events summary */
+  securityEventsSummary: {
+    totalEvents: number;
+    blockedCommands: number;
+    pathTraversalAttempts: number;
+    dangerousCommands: number;
+    workspaceViolations: number;
+  };
+}
+
+/**
+ * Log Export Format options
+ */
+export enum ShellLogExportFormat {
+  JSON = 'json',
+  CSV = 'csv',
+  TEXT = 'text',
+  HTML = 'html',
+}
+
+/**
+ * Log Export Configuration
+ */
+export interface ShellLogExportConfig {
+  /** Export format */
+  format: ShellLogExportFormat;
+  
+  /** Query for filtering logs to export */
+  query?: ShellLogQuery;
+  
+  /** Whether to include sensitive data */
+  includeSensitiveData?: boolean;
+  
+  /** Whether to include performance metrics */
+  includePerformanceMetrics?: boolean;
+  
+  /** Whether to include security events */
+  includeSecurityEvents?: boolean;
+  
+  /** Output file path */
+  outputPath?: string;
+}
+
+/**
+ * Performance Monitor for shell command execution
+ * Collects CPU, memory, network, and file system metrics
+ */
+export class ShellPerformanceMonitor {
+  private static readonly MONITOR_INTERVAL = 100; // Monitor every 100ms
+  private monitoring: boolean = false;
+  private monitoringInterval: NodeJS.Timeout | undefined;
+  private metrics: {
+    cpuUsage: number[];
+    memoryUsage: number[];
+    networkActivity: {
+      requests: number;
+      bytesTransferred: number;
+    };
+    fileSystemOperations: {
+      reads: number;
+      writes: number;
+      bytesRead: number;
+      bytesWritten: number;
+    };
+  };
+
+  constructor() {
+    this.metrics = {
+      cpuUsage: [],
+      memoryUsage: [],
+      networkActivity: {
+        requests: 0,
+        bytesTransferred: 0,
+      },
+      fileSystemOperations: {
+        reads: 0,
+        writes: 0,
+        bytesRead: 0,
+        bytesWritten: 0,
+      },
+    };
+  }
+
+  /**
+   * Start monitoring performance metrics
+   */
+  startMonitoring(): void {
+    if (this.monitoring) {
+      return;
+    }
+
+    this.monitoring = true;
+    this.resetMetrics();
+
+    // Start periodic monitoring
+    this.monitoringInterval = setInterval(() => {
+      this.collectMetrics();
+    }, ShellPerformanceMonitor.MONITOR_INTERVAL);
+  }
+
+  /**
+   * Stop monitoring and return collected metrics
+   */
+  stopMonitoring(): {
+    cpuUsage?: number;
+    memoryUsage?: number;
+    networkActivity?: {
+      requests: number;
+      bytesTransferred: number;
+    };
+    fileSystemOperations?: {
+      reads: number;
+      writes: number;
+      bytesRead: number;
+      bytesWritten: number;
+    };
+  } {
+    if (!this.monitoring) {
+      return {};
+    }
+
+    this.monitoring = false;
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = undefined;
+    }
+
+    // Calculate averages and return final metrics
+    const avgCpuUsage = this.metrics.cpuUsage.length > 0 
+      ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) / this.metrics.cpuUsage.length
+      : undefined;
+
+    const avgMemoryUsage = this.metrics.memoryUsage.length > 0
+      ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) / this.metrics.memoryUsage.length
+      : undefined;
+
+    const result: {
+      cpuUsage?: number;
+      memoryUsage?: number;
+      networkActivity?: {
+        requests: number;
+        bytesTransferred: number;
+      };
+      fileSystemOperations?: {
+        reads: number;
+        writes: number;
+        bytesRead: number;
+        bytesWritten: number;
+      };
+    } = {};
+    
+    if (avgCpuUsage !== undefined) {
+      result.cpuUsage = avgCpuUsage;
+    }
+    if (avgMemoryUsage !== undefined) {
+      result.memoryUsage = avgMemoryUsage;
+    }
+    result.networkActivity = this.metrics.networkActivity;
+    result.fileSystemOperations = this.metrics.fileSystemOperations;
+    
+    return result;
+  }
+
+  /**
+   * Get current performance snapshot
+   */
+  getSnapshot(): {
+    cpuUsage?: number;
+    memoryUsage?: number;
+    networkActivity: {
+      requests: number;
+      bytesTransferred: number;
+    };
+    fileSystemOperations: {
+      reads: number;
+      writes: number;
+      bytesRead: number;
+      bytesWritten: number;
+    };
+  } {
+    const avgCpuUsage = this.metrics.cpuUsage.length > 0 
+      ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) / this.metrics.cpuUsage.length
+      : undefined;
+
+    const avgMemoryUsage = this.metrics.memoryUsage.length > 0
+      ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) / this.metrics.memoryUsage.length
+      : undefined;
+
+    const result: {
+      cpuUsage?: number;
+      memoryUsage?: number;
+      networkActivity: {
+        requests: number;
+        bytesTransferred: number;
+      };
+      fileSystemOperations: {
+        reads: number;
+        writes: number;
+        bytesRead: number;
+        bytesWritten: number;
+      };
+    } = {
+      networkActivity: { ...this.metrics.networkActivity },
+      fileSystemOperations: { ...this.metrics.fileSystemOperations },
+    };
+    
+    if (avgCpuUsage !== undefined) {
+      result.cpuUsage = avgCpuUsage;
+    }
+    if (avgMemoryUsage !== undefined) {
+      result.memoryUsage = avgMemoryUsage;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Reset all metrics
+   */
+  private resetMetrics(): void {
+    this.metrics.cpuUsage = [];
+    this.metrics.memoryUsage = [];
+    this.metrics.networkActivity = {
+      requests: 0,
+      bytesTransferred: 0,
+    };
+    this.metrics.fileSystemOperations = {
+      reads: 0,
+      writes: 0,
+      bytesRead: 0,
+      bytesWritten: 0,
+    };
+  }
+
+  /**
+   * Collect current system metrics
+   */
+  private collectMetrics(): void {
+    try {
+      // Collect CPU usage
+      const cpuUsage = process.cpuUsage();
+      const cpuPercent = (cpuUsage.user + cpuUsage.system) / 1000000; // Convert to milliseconds
+      this.metrics.cpuUsage.push(cpuPercent);
+
+      // Collect memory usage
+      const memoryUsage = process.memoryUsage();
+      this.metrics.memoryUsage.push(memoryUsage.heapUsed);
+
+      // Note: Network and file system metrics would require more complex monitoring
+      // For now, we'll track basic metrics that can be estimated
+      
+    } catch (error) {
+      // Silent fail - performance monitoring shouldn't break execution
+    }
+  }
+
+  /**
+   * Estimate file system operations from command content
+   */
+  static estimateFileOperations(command: string, stdout: string, _stderr: string): {
+    reads: number;
+    writes: number;
+    bytesRead: number;
+    bytesWritten: number;
+  } {
+    let reads = 0;
+    let writes = 0;
+    let bytesRead = 0;
+    let bytesWritten = 0;
+
+    // Estimate based on command type
+    const lowerCommand = command.toLowerCase();
+
+    // Read operations
+    if (lowerCommand.match(/^(cat|head|tail|less|more|grep|find|ls|dir)\s/)) {
+      reads = 1;
+      bytesRead = stdout.length; // Approximate
+    }
+
+    // Write operations
+    if (lowerCommand.match(/^(cp|mv|touch|mkdir|echo.*>|.*>\s)/)) {
+      writes = 1;
+      bytesWritten = command.length; // Very rough estimate
+    }
+
+    // Multiple file operations
+    if (lowerCommand.includes('*') || lowerCommand.includes('?')) {
+      reads = Math.max(reads, 10); // Wildcard likely touches multiple files
+      writes = Math.max(writes, 5);
+    }
+
+    return {
+      reads,
+      writes,
+      bytesRead,
+      bytesWritten,
+    };
+  }
+
+  /**
+   * Estimate network activity from command content
+   */
+  static estimateNetworkActivity(command: string, stdout: string, stderr: string): {
+    requests: number;
+    bytesTransferred: number;
+  } {
+    let requests = 0;
+    let bytesTransferred = 0;
+
+    const lowerCommand = command.toLowerCase();
+
+    // Network commands
+    if (lowerCommand.match(/^(curl|wget|ping|ssh|scp|rsync|git\s+(pull|push|clone|fetch))\s/)) {
+      requests = 1;
+      bytesTransferred = stdout.length + stderr.length; // Rough estimate
+    }
+
+    // Multiple network operations
+    if (lowerCommand.includes('curl') && lowerCommand.includes('&')) {
+      requests = (lowerCommand.match(/curl/g) || []).length;
+    }
+
+    return {
+      requests,
+      bytesTransferred,
+    };
+  }
+}
+
+/**
+ * Enhanced Shell Execution Logger with comprehensive logging capabilities
+ * Following the TokenLogger pattern for file-based logging with rotation
+ */
+export class ShellExecutionLogger {
+  private logFile: string;
+  private securityLogFile: string;
   private events: ShellSecurityEvent[] = [];
   private executionLogs: ShellExecutionLog[] = [];
   private maxEvents: number = 1000;
   private maxExecutionLogs: number = 500;
-
-  constructor(maxEvents: number = 1000, maxExecutionLogs: number = 500) {
+  private sessionId: string;
+  
+  constructor(
+    sessionId: string,
+    maxEvents: number = 1000,
+    maxExecutionLogs: number = 500,
+    _logLevel: ShellLogLevel = ShellLogLevel.INFO
+  ) {
+    this.sessionId = sessionId;
     this.maxEvents = maxEvents;
     this.maxExecutionLogs = maxExecutionLogs;
+    // Log level is preserved for future use
+    void _logLevel;
+
+    // Create logs directory following TokenLogger pattern
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+    const aiyaDir = path.join(homeDir, '.aiya');
+    const logsDir = path.join(aiyaDir, 'logs');
+
+    // Ensure directories exist
+    const fs = require('fs');
+    if (!fs.existsSync(aiyaDir)) {
+      fs.mkdirSync(aiyaDir, { recursive: true });
+    }
+    if (!fs.existsSync(logsDir)) {
+      fs.mkdirSync(logsDir, { recursive: true });
+    }
+
+    this.logFile = path.join(logsDir, 'shell-execution.log');
+    this.securityLogFile = path.join(logsDir, 'shell-security.log');
   }
 
+  /**
+   * Log a security event with enhanced context
+   */
   logSecurityEvent(event: Omit<ShellSecurityEvent, 'timestamp'>): void {
     const securityEvent: ShellSecurityEvent = {
       ...event,
@@ -907,15 +2393,23 @@ export class ShellSecurityLogger {
       this.events = this.events.slice(-this.maxEvents);
     }
 
+    // Write to security log file
+    this.writeSecurityLogEntry(securityEvent);
+
     // Log to console in development/debug mode
     if (process.env.NODE_ENV === 'development' || process.env.DEBUG_SHELL_SECURITY) {
       console.log(`[SHELL SECURITY] ${event.eventType}: ${event.command} - ${event.reason || 'No reason provided'}`);
     }
   }
 
-  logExecution(log: Omit<ShellExecutionLog, 'timestamp'>): void {
+  /**
+   * Log a shell execution with comprehensive tracking
+   */
+  logExecution(log: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'>): void {
     const executionLog: ShellExecutionLog = {
       ...log,
+      id: this.generateExecutionId(),
+      sessionId: this.sessionId,
       timestamp: new Date(),
     };
 
@@ -926,106 +2420,448 @@ export class ShellSecurityLogger {
       this.executionLogs = this.executionLogs.slice(-this.maxExecutionLogs);
     }
 
+    // Write to execution log file
+    this.writeExecutionLogEntry(executionLog);
+
     // Log to console in development/debug mode
     if (process.env.NODE_ENV === 'development' || process.env.DEBUG_SHELL_SECURITY) {
       console.log(`[SHELL EXECUTION] ${log.command} - Exit Code: ${log.exitCode}, Time: ${log.executionTime}ms`);
     }
   }
 
-  getSecurityEvents(limit?: number): ShellSecurityEvent[] {
-    const events = [...this.events].reverse(); // Most recent first
-    return limit ? events.slice(0, limit) : events;
+  /**
+   * Query execution logs with filtering
+   */
+  queryExecutionLogs(query: ShellLogQuery): ShellExecutionLog[] {
+    let results = [...this.executionLogs];
+
+    // Apply filters
+    if (query.dateRange) {
+      results = results.filter(log => 
+        log.timestamp >= query.dateRange!.start && 
+        log.timestamp <= query.dateRange!.end
+      );
+    }
+
+    if (query.commandPattern) {
+      const pattern = typeof query.commandPattern === 'string' 
+        ? new RegExp(query.commandPattern, 'i') 
+        : query.commandPattern;
+      results = results.filter(log => pattern.test(log.command));
+    }
+
+    if (query.success !== undefined) {
+      results = results.filter(log => log.success === query.success);
+    }
+
+    if (query.errorType) {
+      results = results.filter(log => log.errorType === query.errorType);
+    }
+
+    if (query.riskScoreRange) {
+      results = results.filter(log => 
+        log.riskAssessment.riskScore >= query.riskScoreRange!.min &&
+        log.riskAssessment.riskScore <= query.riskScoreRange!.max
+      );
+    }
+
+    if (query.executionTimeRange) {
+      results = results.filter(log => 
+        log.executionTime >= query.executionTimeRange!.min &&
+        log.executionTime <= query.executionTimeRange!.max
+      );
+    }
+
+    if (query.userId) {
+      results = results.filter(log => log.userId === query.userId);
+    }
+
+    if (query.sessionId) {
+      results = results.filter(log => log.sessionId === query.sessionId);
+    }
+
+    // Sort by timestamp (most recent first)
+    results.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    // Apply pagination
+    const offset = query.offset || 0;
+    const limit = query.limit || results.length;
+    
+    return results.slice(offset, offset + limit);
   }
 
-  getExecutionLogs(limit?: number): ShellExecutionLog[] {
-    const logs = [...this.executionLogs].reverse(); // Most recent first
-    return limit ? logs.slice(0, limit) : logs;
-  }
+  /**
+   * Get execution statistics
+   */
+  getExecutionStatistics(): ShellLogStatistics {
+    const totalExecutions = this.executionLogs.length;
+    const successfulExecutions = this.executionLogs.filter(log => log.success).length;
+    const failedExecutions = totalExecutions - successfulExecutions;
+    const successRate = totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0;
+    
+    const averageExecutionTime = totalExecutions > 0 
+      ? this.executionLogs.reduce((sum, log) => sum + log.executionTime, 0) / totalExecutions 
+      : 0;
 
-  getSecurityEventsByType(eventType: ShellSecurityEvent['eventType'], limit?: number): ShellSecurityEvent[] {
-    const filtered = this.events.filter(event => event.eventType === eventType).reverse();
-    return limit ? filtered.slice(0, limit) : filtered;
-  }
+    // Calculate top commands
+    const commandCounts = this.executionLogs.reduce((acc, log) => {
+      const cmd = log.command.split(' ')[0]; // Get base command
+      if (cmd && cmd.length > 0) {
+        if (!acc[cmd]) {
+          acc[cmd] = { count: 0, successful: 0 };
+        }
+        acc[cmd]!.count++;
+        if (log.success) {
+          acc[cmd]!.successful++;
+        }
+      }
+      return acc;
+    }, {} as Record<string, { count: number; successful: number }>);
 
-  getFailedExecutions(limit?: number): ShellExecutionLog[] {
-    const failed = this.executionLogs.filter(log => !log.success).reverse();
-    return limit ? failed.slice(0, limit) : failed;
-  }
+    const topCommands = Object.entries(commandCounts)
+      .map(([command, stats]) => ({
+        command,
+        count: stats.count,
+        successRate: stats.count > 0 ? (stats.successful / stats.count) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
 
-  getSecuritySummary(): {
-    totalEvents: number;
-    blockedCommands: number;
-    allowedCommands: number;
-    pathTraversalAttempts: number;
-    inputValidationFailures: number;
-    workspaceViolations: number;
-    dangerousCommands: number;
-    sanitizationActions: number;
-    totalExecutions: number;
-    successfulExecutions: number;
-    failedExecutions: number;
-    averageExecutionTime: number;
-  } {
+    // Calculate top errors
+    const errorCounts = this.executionLogs
+      .filter(log => log.errorType)
+      .reduce((acc, log) => {
+        const errorType = log.errorType!;
+        acc[errorType] = (acc[errorType] || 0) + 1;
+        return acc;
+      }, {} as Record<ShellErrorType, number>);
+
+    const topErrors = Object.entries(errorCounts)
+      .map(([errorType, count]) => ({
+        errorType: errorType as ShellErrorType,
+        count,
+        percentage: failedExecutions > 0 ? (count / failedExecutions) * 100 : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Calculate risk score distribution
+    const riskScoreDistribution = this.executionLogs.reduce(
+      (acc, log) => {
+        const score = log.riskAssessment.riskScore;
+        if (score <= 30) acc.low++;
+        else if (score <= 70) acc.medium++;
+        else acc.high++;
+        return acc;
+      },
+      { low: 0, medium: 0, high: 0 }
+    );
+
+    // Calculate execution time distribution
+    const executionTimeDistribution = this.executionLogs.reduce(
+      (acc, log) => {
+        const time = log.executionTime;
+        if (time < 1000) acc.fast++;
+        else if (time <= 10000) acc.normal++;
+        else acc.slow++;
+        return acc;
+      },
+      { fast: 0, normal: 0, slow: 0 }
+    );
+
+    // Security events summary
     const eventsByType = this.events.reduce((acc, event) => {
       acc[event.eventType] = (acc[event.eventType] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
-    const totalExecutions = this.executionLogs.length;
-    const successfulExecutions = this.executionLogs.filter(log => log.success).length;
-    const failedExecutions = totalExecutions - successfulExecutions;
-    const averageExecutionTime = totalExecutions > 0 
-      ? this.executionLogs.reduce((sum, log) => sum + log.executionTime, 0) / totalExecutions 
-      : 0;
+    const securityEventsSummary = {
+      totalEvents: this.events.length,
+      blockedCommands: eventsByType['COMMAND_BLOCKED'] || 0,
+      pathTraversalAttempts: eventsByType['PATH_TRAVERSAL'] || 0,
+      dangerousCommands: eventsByType['DANGEROUS_COMMAND'] || 0,
+      workspaceViolations: eventsByType['WORKSPACE_VIOLATION'] || 0,
+    };
 
     return {
-      totalEvents: this.events.length,
-      blockedCommands: eventsByType.COMMAND_BLOCKED || 0,
-      allowedCommands: eventsByType.COMMAND_ALLOWED || 0,
-      pathTraversalAttempts: eventsByType.PATH_TRAVERSAL || 0,
-      inputValidationFailures: eventsByType.INPUT_VALIDATION || 0,
-      workspaceViolations: eventsByType.WORKSPACE_VIOLATION || 0,
-      dangerousCommands: eventsByType.DANGEROUS_COMMAND || 0,
-      sanitizationActions: eventsByType.SANITIZATION || 0,
       totalExecutions,
       successfulExecutions,
       failedExecutions,
+      successRate: Math.round(successRate * 100) / 100,
       averageExecutionTime: Math.round(averageExecutionTime),
+      topCommands,
+      topErrors,
+      riskScoreDistribution,
+      executionTimeDistribution,
+      securityEventsSummary,
     };
   }
 
-  exportSecurityReport(): string {
-    const summary = this.getSecuritySummary();
-    const recentEvents = this.getSecurityEvents(20);
-    const recentExecutions = this.getExecutionLogs(20);
-
-    const report = {
-      generatedAt: new Date().toISOString(),
-      summary,
-      recentSecurityEvents: recentEvents,
-      recentExecutions,
-    };
-
-    return JSON.stringify(report, null, 2);
+  /**
+   * Export logs in various formats
+   */
+  exportLogs(config: ShellLogExportConfig): string {
+    const logs = config.query ? this.queryExecutionLogs(config.query) : this.executionLogs;
+    
+    switch (config.format) {
+      case ShellLogExportFormat.JSON:
+        return this.exportAsJSON(logs, config);
+      case ShellLogExportFormat.CSV:
+        return this.exportAsCSV(logs, config);
+      case ShellLogExportFormat.TEXT:
+        return this.exportAsText(logs, config);
+      case ShellLogExportFormat.HTML:
+        return this.exportAsHTML(logs, config);
+      default:
+        return this.exportAsJSON(logs, config);
+    }
   }
 
+  /**
+   * Clear all logs
+   */
   clearLogs(): void {
     this.events = [];
     this.executionLogs = [];
-  }
-
-  setMaxEvents(maxEvents: number): void {
-    this.maxEvents = maxEvents;
-    if (this.events.length > maxEvents) {
-      this.events = this.events.slice(-maxEvents);
+    
+    // Clear log files
+    const fs = require('fs');
+    try {
+      fs.writeFileSync(this.logFile, '');
+      fs.writeFileSync(this.securityLogFile, '');
+    } catch (error) {
+      console.error('Failed to clear log files:', error);
     }
   }
 
-  setMaxExecutionLogs(maxExecutionLogs: number): void {
-    this.maxExecutionLogs = maxExecutionLogs;
-    if (this.executionLogs.length > maxExecutionLogs) {
-      this.executionLogs = this.executionLogs.slice(-maxExecutionLogs);
+  /**
+   * Rotate logs if they get too large
+   */
+  rotateLogs(): void {
+    const fs = require('fs');
+    const maxFileSize = 10 * 1024 * 1024; // 10MB
+    
+    try {
+      // Rotate execution log
+      if (fs.existsSync(this.logFile)) {
+        const stats = fs.statSync(this.logFile);
+        if (stats.size > maxFileSize) {
+          const backupFile = `${this.logFile}.${Date.now()}.backup`;
+          fs.renameSync(this.logFile, backupFile);
+        }
+      }
+
+      // Rotate security log
+      if (fs.existsSync(this.securityLogFile)) {
+        const stats = fs.statSync(this.securityLogFile);
+        if (stats.size > maxFileSize) {
+          const backupFile = `${this.securityLogFile}.${Date.now()}.backup`;
+          fs.renameSync(this.securityLogFile, backupFile);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to rotate logs:', error);
     }
+  }
+
+  // Private helper methods
+  private generateExecutionId(): string {
+    return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  private writeExecutionLogEntry(log: ShellExecutionLog): void {
+    const fs = require('fs');
+    const logLine = `[${log.timestamp.toISOString()}] [${log.sessionId}] [${log.id}] ${log.command} - Exit: ${log.exitCode}, Time: ${log.executionTime}ms, Success: ${log.success}`;
+    
+    try {
+      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
+    } catch (error) {
+      console.error('Failed to write execution log:', error);
+    }
+  }
+
+  private writeSecurityLogEntry(event: ShellSecurityEvent): void {
+    const fs = require('fs');
+    const logLine = `[${event.timestamp.toISOString()}] [${this.sessionId}] [${event.eventType}] ${event.command} - ${event.reason || 'No reason'}`;
+    
+    try {
+      fs.appendFileSync(this.securityLogFile, logLine + '\n', 'utf8');
+    } catch (error) {
+      console.error('Failed to write security log:', error);
+    }
+  }
+
+  private exportAsJSON(logs: ShellExecutionLog[], config: ShellLogExportConfig): string {
+    const exportData = {
+      generatedAt: new Date().toISOString(),
+      sessionId: this.sessionId,
+      totalLogs: logs.length,
+      statistics: this.getExecutionStatistics(),
+      logs: logs.map(log => this.sanitizeLogForExport(log, config)),
+    };
+
+    return JSON.stringify(exportData, null, 2);
+  }
+
+  private exportAsCSV(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+    const headers = [
+      'id', 'timestamp', 'command', 'workingDirectory', 'exitCode',
+      'executionTime', 'success', 'errorType', 'riskScore'
+    ];
+
+    const rows = logs.map(log => [
+      log.id,
+      log.timestamp.toISOString(),
+      log.command,
+      log.workingDirectoryRelative,
+      log.exitCode,
+      log.executionTime,
+      log.success,
+      log.errorType || '',
+      log.riskAssessment.riskScore
+    ]);
+
+    return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
+  }
+
+  private exportAsText(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+    const lines = logs.map(log => {
+      const timestamp = log.timestamp.toISOString();
+      const status = log.success ? 'SUCCESS' : 'FAILED';
+      const error = log.errorType ? ` (${log.errorType})` : '';
+      return `[${timestamp}] ${status}${error} - ${log.command} (${log.executionTime}ms)`;
+    });
+
+    return lines.join('\n');
+  }
+
+  private exportAsHTML(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+    const stats = this.getExecutionStatistics();
+    const rows = logs.map(log => {
+      const status = log.success ? 'success' : 'error';
+      const timestamp = log.timestamp.toISOString();
+      return `
+        <tr class="${status}">
+          <td>${timestamp}</td>
+          <td><code>${log.command}</code></td>
+          <td>${log.workingDirectoryRelative}</td>
+          <td>${log.exitCode}</td>
+          <td>${log.executionTime}ms</td>
+          <td>${log.success ? 'Success' : 'Failed'}</td>
+          <td>${log.errorType || ''}</td>
+          <td>${log.riskAssessment.riskScore}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Shell Execution Log Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            .stats { background: #f5f5f5; padding: 15px; margin-bottom: 20px; border-radius: 5px; }
+            table { border-collapse: collapse; width: 100%; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background-color: #f2f2f2; }
+            .success { background-color: #d4edda; }
+            .error { background-color: #f8d7da; }
+            code { background: #f1f1f1; padding: 2px 4px; border-radius: 3px; }
+          </style>
+        </head>
+        <body>
+          <h1>Shell Execution Log Report</h1>
+          <div class="stats">
+            <h2>Statistics</h2>
+            <p>Total Executions: ${stats.totalExecutions}</p>
+            <p>Success Rate: ${stats.successRate}%</p>
+            <p>Average Execution Time: ${stats.averageExecutionTime}ms</p>
+          </div>
+          <h2>Execution Log</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Command</th>
+                <th>Directory</th>
+                <th>Exit Code</th>
+                <th>Time</th>
+                <th>Status</th>
+                <th>Error Type</th>
+                <th>Risk Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+            </tbody>
+          </table>
+        </body>
+      </html>
+    `;
+  }
+
+  private sanitizeLogForExport(log: ShellExecutionLog, config: ShellLogExportConfig): Partial<ShellExecutionLog> {
+    const sanitized: Partial<ShellExecutionLog> = {
+      id: log.id,
+      timestamp: log.timestamp,
+      command: log.command,
+      workingDirectoryRelative: log.workingDirectoryRelative,
+      exitCode: log.exitCode,
+      executionTime: log.executionTime,
+      success: log.success,
+      riskAssessment: log.riskAssessment,
+    };
+
+    if (log.errorType) {
+      sanitized.errorType = log.errorType;
+    }
+
+    if (config.includeSensitiveData) {
+      sanitized.workingDirectory = log.workingDirectory;
+      if (log.originalCommand) {
+        sanitized.originalCommand = log.originalCommand;
+      }
+      if (log.stdout) {
+        sanitized.stdout = log.stdout;
+      }
+      if (log.stderr) {
+        sanitized.stderr = log.stderr;
+      }
+    }
+
+    if (config.includePerformanceMetrics) {
+      sanitized.performance = log.performance;
+    }
+
+    if (config.includeSecurityEvents) {
+      sanitized.securityEvents = log.securityEvents;
+    }
+
+    return sanitized;
+  }
+
+  // Legacy methods for backward compatibility
+  getSecurityEvents(limit?: number): ShellSecurityEvent[] {
+    const events = [...this.events].reverse();
+    return limit ? events.slice(0, limit) : events;
+  }
+
+  getExecutionLogs(limit?: number): ShellExecutionLog[] {
+    const logs = [...this.executionLogs].reverse();
+    return limit ? logs.slice(0, limit) : logs;
+  }
+
+  getSecuritySummary() {
+    return this.getExecutionStatistics().securityEventsSummary;
+  }
+
+  exportSecurityReport(): string {
+    return this.exportLogs({
+      format: ShellLogExportFormat.JSON,
+      includeSecurityEvents: true,
+      includePerformanceMetrics: true,
+    });
   }
 
   // Helper methods for common security events
@@ -1105,14 +2941,16 @@ export class ShellMCPClient extends MCPClient {
   private security: WorkspaceSecurity;
   private boundaryEnforcer: WorkspaceBoundaryEnforcer;
   private commandFilter: CommandFilter;
-  private securityLogger: ShellSecurityLogger;
+  private executionLogger: ShellExecutionLogger;
+  private sessionId: string;
 
   constructor(security: WorkspaceSecurity, config?: Partial<ShellToolConfig>) {
     super('shell');
     this.security = security;
     this.boundaryEnforcer = new WorkspaceBoundaryEnforcer(security);
     this.commandFilter = new CommandFilter(config);
-    this.securityLogger = new ShellSecurityLogger();
+    this.sessionId = randomUUID();
+    this.executionLogger = new ShellExecutionLogger(this.sessionId);
   }
 
   async connect(): Promise<void> {
@@ -1215,91 +3053,205 @@ export class ShellMCPClient extends MCPClient {
   }
 
   /**
-   * ExecuteCommand tool implementation (Phase 3: comprehensive security integration)
+   * ExecuteCommand tool implementation (Phase 4: enhanced logging and error handling)
    */
   private async executeCommand(params: any): Promise<ToolResult> {
     const { command, cwd, timeout = 30 } = params as ShellExecuteParams;
     const securityEvents: ShellSecurityEvent[] = [];
+    const performanceMonitor = new ShellPerformanceMonitor();
+    const startTime = performance.now();
+    
+    let workingDirectory = this.security.getWorkspaceRoot();
+    let sanitizedCommand = command;
+    let finalCommand = command;
+    let result: ShellExecuteResult | null = null;
 
     try {
       // 1. Basic parameter validation
       if (!command || typeof command !== 'string') {
-        throw new ShellInputValidationError(String(command), 'Command parameter is required and must be a string');
+        const context: ShellErrorContext = {
+          command: String(command),
+          workingDirectory,
+          timestamp: new Date(),
+        };
+        throw new ShellInputValidationError(String(command), 'Command parameter is required and must be a string', context);
       }
 
       if (timeout < 1 || timeout > 300) {
-        throw new ShellInputValidationError(String(timeout), 'Timeout must be between 1 and 300 seconds');
+        const context: ShellErrorContext = {
+          command,
+          workingDirectory,
+          timeout,
+          timestamp: new Date(),
+        };
+        throw new ShellInputValidationError(String(timeout), 'Timeout must be between 1 and 300 seconds', context);
       }
 
       // 2. Input validation and sanitization
       const inputValidation = CommandSanitizer.validateInput(command);
       if (!inputValidation.valid) {
-        this.securityLogger.logInputValidation(command, this.security.getWorkspaceRoot(), inputValidation.reason!);
-        throw new ShellInputValidationError(command, inputValidation.reason!);
+        this.executionLogger.logInputValidation(command, workingDirectory, inputValidation.reason!);
+        const context: ShellErrorContext = {
+          command,
+          workingDirectory,
+          timestamp: new Date(),
+        };
+        throw new ShellInputValidationError(command, inputValidation.reason!, context);
       }
 
-      const sanitizedCommand = inputValidation.sanitized!;
+      sanitizedCommand = inputValidation.sanitized!;
       if (sanitizedCommand !== command) {
-        this.securityLogger.logSanitization(command, this.security.getWorkspaceRoot(), 'Command input sanitized');
+        this.executionLogger.logSanitization(command, workingDirectory, 'Command input sanitized');
       }
 
       // 3. Dangerous command detection
       const dangerCheck = DangerousCommandDetector.isDangerous(sanitizedCommand);
       if (dangerCheck.dangerous) {
         const riskScore = DangerousCommandDetector.calculateRiskScore(sanitizedCommand);
-        this.securityLogger.logDangerousCommand(sanitizedCommand, this.security.getWorkspaceRoot(), dangerCheck.reason!, riskScore);
-        throw new ShellCommandBlockedError(sanitizedCommand, dangerCheck.reason!);
+        this.executionLogger.logDangerousCommand(sanitizedCommand, workingDirectory, dangerCheck.reason!, riskScore);
+        const context: ShellErrorContext = {
+          command: sanitizedCommand,
+          workingDirectory,
+          riskScore,
+          timestamp: new Date(),
+        };
+        throw new ShellCommandBlockedError(sanitizedCommand, dangerCheck.reason!, context);
       }
 
       // 4. Command filtering (whitelist/blacklist)
       const filterCheck = this.commandFilter.isCommandAllowed(sanitizedCommand);
       if (!filterCheck.allowed) {
-        this.securityLogger.logCommandBlocked(sanitizedCommand, this.security.getWorkspaceRoot(), filterCheck.reason!);
-        throw new ShellCommandBlockedError(sanitizedCommand, filterCheck.reason!);
+        this.executionLogger.logCommandBlocked(sanitizedCommand, workingDirectory, filterCheck.reason!);
+        const context: ShellErrorContext = {
+          command: sanitizedCommand,
+          workingDirectory,
+          timestamp: new Date(),
+        };
+        throw new ShellCommandBlockedError(sanitizedCommand, filterCheck.reason!, context);
       }
 
       // 5. Working directory validation
-      let workingDirectory = this.security.getWorkspaceRoot();
       if (cwd) {
         try {
           workingDirectory = await this.security.validateFileAccess(cwd, 'read');
         } catch (error) {
-          this.securityLogger.logWorkspaceViolation(sanitizedCommand, cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`);
-          throw new ShellInputValidationError(cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`);
+          this.executionLogger.logWorkspaceViolation(sanitizedCommand, cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`);
+          const context: ShellErrorContext = {
+            command: sanitizedCommand,
+            workingDirectory: cwd,
+            timestamp: new Date(),
+            originalError: error,
+          };
+          throw new ShellInputValidationError(cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`, context);
         }
       }
 
       // 6. Workspace boundary enforcement
       const boundaryCheck = this.boundaryEnforcer.enforceWorkspaceBoundary(sanitizedCommand, workingDirectory);
       if (!boundaryCheck.allowed) {
-        this.securityLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, boundaryCheck.reason!);
-        throw new ShellPathTraversalError(boundaryCheck.reason!);
+        this.executionLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, boundaryCheck.reason!);
+        const context: ShellErrorContext = {
+          command: sanitizedCommand,
+          workingDirectory,
+          timestamp: new Date(),
+        };
+        throw new ShellPathTraversalError(boundaryCheck.reason!, context);
       }
 
       // 7. File operation validation
       const fileOpCheck = this.boundaryEnforcer.validateFileOperations(sanitizedCommand);
       if (!fileOpCheck.allowed) {
-        this.securityLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, fileOpCheck.reason!);
-        throw new ShellPathTraversalError(fileOpCheck.reason!);
+        this.executionLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, fileOpCheck.reason!);
+        const context: ShellErrorContext = {
+          command: sanitizedCommand,
+          workingDirectory,
+          timestamp: new Date(),
+        };
+        throw new ShellPathTraversalError(fileOpCheck.reason!, context);
       }
 
       // 8. Final command preparation
-      const finalCommand = boundaryCheck.sanitizedCommand || sanitizedCommand;
-      this.securityLogger.logCommandAllowed(finalCommand, workingDirectory, filterCheck.reason);
+      finalCommand = boundaryCheck.sanitizedCommand || sanitizedCommand;
+      this.executionLogger.logCommandAllowed(finalCommand, workingDirectory, filterCheck.reason);
 
-      // 9. Execute command with timeout and error handling
-      const result = await this.executeCommandWithTimeout(finalCommand, workingDirectory, timeout);
+      // 9. Start performance monitoring
+      performanceMonitor.startMonitoring();
 
-      // 10. Log execution
-      this.securityLogger.logExecution({
+      // 10. Execute command with timeout and error handling
+      result = await this.executeCommandWithTimeout(finalCommand, workingDirectory, timeout);
+
+      // 11. Stop performance monitoring
+      const performanceMetrics = performanceMonitor.stopMonitoring();
+
+      // 12. Analyze command risk and extract metadata
+      const riskAnalysis = ShellErrorCategorizer.analyzeCommandRisk(finalCommand, workingDirectory, result.executionTime);
+      const commandMetadata = ShellErrorCategorizer.extractCommandMetadata(finalCommand);
+      const fileOperations = ShellPerformanceMonitor.estimateFileOperations(finalCommand, result.stdout, result.stderr);
+      const networkActivity = ShellPerformanceMonitor.estimateNetworkActivity(finalCommand, result.stdout, result.stderr);
+
+      // 13. Log comprehensive execution details
+      const logEntry: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'> = {
         command: finalCommand,
         workingDirectory,
+        workingDirectoryRelative: this.security.getRelativePathFromWorkspace(workingDirectory),
         exitCode: result.exitCode,
         executionTime: result.executionTime,
         success: result.success,
-        errorType: result.success ? undefined : 'EXECUTION_ERROR' as string | undefined,
+        stdout: result.stdout,
+        stderr: result.stderr,
+        outputSize: (result.stdout.length + result.stderr.length),
         securityEvents,
-      });
+        performance: {
+          networkActivity: {
+            requests: networkActivity.requests,
+            bytesTransferred: networkActivity.bytesTransferred,
+          },
+          fileSystemOperations: {
+            reads: fileOperations.reads,
+            writes: fileOperations.writes,
+            bytesRead: fileOperations.bytesRead,
+            bytesWritten: fileOperations.bytesWritten,
+          },
+        },
+        riskAssessment: {
+          riskScore: riskAnalysis.riskScore,
+          riskFactors: riskAnalysis.riskFactors,
+          manualApprovalRequired: riskAnalysis.riskScore > 70,
+          approved: true, // Since it was executed
+        },
+        metadata: {
+          category: commandMetadata.category,
+          fileOperations: commandMetadata.fileOperations,
+          networkOperations: commandMetadata.networkOperations,
+          environmentVariables: commandMetadata.environmentVariables,
+          tags: commandMetadata.tags,
+        },
+      };
+
+      if (command !== finalCommand) {
+        logEntry.originalCommand = command;
+      }
+
+      if (!result.success) {
+        logEntry.errorType = ShellErrorType.EXECUTION_ERROR;
+        logEntry.error = {
+          message: result.stderr || 'Command execution failed',
+          type: ShellErrorType.EXECUTION_ERROR,
+          suggestions: ['Check command output for error details', 'Verify command syntax'],
+          retryable: true,
+          code: result.exitCode,
+        };
+      }
+
+      if (performanceMetrics.cpuUsage !== undefined) {
+        logEntry.performance.cpuUsage = performanceMetrics.cpuUsage;
+      }
+
+      if (performanceMetrics.memoryUsage !== undefined) {
+        logEntry.performance.memoryUsage = performanceMetrics.memoryUsage;
+      }
+
+      this.executionLogger.logExecution(logEntry);
 
       return {
         content: [
@@ -1314,30 +3266,102 @@ export class ShellMCPClient extends MCPClient {
               security: {
                 validated: true,
                 sanitized: sanitizedCommand !== command,
-                riskScore: DangerousCommandDetector.calculateRiskScore(finalCommand),
-                phase: 'Phase 3 - Full Security Integration',
+                riskScore: riskAnalysis.riskScore,
+                riskFactors: riskAnalysis.riskFactors,
+                phase: 'Phase 4 - Enhanced Logging and Error Handling',
               },
+              performance: performanceMetrics,
+              metadata: commandMetadata,
             }, null, 2),
           },
         ],
       };
 
     } catch (error) {
-      // Log security errors
-      if (error instanceof ShellSecurityError) {
-        this.securityLogger.logExecution({
-          command: command,
-          workingDirectory: this.security.getWorkspaceRoot(),
-          exitCode: -1,
-          executionTime: 0,
-          success: false,
-          errorType: error.securityType,
-          securityEvents,
-        });
+      
+      // Stop performance monitoring if it was started
+      performanceMonitor.stopMonitoring();
+
+      // Create appropriate error context
+      const executionTime = performance.now() - startTime;
+
+      // Use error categorization for better error handling
+      let categorizedError: ShellExecutionError;
+      
+      if (error instanceof ShellExecutionError) {
+        categorizedError = error;
+      } else {
+        // Categorize the error using the new system
+        categorizedError = ShellErrorCategorizer.createCategorizedError(
+          error,
+          result?.exitCode || -1,
+          result?.stdout || '',
+          result?.stderr || '',
+          finalCommand,
+          workingDirectory,
+          executionTime,
+          error
+        );
       }
 
-      // Re-throw the error for proper handling
-      throw error;
+      // Log failed execution with comprehensive details
+      const failedLogEntry: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'> = {
+        command: finalCommand,
+        workingDirectory,
+        workingDirectoryRelative: this.security.getRelativePathFromWorkspace(workingDirectory),
+        exitCode: categorizedError.code || -1,
+        executionTime,
+        success: false,
+        stdout: result?.stdout || '',
+        stderr: result?.stderr || categorizedError.message,
+        outputSize: (result?.stdout?.length || 0) + (result?.stderr?.length || 0) + categorizedError.message.length,
+        errorType: categorizedError.errorType,
+        error: {
+          message: categorizedError.message,
+          type: categorizedError.errorType,
+          suggestions: categorizedError.suggestions,
+          retryable: categorizedError.retryable,
+        },
+        securityEvents,
+        performance: {
+          networkActivity: {
+            requests: 0,
+            bytesTransferred: 0,
+          },
+          fileSystemOperations: {
+            reads: 0,
+            writes: 0,
+            bytesRead: 0,
+            bytesWritten: 0,
+          },
+        },
+        riskAssessment: {
+          riskScore: 0,
+          riskFactors: ['Execution failed'],
+          manualApprovalRequired: false,
+          approved: false,
+        },
+        metadata: {
+          category: 'error',
+          fileOperations: [],
+          networkOperations: [],
+          environmentVariables: [],
+          tags: ['error', 'failed'],
+        },
+      };
+
+      if (command !== finalCommand) {
+        failedLogEntry.originalCommand = command;
+      }
+
+      if (categorizedError.code !== undefined) {
+        failedLogEntry.error!.code = categorizedError.code;
+      }
+
+      this.executionLogger.logExecution(failedLogEntry);
+
+      // Re-throw the categorized error
+      throw categorizedError;
     }
   }
 
@@ -1444,23 +3468,39 @@ export class ShellMCPClient extends MCPClient {
   }
 
   getSecuritySummary() {
-    return this.securityLogger.getSecuritySummary();
+    return this.executionLogger.getSecuritySummary();
   }
 
   getSecurityEvents(limit?: number): ShellSecurityEvent[] {
-    return this.securityLogger.getSecurityEvents(limit);
+    return this.executionLogger.getSecurityEvents(limit);
   }
 
   getExecutionLogs(limit?: number): ShellExecutionLog[] {
-    return this.securityLogger.getExecutionLogs(limit);
+    return this.executionLogger.getExecutionLogs(limit);
+  }
+
+  queryExecutionLogs(query: ShellLogQuery): ShellExecutionLog[] {
+    return this.executionLogger.queryExecutionLogs(query);
+  }
+
+  getExecutionStatistics(): ShellLogStatistics {
+    return this.executionLogger.getExecutionStatistics();
   }
 
   exportSecurityReport(): string {
-    return this.securityLogger.exportSecurityReport();
+    return this.executionLogger.exportSecurityReport();
+  }
+
+  exportLogs(config: ShellLogExportConfig): string {
+    return this.executionLogger.exportLogs(config);
   }
 
   clearSecurityLogs(): void {
-    this.securityLogger.clearLogs();
+    this.executionLogger.clearLogs();
+  }
+
+  rotateLogs(): void {
+    this.executionLogger.rotateLogs();
   }
 
   addAllowedCommand(command: string): void {
@@ -1473,5 +3513,57 @@ export class ShellMCPClient extends MCPClient {
 
   resetConfigurationToDefaults(): void {
     this.commandFilter.resetToDefaults();
+  }
+
+  // New enhanced methods for Phase 4
+  getSessionId(): string {
+    return this.sessionId;
+  }
+
+  analyzeCommandRisk(command: string, workingDirectory?: string): {
+    riskScore: number;
+    riskFactors: string[];
+    category: string;
+  } {
+    return ShellErrorCategorizer.analyzeCommandRisk(
+      command,
+      workingDirectory || this.security.getWorkspaceRoot(),
+      0
+    );
+  }
+
+  extractCommandMetadata(command: string): {
+    category: string;
+    fileOperations: string[];
+    networkOperations: string[];
+    environmentVariables: string[];
+    tags: string[];
+  } {
+    return ShellErrorCategorizer.extractCommandMetadata(command);
+  }
+
+  categorizeError(
+    error: unknown,
+    exitCode: number,
+    stdout: string,
+    stderr: string,
+    command: string,
+    workingDirectory: string,
+    executionTime: number
+  ): {
+    errorType: ShellErrorType;
+    suggestions: string[];
+    retryable: boolean;
+    context: ShellErrorContext;
+  } {
+    return ShellErrorCategorizer.categorizeError(
+      error,
+      exitCode,
+      stdout,
+      stderr,
+      command,
+      workingDirectory,
+      executionTime
+    );
   }
 }
