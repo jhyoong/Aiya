@@ -11,6 +11,7 @@ import { promisify } from 'util';
 import { performance } from 'perf_hooks';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import * as fs from 'fs';
 
 /**
  * Parameters for shell command execution
@@ -1015,6 +1016,9 @@ export class DangerousCommandDetector {
     'chmod 777',
     'chmod -R 777',
     'chown -R',
+    'sudo rm',
+    'sudo systemctl',
+    'chown root:root',
     
     // System configuration
     'systemctl',
@@ -1060,6 +1064,11 @@ export class DangerousCommandDetector {
     /\/\.\.\/+/,
     /\.\.\\+/,
     /\\\.\.\\+/,
+    /\/\.\.\/.*\/etc/,
+    /\/\.\.\/.*\/usr/,
+    /\/\.\.\/.*\/var/,
+    /\.\..*\/etc\/passwd/,
+    /\.\..*\/etc\/shadow/,
     
     // System path access
     /^\/etc\//,
@@ -1070,6 +1079,11 @@ export class DangerousCommandDetector {
     /^\/root\//,
     /^\/home\/[^\/]+\//,
     /^~\//,
+    /\/etc\/passwd/,
+    /\/etc\/shadow/,
+    /\/usr\/bin/,
+    /\/var\/log/,
+    /\/tmp\/.*malicious/,
     
     // Command injection patterns
     /;\s*rm\s/,
@@ -1079,6 +1093,14 @@ export class DangerousCommandDetector {
     /\|\s*rm\s/,
     /`.*rm\s/,
     /\$\(.*rm\s/,
+    
+    // Privilege escalation patterns
+    /sudo\s+rm/,
+    /sudo\s+systemctl/,
+    /sudo\s+chmod/,
+    /sudo\s+chown/,
+    /chown\s+root:root/,
+    /chmod\s+777\s+\/etc/,
     
     // Dangerous redirections
     />\s*\/dev\/[sh]d[a-z]/,
@@ -2365,7 +2387,6 @@ export class ShellExecutionLogger {
     const logsDir = path.join(aiyaDir, 'logs');
 
     // Ensure directories exist
-    const fs = require('fs');
     if (!fs.existsSync(aiyaDir)) {
       fs.mkdirSync(aiyaDir, { recursive: true });
     }
@@ -2625,7 +2646,6 @@ export class ShellExecutionLogger {
     this.executionLogs = [];
     
     // Clear log files
-    const fs = require('fs');
     try {
       fs.writeFileSync(this.logFile, '');
       fs.writeFileSync(this.securityLogFile, '');
@@ -2638,7 +2658,6 @@ export class ShellExecutionLogger {
    * Rotate logs if they get too large
    */
   rotateLogs(): void {
-    const fs = require('fs');
     const maxFileSize = 10 * 1024 * 1024; // 10MB
     
     try {
@@ -2670,7 +2689,6 @@ export class ShellExecutionLogger {
   }
 
   private writeExecutionLogEntry(log: ShellExecutionLog): void {
-    const fs = require('fs');
     const logLine = `[${log.timestamp.toISOString()}] [${log.sessionId}] [${log.id}] ${log.command} - Exit: ${log.exitCode}, Time: ${log.executionTime}ms, Success: ${log.success}`;
     
     try {
@@ -2681,7 +2699,6 @@ export class ShellExecutionLogger {
   }
 
   private writeSecurityLogEntry(event: ShellSecurityEvent): void {
-    const fs = require('fs');
     const logLine = `[${event.timestamp.toISOString()}] [${this.sessionId}] [${event.eventType}] ${event.command} - ${event.reason || 'No reason'}`;
     
     try {

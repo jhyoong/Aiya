@@ -84,16 +84,8 @@ describe('Shell MCP Security Tests', () => {
 
       privilegeCommands.forEach(cmd => {
         const result = DangerousCommandDetector.isDangerous(cmd);
-        // Some commands are caught by exact match, others by patterns
-        if (!result.dangerous) {
-          // Test with the command filter instead for these cases
-          const filter = new CommandFilter();
-          const filterResult = filter.isCommandAllowed(cmd);
-          expect(filterResult.allowed).toBe(false);
-        } else {
-          expect(result.dangerous).toBe(true);
-          expect(result.reason).toBeDefined();
-        }
+        expect(result.dangerous).toBe(true);
+        expect(result.reason).toBeDefined();
       });
     });
 
@@ -108,9 +100,8 @@ describe('Shell MCP Security Tests', () => {
 
       pathTraversalCommands.forEach(cmd => {
         const result = DangerousCommandDetector.isDangerous(cmd);
-        // Path traversal is primarily caught by patterns, not exact matches
-        const hasPathTraversal = result.dangerous || cmd.includes('..') || cmd.includes('/etc/') || cmd.includes('/usr/') || cmd.includes('/var/') || cmd.includes('/tmp/');
-        expect(hasPathTraversal).toBe(true);
+        expect(result.dangerous).toBe(true);
+        expect(result.reason).toBeDefined();
       });
     });
 
