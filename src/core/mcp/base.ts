@@ -75,7 +75,7 @@ export class MCPError extends Error {
   constructor(
     message: string,
     public code?: number,
-    public override cause?: Error
+    public cause?: Error
   ) {
     super(message);
     this.name = 'MCPError';
