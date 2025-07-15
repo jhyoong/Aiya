@@ -6,6 +6,9 @@ import {
   MCPError,
 } from './base.js';
 import { WorkspaceSecurity } from '../security/workspace.js';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import { performance } from 'perf_hooks';
 
 /**
  * Parameters for shell command execution
@@ -141,8 +144,7 @@ export class ShellMCPClient extends MCPClient {
   }
 
   /**
-   * ExecuteCommand tool implementation (Phase 1: stub)
-   * Phase 2 will implement actual command execution
+   * ExecuteCommand tool implementation (Phase 2: actual command execution)
    */
   private async executeCommand(params: any): Promise<ToolResult> {
     const { command, cwd, timeout = 30 } = params as ShellExecuteParams;
@@ -167,14 +169,8 @@ export class ShellMCPClient extends MCPClient {
       throw new MCPError('Timeout must be between 1 and 300 seconds');
     }
 
-    // Phase 1: Return structured stub response
-    const result: ShellExecuteResult = {
-      success: true,
-      stdout: `[Phase 1 Stub] Would execute: ${command}`,
-      stderr: '',
-      exitCode: 0,
-      executionTime: 0,
-    };
+    // Execute command with timeout and error handling
+    const result = await this.executeCommandWithTimeout(command, workingDirectory, timeout);
 
     return {
       content: [
@@ -185,10 +181,103 @@ export class ShellMCPClient extends MCPClient {
             workingDirectory: this.security.getRelativePathFromWorkspace(workingDirectory),
             timeout,
             result,
-            phase: 'Phase 1 - Structure Only',
+            phase: 'Phase 2 - Core Execution',
           }, null, 2),
         },
       ],
     };
+  }
+
+  /**
+   * Execute command with timeout handling and structured error response
+   */
+  private async executeCommandWithTimeout(
+    command: string,
+    workingDirectory: string,
+    timeoutSeconds: number
+  ): Promise<ShellExecuteResult> {
+    const execAsync = promisify(exec);
+    const startTime = performance.now();
+
+    try {
+      // Set up AbortController for timeout
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => {
+        abortController.abort();
+      }, timeoutSeconds * 1000);
+
+      // Execute command
+      const { stdout, stderr } = await execAsync(command, {
+        cwd: workingDirectory,
+        signal: abortController.signal,
+        maxBuffer: 1024 * 1024, // 1MB buffer limit
+      });
+
+      clearTimeout(timeoutId);
+      const executionTime = performance.now() - startTime;
+
+      return {
+        success: true,
+        stdout: stdout || '',
+        stderr: stderr || '',
+        exitCode: 0,
+        executionTime: Math.round(executionTime),
+      };
+    } catch (error: any) {
+      const executionTime = performance.now() - startTime;
+
+      // Handle timeout
+      if (error.name === 'AbortError' || error.signal === 'SIGTERM') {
+        return {
+          success: false,
+          stdout: '',
+          stderr: `Command timed out after ${timeoutSeconds} seconds`,
+          exitCode: -1,
+          executionTime: Math.round(executionTime),
+        };
+      }
+
+      // Handle command not found
+      if (error.code === 'ENOENT') {
+        return {
+          success: false,
+          stdout: '',
+          stderr: `Command not found: ${command}`,
+          exitCode: 127,
+          executionTime: Math.round(executionTime),
+        };
+      }
+
+      // Handle permission denied
+      if (error.code === 'EACCES') {
+        return {
+          success: false,
+          stdout: '',
+          stderr: `Permission denied: ${command}`,
+          exitCode: 126,
+          executionTime: Math.round(executionTime),
+        };
+      }
+
+      // Handle non-zero exit codes (command ran but failed)
+      if (error.code && typeof error.code === 'number') {
+        return {
+          success: false,
+          stdout: error.stdout || '',
+          stderr: error.stderr || error.message,
+          exitCode: error.code,
+          executionTime: Math.round(executionTime),
+        };
+      }
+
+      // Handle other errors
+      return {
+        success: false,
+        stdout: '',
+        stderr: error.message || 'Unknown execution error',
+        exitCode: 1,
+        executionTime: Math.round(executionTime),
+      };
+    }
   }
 }
