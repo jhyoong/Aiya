@@ -736,6 +736,14 @@ export class CommandFilter {
       };
     }
 
+    // Check for complex commands if not allowed
+    if (!this.config.allowComplexCommands && !CommandSanitizer.isSimpleCommand(command)) {
+      return {
+        allowed: false,
+        reason: 'Complex commands with pipes, redirections, or chaining are not allowed'
+      };
+    }
+
     // Check if command is explicitly allowed
     if (this.isCommandWhitelisted(commandName, normalizedCommand)) {
       // Check if it matches auto-approve patterns
@@ -743,14 +751,6 @@ export class CommandFilter {
         return { allowed: true, requiresConfirmation: false };
       }
       return { allowed: true, requiresConfirmation: this.config.requireConfirmation };
-    }
-
-    // Check for complex commands if not allowed
-    if (!this.config.allowComplexCommands && !CommandSanitizer.isSimpleCommand(command)) {
-      return {
-        allowed: false,
-        reason: 'Complex commands with pipes, redirections, or chaining are not allowed'
-      };
     }
 
     // Command not in whitelist - requires confirmation if enabled
