@@ -39,6 +39,7 @@ export class ConfigurationGenerator {
       security: this.getDefaultSecurity(),
       ui: this.getDefaultUI(),
       mcp: this.getDefaultMCP(),
+      shell: this.getDefaultShell(),
       max_tokens: session.primaryProvider.capabilities?.maxTokens || 8192,
     };
   }
@@ -73,6 +74,7 @@ export class ConfigurationGenerator {
       security: this.getDefaultSecurity(),
       ui: this.getDefaultUI(),
       mcp: this.getDefaultMCP(),
+      shell: this.getDefaultShell(),
       max_tokens: session.primaryProvider.capabilities?.maxTokens || 8192,
     };
   }
@@ -235,6 +237,55 @@ export class ConfigurationGenerator {
         return line + '  # External MCP servers (currently empty)';
       }
 
+      // Shell section comments
+      if (trimmed.startsWith('shell:')) {
+        return line + '  # Shell command execution and security settings';
+      }
+
+      if (trimmed.startsWith('confirmationThreshold:')) {
+        return line + '  # Risk score threshold for confirmation prompts (0-100)';
+      }
+
+      if (trimmed.startsWith('trustedCommands:')) {
+        return line + '  # Regex patterns for commands that bypass confirmation';
+      }
+
+      if (trimmed.startsWith('alwaysBlockPatterns:')) {
+        return line + '  # Commands that are always blocked regardless of confirmation';
+      }
+
+      if (trimmed.startsWith('confirmationTimeout:')) {
+        return line + '  # Timeout for confirmation prompts in milliseconds';
+      }
+
+      if (trimmed.startsWith('sessionMemory:')) {
+        return line + '  # Remember confirmation decisions for current session';
+      }
+
+      if (trimmed.startsWith('requireConfirmation:')) {
+        return line + '  # Enable confirmation prompts for risky commands';
+      }
+
+      if (trimmed.startsWith('allowComplexCommands:')) {
+        return line + '  # Allow complex command patterns (pipes, redirects, etc.)';
+      }
+
+      if (trimmed.startsWith('maxExecutionTime:')) {
+        return line + '  # Maximum command execution time in seconds';
+      }
+
+      if (trimmed.startsWith('allowedCommands:')) {
+        return line + '  # Commands allowed for execution';
+      }
+
+      if (trimmed.startsWith('blockedCommands:')) {
+        return line + '  # Commands that are blocked from execution';
+      }
+
+      if (trimmed.startsWith('autoApprovePatterns:')) {
+        return line + '  # Patterns for commands that are automatically approved';
+      }
+
       // Provider-specific comments
       if (trimmed.startsWith('type:')) {
         return line + '  # Provider type';
@@ -278,6 +329,12 @@ export class ConfigurationGenerator {
 # - AIYA_MODEL: Override model name
 # - AIYA_BASE_URL: Override base URL
 # - AIYA_STREAMING: Override streaming setting (true/false)
+# - AIYA_SHELL_CONFIRMATION_THRESHOLD: Override confirmation threshold (0-100)
+# - AIYA_SHELL_CONFIRMATION_TIMEOUT: Override confirmation timeout (milliseconds)
+# - AIYA_SHELL_SESSION_MEMORY: Override session memory setting (true/false)
+# - AIYA_SHELL_REQUIRE_CONFIRMATION: Override require confirmation (true/false)
+# - AIYA_SHELL_ALLOW_COMPLEX_COMMANDS: Override allow complex commands (true/false)
+# - AIYA_SHELL_MAX_EXECUTION_TIME: Override max execution time (seconds)
 #
 # Chat Commands:
 # - /read <file>: Read and display file content
@@ -345,6 +402,144 @@ export class ConfigurationGenerator {
   private getDefaultMCP() {
     return {
       servers: [],
+    };
+  }
+
+  /**
+   * Get default shell configuration
+   */
+  private getDefaultShell() {
+    return {
+      allowedCommands: [
+        'echo',
+        'cat',
+        'head',
+        'tail',
+        'less',
+        'more',
+        'ls',
+        'dir',
+        'pwd',
+        'find',
+        'grep',
+        'sort',
+        'wc',
+        'date',
+        'whoami',
+        'id',
+        'uname',
+        'which',
+        'where',
+        'npm',
+        'yarn',
+        'pnpm',
+        'node',
+        'python',
+        'pip',
+        'git',
+        'docker',
+        'docker-compose',
+        'make',
+        'cmake',
+        'gcc',
+        'clang',
+        'javac',
+        'java',
+        'cargo',
+        'rustc',
+        'go',
+        'dotnet',
+        'build',
+        'test',
+        'lint',
+        'format',
+        'compile',
+        'jest',
+        'mocha',
+        'pytest',
+        'phpunit',
+        'rspec',
+        'touch',
+        'mkdir',
+        'cp',
+        'mv',
+        'ln',
+        'tar',
+        'gzip',
+        'gunzip',
+        'zip',
+        'unzip',
+        'awk',
+        'sed',
+        'cut',
+        'tr',
+        'diff',
+        'patch',
+      ],
+      blockedCommands: [
+        'sudo',
+        'su',
+        'passwd',
+        'chown',
+        'chmod',
+        'chgrp',
+        'mount',
+        'umount',
+        'fdisk',
+        'mkfs',
+        'fsck',
+        'parted',
+        'dd',
+        'shred',
+        'rm',
+        'rmdir',
+        'killall',
+        'pkill',
+        'kill',
+        'halt',
+        'shutdown',
+        'reboot',
+        'poweroff',
+        'init',
+        'systemctl',
+        'service',
+        'crontab',
+        'at',
+        'batch',
+      ],
+      requireConfirmation: true,
+      autoApprovePatterns: [
+        '^ls($|\\s)',
+        '^pwd($|\\s)',
+        '^echo($|\\s)',
+        '^cat($|\\s)',
+        '^head($|\\s)',
+        '^tail($|\\s)',
+        '^git status($|\\s)',
+        '^npm test($|\\s)',
+        '^npm run($|\\s)',
+        '^yarn test($|\\s)',
+        '^yarn run($|\\s)',
+      ],
+      maxExecutionTime: 30,
+      allowComplexCommands: false,
+      confirmationThreshold: 50,
+      trustedCommands: [
+        '^ls($|\\s)',
+        '^pwd($|\\s)',
+        '^echo($|\\s)',
+        '^git status($|\\s)',
+        '^npm test($|\\s)',
+      ],
+      alwaysBlockPatterns: [
+        'rm -rf /',
+        'sudo rm -rf',
+        'format.*',
+        'dd if=/dev/zero',
+        ':(\\(\\))',
+      ],
+      confirmationTimeout: 30000,
+      sessionMemory: true,
     };
   }
 

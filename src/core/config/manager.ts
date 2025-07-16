@@ -67,6 +67,19 @@ export interface AiyaConfig {
       cwd?: string;
     }>;
   };
+  shell?: {
+    allowedCommands: string[];
+    blockedCommands: string[];
+    requireConfirmation: boolean;
+    autoApprovePatterns: string[];
+    maxExecutionTime: number;
+    allowComplexCommands: boolean;
+    confirmationThreshold: number;
+    trustedCommands: string[];
+    alwaysBlockPatterns: string[];
+    confirmationTimeout: number;
+    sessionMemory: boolean;
+  };
   max_tokens?: number;
 }
 
@@ -123,6 +136,138 @@ const DEFAULT_CONFIG: AiyaConfig = {
   },
   mcp: {
     servers: [],
+  },
+  shell: {
+    allowedCommands: [
+      'echo',
+      'cat',
+      'head',
+      'tail',
+      'less',
+      'more',
+      'ls',
+      'dir',
+      'pwd',
+      'find',
+      'grep',
+      'sort',
+      'wc',
+      'date',
+      'whoami',
+      'id',
+      'uname',
+      'which',
+      'where',
+      'npm',
+      'yarn',
+      'pnpm',
+      'node',
+      'python',
+      'pip',
+      'git',
+      'docker',
+      'docker-compose',
+      'make',
+      'cmake',
+      'gcc',
+      'clang',
+      'javac',
+      'java',
+      'cargo',
+      'rustc',
+      'go',
+      'dotnet',
+      'build',
+      'test',
+      'lint',
+      'format',
+      'compile',
+      'jest',
+      'mocha',
+      'pytest',
+      'phpunit',
+      'rspec',
+      'touch',
+      'mkdir',
+      'cp',
+      'mv',
+      'ln',
+      'tar',
+      'gzip',
+      'gunzip',
+      'zip',
+      'unzip',
+      'awk',
+      'sed',
+      'cut',
+      'tr',
+      'diff',
+      'patch',
+    ],
+    blockedCommands: [
+      'sudo',
+      'su',
+      'passwd',
+      'chown',
+      'chmod',
+      'chgrp',
+      'mount',
+      'umount',
+      'fdisk',
+      'mkfs',
+      'fsck',
+      'parted',
+      'dd',
+      'shred',
+      'rm',
+      'rmdir',
+      'killall',
+      'pkill',
+      'kill',
+      'halt',
+      'shutdown',
+      'reboot',
+      'poweroff',
+      'init',
+      'systemctl',
+      'service',
+      'crontab',
+      'at',
+      'batch',
+    ],
+    requireConfirmation: true,
+    autoApprovePatterns: [
+      '^ls($|\\s)',
+      '^pwd($|\\s)',
+      '^echo($|\\s)',
+      '^cat($|\\s)',
+      '^head($|\\s)',
+      '^tail($|\\s)',
+      '^git status($|\\s)',
+      '^npm test($|\\s)',
+      '^npm run($|\\s)',
+      '^yarn test($|\\s)',
+      '^yarn run($|\\s)',
+    ],
+    maxExecutionTime: 30,
+    allowComplexCommands: false,
+    confirmationThreshold: 50,
+    trustedCommands: [
+      '^ls($|\\s)',
+      '^pwd($|\\s)',
+      '^echo($|\\s)',
+      '^git status($|\\s)',
+      '^npm test($|\\s)',
+    ],
+    alwaysBlockPatterns: [
+      'rm -rf /',
+      'sudo rm -rf',
+      'format.*',
+      'dd if=/dev/zero',
+      ':(\\(\\))',
+    ],
+    confirmationTimeout: 30000,
+    sessionMemory: true,
   },
   max_tokens: 4096,
 };
@@ -418,6 +563,56 @@ export class ConfigManager {
         this.config.ui.thinking = thinkingMode as 'on' | 'brief' | 'off';
       }
     }
+
+    // Shell configuration environment overrides
+    if (!this.config.shell) {
+      this.config.shell = {
+        allowedCommands: [],
+        blockedCommands: [],
+        requireConfirmation: true,
+        autoApprovePatterns: [],
+        maxExecutionTime: 30,
+        allowComplexCommands: false,
+        confirmationThreshold: 50,
+        trustedCommands: [],
+        alwaysBlockPatterns: [],
+        confirmationTimeout: 30000,
+        sessionMemory: true,
+      };
+    }
+
+    if (process.env.AIYA_SHELL_CONFIRMATION_THRESHOLD) {
+      const threshold = parseInt(process.env.AIYA_SHELL_CONFIRMATION_THRESHOLD, 10);
+      if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
+        this.config.shell.confirmationThreshold = threshold;
+      }
+    }
+
+    if (process.env.AIYA_SHELL_CONFIRMATION_TIMEOUT) {
+      const timeout = parseInt(process.env.AIYA_SHELL_CONFIRMATION_TIMEOUT, 10);
+      if (!isNaN(timeout) && timeout > 0) {
+        this.config.shell.confirmationTimeout = timeout;
+      }
+    }
+
+    if (process.env.AIYA_SHELL_SESSION_MEMORY) {
+      this.config.shell.sessionMemory = process.env.AIYA_SHELL_SESSION_MEMORY === 'true';
+    }
+
+    if (process.env.AIYA_SHELL_REQUIRE_CONFIRMATION) {
+      this.config.shell.requireConfirmation = process.env.AIYA_SHELL_REQUIRE_CONFIRMATION === 'true';
+    }
+
+    if (process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS) {
+      this.config.shell.allowComplexCommands = process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS === 'true';
+    }
+
+    if (process.env.AIYA_SHELL_MAX_EXECUTION_TIME) {
+      const maxTime = parseInt(process.env.AIYA_SHELL_MAX_EXECUTION_TIME, 10);
+      if (!isNaN(maxTime) && maxTime > 0) {
+        this.config.shell.maxExecutionTime = maxTime;
+      }
+    }
   }
 
   private validateConfig(): void {
@@ -440,6 +635,106 @@ export class ConfigManager {
     if (this.config.security.maxFileSize <= 0) {
       throw new Error('Max file size must be positive');
     }
+
+    // Validate shell configuration if present
+    if (this.config.shell) {
+      this.validateShellConfig();
+    }
+  }
+
+  private validateShellConfig(): void {
+    if (!this.config.shell) return;
+
+    // Validate confirmationThreshold
+    if (
+      this.config.shell.confirmationThreshold < 0 ||
+      this.config.shell.confirmationThreshold > 100
+    ) {
+      throw new Error(
+        `Invalid confirmationThreshold: ${this.config.shell.confirmationThreshold}. Must be between 0 and 100.`
+      );
+    }
+
+    // Validate confirmationTimeout
+    if (this.config.shell.confirmationTimeout <= 0) {
+      throw new Error(
+        `Invalid confirmationTimeout: ${this.config.shell.confirmationTimeout}. Must be greater than 0.`
+      );
+    }
+
+    // Validate maxExecutionTime
+    if (this.config.shell.maxExecutionTime <= 0) {
+      throw new Error(
+        `Invalid maxExecutionTime: ${this.config.shell.maxExecutionTime}. Must be greater than 0.`
+      );
+    }
+
+    // Validate array fields
+    if (!Array.isArray(this.config.shell.allowedCommands)) {
+      throw new Error('allowedCommands must be an array');
+    }
+
+    if (!Array.isArray(this.config.shell.blockedCommands)) {
+      throw new Error('blockedCommands must be an array');
+    }
+
+    if (!Array.isArray(this.config.shell.autoApprovePatterns)) {
+      throw new Error('autoApprovePatterns must be an array');
+    }
+
+    if (!Array.isArray(this.config.shell.trustedCommands)) {
+      throw new Error('trustedCommands must be an array');
+    }
+
+    if (!Array.isArray(this.config.shell.alwaysBlockPatterns)) {
+      throw new Error('alwaysBlockPatterns must be an array');
+    }
+
+    // Validate boolean fields
+    if (typeof this.config.shell.requireConfirmation !== 'boolean') {
+      throw new Error('requireConfirmation must be a boolean');
+    }
+
+    if (typeof this.config.shell.allowComplexCommands !== 'boolean') {
+      throw new Error('allowComplexCommands must be a boolean');
+    }
+
+    if (typeof this.config.shell.sessionMemory !== 'boolean') {
+      throw new Error('sessionMemory must be a boolean');
+    }
+
+    // Validate regex patterns in trustedCommands
+    this.config.shell.trustedCommands.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in trustedCommands[${index}]: ${pattern}`
+        );
+      }
+    });
+
+    // Validate regex patterns in alwaysBlockPatterns
+    this.config.shell.alwaysBlockPatterns.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in alwaysBlockPatterns[${index}]: ${pattern}`
+        );
+      }
+    });
+
+    // Validate regex patterns in autoApprovePatterns
+    this.config.shell.autoApprovePatterns.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in autoApprovePatterns[${index}]: ${pattern}`
+        );
+      }
+    });
   }
 
   private requiresBaseUrl(providerType: string): boolean {
@@ -509,6 +804,10 @@ export class ConfigManager {
 
     if (override.mcp) {
       result.mcp = { ...result.mcp, ...override.mcp };
+    }
+
+    if (override.shell) {
+      result.shell = { ...result.shell, ...override.shell };
     }
 
     if (override.max_tokens !== undefined) {
