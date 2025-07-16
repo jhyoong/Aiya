@@ -1,14 +1,14 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { 
-  ShellMCPClient, 
-  DangerousCommandDetector, 
-  CommandSanitizer, 
-  CommandFilter, 
+import {
+  ShellMCPClient,
+  DangerousCommandDetector,
+  CommandSanitizer,
+  CommandFilter,
   WorkspaceBoundaryEnforcer,
   ShellExecutionLogger,
   ShellCommandBlockedError,
   ShellPathTraversalError,
-  ShellInputValidationError
+  ShellInputValidationError,
 } from '../../../src/core/mcp/shell.js';
 import { WorkspaceSecurity } from '../../../src/core/security/workspace.js';
 import * as path from 'path';
@@ -21,7 +21,11 @@ describe('Shell MCP Security Tests', () => {
   beforeEach(() => {
     // Use a temporary directory for tests
     workspaceRoot = path.join(os.tmpdir(), 'aiya-test-workspace');
-    security = new WorkspaceSecurity(workspaceRoot, ['.txt', '.js', '.ts'], 1024 * 1024);
+    security = new WorkspaceSecurity(
+      workspaceRoot,
+      ['.txt', '.js', '.ts'],
+      1024 * 1024
+    );
   });
 
   describe('DangerousCommandDetector', () => {
@@ -124,9 +128,15 @@ describe('Shell MCP Security Tests', () => {
     });
 
     test('should calculate risk scores correctly', () => {
-      expect(DangerousCommandDetector.calculateRiskScore('rm -rf /')).toBeGreaterThanOrEqual(30);
-      expect(DangerousCommandDetector.calculateRiskScore('sudo reboot')).toBeGreaterThanOrEqual(40);
-      expect(DangerousCommandDetector.calculateRiskScore('ls -la')).toBeLessThan(10);
+      expect(
+        DangerousCommandDetector.calculateRiskScore('rm -rf /')
+      ).toBeGreaterThanOrEqual(30);
+      expect(
+        DangerousCommandDetector.calculateRiskScore('sudo reboot')
+      ).toBeGreaterThanOrEqual(40);
+      expect(
+        DangerousCommandDetector.calculateRiskScore('ls -la')
+      ).toBeLessThan(10);
       expect(DangerousCommandDetector.calculateRiskScore('echo hello')).toBe(0);
     });
   });
@@ -135,19 +145,20 @@ describe('Shell MCP Security Tests', () => {
     test('should validate input correctly', () => {
       // Valid inputs
       expect(CommandSanitizer.validateInput('ls -la').valid).toBe(true);
-      expect(CommandSanitizer.validateInput('echo "hello world"').valid).toBe(true);
-      
+      expect(CommandSanitizer.validateInput('echo "hello world"').valid).toBe(
+        true
+      );
+
       // Invalid inputs
       expect(CommandSanitizer.validateInput('').valid).toBe(false);
       expect(CommandSanitizer.validateInput('   ').valid).toBe(false);
-      expect(CommandSanitizer.validateInput('a'.repeat(1001)).valid).toBe(false);
+      expect(CommandSanitizer.validateInput('a'.repeat(1001)).valid).toBe(
+        false
+      );
     });
 
     test('should detect command injection patterns', () => {
-      const injectionCommands = [
-        'echo hello; rm file',
-        'ls && sudo reboot',
-      ];
+      const injectionCommands = ['echo hello; rm file', 'ls && sudo reboot'];
 
       injectionCommands.forEach(cmd => {
         const result = CommandSanitizer.validateInput(cmd);
@@ -178,7 +189,9 @@ describe('Shell MCP Security Tests', () => {
     });
 
     test('should extract file paths from commands', () => {
-      const paths = CommandSanitizer.extractFilePathsFromCommand('cp /path/to/file ./destination');
+      const paths = CommandSanitizer.extractFilePathsFromCommand(
+        'cp /path/to/file ./destination'
+      );
       expect(paths).toContain('/path/to/file');
       expect(paths).toContain('./destination');
     });
@@ -226,8 +239,10 @@ describe('Shell MCP Security Tests', () => {
         autoApprovePatterns: [],
         maxExecutionTime: 30,
       });
-      
-      const result = restrictiveFilter.isCommandAllowed('echo hello | grep test');
+
+      const result = restrictiveFilter.isCommandAllowed(
+        'echo hello | grep test'
+      );
       expect(result.allowed).toBe(false);
       expect(result.reason).toContain('Complex commands');
     });
@@ -238,6 +253,148 @@ describe('Shell MCP Security Tests', () => {
 
       filter.addBlockedCommand('customcmd');
       expect(filter.isCommandAllowed('customcmd').allowed).toBe(false);
+    });
+
+    describe('Phase 5 Configuration Fields', () => {
+      test('should have correct default values for Phase 5 fields', () => {
+        const filter = new CommandFilter();
+        const config = filter.getConfig();
+
+        expect(config.confirmationThreshold).toBe(50);
+        expect(config.confirmationTimeout).toBe(30000);
+        expect(config.sessionMemory).toBe(true);
+        expect(Array.isArray(config.trustedCommands)).toBe(true);
+        expect(Array.isArray(config.alwaysBlockPatterns)).toBe(true);
+        expect(config.trustedCommands.length).toBeGreaterThan(0);
+        expect(config.alwaysBlockPatterns.length).toBeGreaterThan(0);
+      });
+
+      test('should validate confirmationThreshold range', () => {
+        expect(() => new CommandFilter({ confirmationThreshold: -1 })).toThrow(
+          'Invalid confirmationThreshold: -1. Must be between 0 and 100.'
+        );
+        expect(() => new CommandFilter({ confirmationThreshold: 101 })).toThrow(
+          'Invalid confirmationThreshold: 101. Must be between 0 and 100.'
+        );
+        expect(
+          () => new CommandFilter({ confirmationThreshold: 0 })
+        ).not.toThrow();
+        expect(
+          () => new CommandFilter({ confirmationThreshold: 100 })
+        ).not.toThrow();
+        expect(
+          () => new CommandFilter({ confirmationThreshold: 50 })
+        ).not.toThrow();
+      });
+
+      test('should validate confirmationTimeout is positive', () => {
+        expect(() => new CommandFilter({ confirmationTimeout: 0 })).toThrow(
+          'Invalid confirmationTimeout: 0. Must be greater than 0.'
+        );
+        expect(() => new CommandFilter({ confirmationTimeout: -1000 })).toThrow(
+          'Invalid confirmationTimeout: -1000. Must be greater than 0.'
+        );
+        expect(
+          () => new CommandFilter({ confirmationTimeout: 1000 })
+        ).not.toThrow();
+        expect(
+          () => new CommandFilter({ confirmationTimeout: 30000 })
+        ).not.toThrow();
+      });
+
+      test('should validate trustedCommands is array', () => {
+        expect(
+          () => new CommandFilter({ trustedCommands: 'not an array' as any })
+        ).toThrow('trustedCommands must be an array');
+        expect(() => new CommandFilter({ trustedCommands: [] })).not.toThrow();
+        expect(
+          () => new CommandFilter({ trustedCommands: ['^ls($|\\s)'] })
+        ).not.toThrow();
+      });
+
+      test('should validate alwaysBlockPatterns is array', () => {
+        expect(
+          () =>
+            new CommandFilter({ alwaysBlockPatterns: 'not an array' as any })
+        ).toThrow('alwaysBlockPatterns must be an array');
+        expect(
+          () => new CommandFilter({ alwaysBlockPatterns: [] })
+        ).not.toThrow();
+        expect(
+          () => new CommandFilter({ alwaysBlockPatterns: ['rm -rf /'] })
+        ).not.toThrow();
+      });
+
+      test('should validate sessionMemory is boolean', () => {
+        expect(
+          () => new CommandFilter({ sessionMemory: 'not a boolean' as any })
+        ).toThrow('sessionMemory must be a boolean');
+        expect(() => new CommandFilter({ sessionMemory: true })).not.toThrow();
+        expect(() => new CommandFilter({ sessionMemory: false })).not.toThrow();
+      });
+
+      test('should validate regex patterns in trustedCommands', () => {
+        expect(
+          () => new CommandFilter({ trustedCommands: ['[invalid regex'] })
+        ).toThrow(
+          'Invalid regex pattern in trustedCommands[0]: [invalid regex'
+        );
+        expect(
+          () =>
+            new CommandFilter({ trustedCommands: ['^ls($|\\s)', '[invalid'] })
+        ).toThrow('Invalid regex pattern in trustedCommands[1]: [invalid');
+        expect(
+          () =>
+            new CommandFilter({
+              trustedCommands: ['^ls($|\\s)', '^pwd($|\\s)'],
+            })
+        ).not.toThrow();
+      });
+
+      test('should validate regex patterns in alwaysBlockPatterns', () => {
+        expect(
+          () => new CommandFilter({ alwaysBlockPatterns: ['[invalid regex'] })
+        ).toThrow(
+          'Invalid regex pattern in alwaysBlockPatterns[0]: [invalid regex'
+        );
+        expect(
+          () =>
+            new CommandFilter({ alwaysBlockPatterns: ['rm -rf /', '[invalid'] })
+        ).toThrow('Invalid regex pattern in alwaysBlockPatterns[1]: [invalid');
+        expect(
+          () =>
+            new CommandFilter({
+              alwaysBlockPatterns: ['rm -rf /', 'sudo rm -rf'],
+            })
+        ).not.toThrow();
+      });
+
+      test('should validate configuration on updateConfig', () => {
+        // Test each validation separately since validation runs in sequence
+        const filter1 = new CommandFilter();
+        expect(() =>
+          filter1.updateConfig({ confirmationThreshold: 150 })
+        ).toThrow(
+          'Invalid confirmationThreshold: 150. Must be between 0 and 100.'
+        );
+
+        const filter2 = new CommandFilter();
+        expect(() =>
+          filter2.updateConfig({ confirmationTimeout: -500 })
+        ).toThrow('Invalid confirmationTimeout: -500. Must be greater than 0.');
+
+        const filter3 = new CommandFilter();
+        expect(() =>
+          filter3.updateConfig({ trustedCommands: ['[invalid'] })
+        ).toThrow('Invalid regex pattern in trustedCommands[0]: [invalid');
+
+        // Valid update should work
+        const filter4 = new CommandFilter();
+        expect(() =>
+          filter4.updateConfig({ confirmationThreshold: 75 })
+        ).not.toThrow();
+        expect(filter4.getConfig().confirmationThreshold).toBe(75);
+      });
     });
   });
 
@@ -255,7 +412,10 @@ describe('Shell MCP Security Tests', () => {
     });
 
     test('should validate workspace boundaries', () => {
-      const result = enforcer.enforceWorkspaceBoundary('ls /etc/', workspaceRoot);
+      const result = enforcer.enforceWorkspaceBoundary(
+        'ls /etc/',
+        workspaceRoot
+      );
       expect(result.allowed).toBe(false);
       expect(result.reason).toBeDefined();
     });
@@ -280,8 +440,13 @@ describe('Shell MCP Security Tests', () => {
     });
 
     test('should log security events', () => {
-      logger.logCommandBlocked('rm -rf /', workspaceRoot, 'Dangerous command', 90);
-      
+      logger.logCommandBlocked(
+        'rm -rf /',
+        workspaceRoot,
+        'Dangerous command',
+        90
+      );
+
       const events = logger.getSecurityEvents(1);
       expect(events).toHaveLength(1);
       expect(events[0].eventType).toBe('COMMAND_BLOCKED');
@@ -308,7 +473,11 @@ describe('Shell MCP Security Tests', () => {
     test('should generate security summary', () => {
       logger.logCommandBlocked('rm -rf /', workspaceRoot, 'Dangerous command');
       logger.logCommandAllowed('ls -la', workspaceRoot);
-      logger.logPathTraversal('cat ../../../etc/passwd', workspaceRoot, 'Path traversal');
+      logger.logPathTraversal(
+        'cat ../../../etc/passwd',
+        workspaceRoot,
+        'Path traversal'
+      );
 
       const summary = logger.getSecuritySummary();
       expect(summary.totalEvents).toBe(3);
@@ -317,8 +486,12 @@ describe('Shell MCP Security Tests', () => {
     });
 
     test('should export security report', () => {
-      logger.logCommandBlocked('sudo reboot', workspaceRoot, 'Privilege escalation');
-      
+      logger.logCommandBlocked(
+        'sudo reboot',
+        workspaceRoot,
+        'Privilege escalation'
+      );
+
       const report = logger.exportSecurityReport();
       expect(report).toContain('generatedAt');
       expect(report).toContain('sessionId');
@@ -339,7 +512,7 @@ describe('Shell MCP Security Tests', () => {
 
     test('should block dangerous commands', async () => {
       await client.connect();
-      
+
       const result = await client.callTool('ExecuteCommand', {
         command: 'rm -rf /',
       });
@@ -350,7 +523,7 @@ describe('Shell MCP Security Tests', () => {
 
     test('should block path traversal attempts', async () => {
       await client.connect();
-      
+
       const result = await client.callTool('ExecuteCommand', {
         command: 'cat ../../../etc/passwd',
       });
@@ -362,7 +535,7 @@ describe('Shell MCP Security Tests', () => {
 
     test('should block command injection', async () => {
       await client.connect();
-      
+
       const result = await client.callTool('ExecuteCommand', {
         command: 'echo hello; rm file',
       });
@@ -373,7 +546,7 @@ describe('Shell MCP Security Tests', () => {
 
     test('should validate input parameters', async () => {
       await client.connect();
-      
+
       const result = await client.callTool('ExecuteCommand', {
         command: '',
       });
@@ -384,19 +557,21 @@ describe('Shell MCP Security Tests', () => {
 
     test('should handle timeout validation', async () => {
       await client.connect();
-      
+
       const result = await client.callTool('ExecuteCommand', {
         command: 'echo hello',
         timeout: 500, // Above maximum
       });
 
       expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain('Timeout must be between 1 and 300 seconds');
+      expect(result.content[0].text).toContain(
+        'Timeout must be between 1 and 300 seconds'
+      );
     });
 
     test('should provide security information in response', async () => {
       await client.connect();
-      
+
       // Mock a safe command that would actually execute
       const result = await client.callTool('ExecuteCommand', {
         command: 'echo "test"',
@@ -406,7 +581,9 @@ describe('Shell MCP Security Tests', () => {
         const response = JSON.parse(result.content[0].text!);
         expect(response.security).toBeDefined();
         expect(response.security.validated).toBe(true);
-        expect(response.security.phase).toBe('Phase 4 - Enhanced Logging and Error Handling');
+        expect(response.security.phase).toBe(
+          'Phase 4 - Enhanced Logging and Error Handling'
+        );
       }
     });
 
@@ -418,7 +595,7 @@ describe('Shell MCP Security Tests', () => {
 
       client.addAllowedCommand('customcmd');
       client.addBlockedCommand('badcmd');
-      
+
       const updatedConfig = client.getConfiguration();
       expect(updatedConfig.allowedCommands).toContain('customcmd');
       expect(updatedConfig.blockedCommands).toContain('badcmd');
@@ -443,7 +620,11 @@ describe('Shell MCP Security Tests', () => {
       };
 
       expect(() => {
-        throw new ShellCommandBlockedError('rm -rf /', 'Dangerous command', context);
+        throw new ShellCommandBlockedError(
+          'rm -rf /',
+          'Dangerous command',
+          context
+        );
       }).toThrow('Command blocked: rm -rf /');
 
       expect(() => {
@@ -451,7 +632,11 @@ describe('Shell MCP Security Tests', () => {
       }).toThrow('Path traversal attempt detected');
 
       expect(() => {
-        throw new ShellInputValidationError('invalid input', 'Invalid format', context);
+        throw new ShellInputValidationError(
+          'invalid input',
+          'Invalid format',
+          context
+        );
       }).toThrow('Input validation failed');
     });
 

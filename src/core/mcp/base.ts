@@ -74,7 +74,7 @@ export abstract class MCPClient {
 export class MCPError extends Error {
   public code?: number | undefined;
   public override cause?: Error | undefined;
-  
+
   constructor(
     message: string,
     code?: number | undefined,

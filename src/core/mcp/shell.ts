@@ -145,7 +145,7 @@ export class ShellCommandBlockedError extends ShellExecutionError {
         'Review the command for security risks',
         'Check if the command is in the allowed commands list',
         'Use a safer alternative command',
-        'Contact administrator if this command should be allowed'
+        'Contact administrator if this command should be allowed',
       ],
       false, // Security errors are not retryable
       403
@@ -167,7 +167,7 @@ export class ShellPathTraversalError extends ShellExecutionError {
         'Use paths within the workspace directory',
         'Avoid using ../ or absolute paths',
         'Check file access permissions',
-        'Use relative paths from workspace root'
+        'Use relative paths from workspace root',
       ],
       false, // Security errors are not retryable
       403
@@ -189,7 +189,7 @@ export class ShellInputValidationError extends ShellExecutionError {
         'Check command syntax and format',
         'Avoid special characters and control sequences',
         'Ensure command length is within limits',
-        'Use properly escaped strings'
+        'Use properly escaped strings',
       ],
       false, // Input validation errors are not retryable
       400
@@ -202,7 +202,11 @@ export class ShellInputValidationError extends ShellExecutionError {
  * Shell Timeout Error for command timeouts
  */
 export class ShellTimeoutError extends ShellExecutionError {
-  constructor(command: string, timeoutSeconds: number, context: ShellErrorContext) {
+  constructor(
+    command: string,
+    timeoutSeconds: number,
+    context: ShellErrorContext
+  ) {
     super(
       `Command timed out after ${timeoutSeconds} seconds: ${command}`,
       ShellErrorType.TIMEOUT_ERROR,
@@ -211,7 +215,7 @@ export class ShellTimeoutError extends ShellExecutionError {
         'Try running the command with a longer timeout',
         'Break down the command into smaller parts',
         'Check if the command is stuck in an infinite loop',
-        'Optimize the command for better performance'
+        'Optimize the command for better performance',
       ],
       true, // Timeout errors are retryable
       -1
@@ -233,7 +237,7 @@ export class ShellPermissionError extends ShellExecutionError {
         'Check file and directory permissions',
         'Ensure you have execute permissions for the command',
         'Verify workspace access rights',
-        'Try running with appropriate permissions'
+        'Try running with appropriate permissions',
       ],
       false, // Permission errors are not retryable
       126,
@@ -256,7 +260,7 @@ export class ShellCommandNotFoundError extends ShellExecutionError {
         'Check if the command is installed',
         'Verify the command name spelling',
         'Check if the command is in your PATH',
-        'Try using the full path to the command'
+        'Try using the full path to the command',
       ],
       false, // Command not found errors are not retryable
       127
@@ -278,7 +282,7 @@ export class ShellWorkspaceViolationError extends ShellSecurityError {
         'Operations must be performed within the workspace directory',
         'Use relative paths from the workspace root',
         'Check workspace configuration and boundaries',
-        'Avoid accessing system directories'
+        'Avoid accessing system directories',
       ]
     );
     this.name = 'ShellWorkspaceViolationError';
@@ -298,7 +302,7 @@ export class ShellDangerousCommandError extends ShellSecurityError {
         'Use safer alternatives to accomplish the task',
         'Review the command for potential risks',
         'Consider breaking down into smaller, safer operations',
-        'Contact administrator if this operation is necessary'
+        'Contact administrator if this operation is necessary',
       ]
     );
     this.name = 'ShellDangerousCommandError';
@@ -311,22 +315,22 @@ export class ShellDangerousCommandError extends ShellSecurityError {
 export interface ShellErrorPattern {
   /** Patterns to match in error messages */
   messagePatterns: (string | RegExp)[];
-  
+
   /** Patterns to match in stderr output */
   stderrPatterns?: (string | RegExp)[];
-  
+
   /** Exit codes that indicate this error type */
   exitCodes?: number[];
-  
+
   /** Error type to assign when pattern matches */
   errorType: ShellErrorType;
-  
+
   /** Whether this error type is retryable */
   retryable: boolean;
-  
+
   /** Default suggestions for this error type */
   suggestions: string[];
-  
+
   /** Priority for pattern matching (higher priority wins) */
   priority: number;
 }
@@ -364,7 +368,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 100,
     },
-    
+
     // Command not found errors
     {
       messagePatterns: [
@@ -393,7 +397,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 90,
     },
-    
+
     // Timeout errors
     {
       messagePatterns: [
@@ -403,11 +407,7 @@ export class ShellErrorCategorizer {
         /operation timed out/i,
         /request timeout/i,
       ],
-      stderrPatterns: [
-        /timeout/i,
-        /timed out/i,
-        /operation timed out/i,
-      ],
+      stderrPatterns: [/timeout/i, /timed out/i, /operation timed out/i],
       exitCodes: [-1],
       errorType: ShellErrorType.TIMEOUT_ERROR,
       retryable: true,
@@ -420,7 +420,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 80,
     },
-    
+
     // Path traversal and workspace violations
     {
       messagePatterns: [
@@ -447,7 +447,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 95,
     },
-    
+
     // Input validation errors
     {
       messagePatterns: [
@@ -479,7 +479,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 70,
     },
-    
+
     // Security and dangerous command errors
     {
       messagePatterns: [
@@ -507,7 +507,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 85,
     },
-    
+
     // Workspace violation errors
     {
       messagePatterns: [
@@ -533,7 +533,7 @@ export class ShellErrorCategorizer {
       ],
       priority: 85,
     },
-    
+
     // Configuration errors
     {
       messagePatterns: [
@@ -559,22 +559,11 @@ export class ShellErrorCategorizer {
       ],
       priority: 60,
     },
-    
+
     // General execution errors (lowest priority)
     {
-      messagePatterns: [
-        /error/i,
-        /failed/i,
-        /exception/i,
-        /abort/i,
-        /crash/i,
-      ],
-      stderrPatterns: [
-        /error/i,
-        /failed/i,
-        /exception/i,
-        /abort/i,
-      ],
+      messagePatterns: [/error/i, /failed/i, /exception/i, /abort/i, /crash/i],
+      stderrPatterns: [/error/i, /failed/i, /exception/i, /abort/i],
       exitCodes: [1, 2, 3, 4, 5],
       errorType: ShellErrorType.EXECUTION_ERROR,
       retryable: true,
@@ -609,7 +598,7 @@ export class ShellErrorCategorizer {
   } {
     const errorMessage = this.extractErrorMessage(error);
     const allText = `${errorMessage} ${stdout} ${stderr}`.toLowerCase();
-    
+
     // Find the best matching pattern
     const matchingPattern = this.findBestMatchingPattern(
       errorMessage,
@@ -617,7 +606,7 @@ export class ShellErrorCategorizer {
       exitCode,
       allText
     );
-    
+
     const context: ShellErrorContext = {
       command,
       workingDirectory,
@@ -626,16 +615,19 @@ export class ShellErrorCategorizer {
       timestamp: new Date(),
       originalError,
     };
-    
+
     if (matchingPattern) {
       return {
         errorType: matchingPattern.errorType,
-        suggestions: this.enhanceSuggestions(matchingPattern.suggestions, context),
+        suggestions: this.enhanceSuggestions(
+          matchingPattern.suggestions,
+          context
+        ),
         retryable: matchingPattern.retryable,
         context,
       };
     }
-    
+
     // Default to unknown error
     return {
       errorType: ShellErrorType.UNKNOWN_ERROR,
@@ -674,39 +666,52 @@ export class ShellErrorCategorizer {
       executionTime,
       originalError
     );
-    
+
     const errorMessage = this.extractErrorMessage(error);
     const context = categorization.context;
-    
+
     // Create specific error types based on categorization
     switch (categorization.errorType) {
       case ShellErrorType.PERMISSION_ERROR:
-        return new ShellPermissionError(command, context, originalError as Error);
-        
+        return new ShellPermissionError(
+          command,
+          context,
+          originalError as Error
+        );
+
       case ShellErrorType.COMMAND_NOT_FOUND:
         return new ShellCommandNotFoundError(command, context);
-        
+
       case ShellErrorType.TIMEOUT_ERROR:
         return new ShellTimeoutError(command, context.timeout || 30, context);
-        
+
       case ShellErrorType.PATH_TRAVERSAL:
         return new ShellPathTraversalError(command, context);
-        
+
       case ShellErrorType.INPUT_VALIDATION:
         return new ShellInputValidationError(command, errorMessage, context);
-        
+
       case ShellErrorType.COMMAND_BLOCKED:
         return new ShellCommandBlockedError(command, errorMessage, context);
-        
+
       case ShellErrorType.WORKSPACE_VIOLATION:
-        return new ShellWorkspaceViolationError(command, workingDirectory, context);
-        
+        return new ShellWorkspaceViolationError(
+          command,
+          workingDirectory,
+          context
+        );
+
       case ShellErrorType.DANGEROUS_COMMAND:
         return new ShellDangerousCommandError(command, errorMessage, context);
-        
+
       case ShellErrorType.SECURITY_ERROR:
-        return new ShellSecurityError(errorMessage, context, 'SECURITY_ERROR', categorization.suggestions);
-        
+        return new ShellSecurityError(
+          errorMessage,
+          context,
+          'SECURITY_ERROR',
+          categorization.suggestions
+        );
+
       default:
         return new ShellExecutionError(
           errorMessage,
@@ -734,55 +739,62 @@ export class ShellErrorCategorizer {
   } {
     let riskScore = 0;
     const riskFactors: string[] = [];
-    
+
     // Command-based risk factors
     if (command.includes('rm')) {
       riskScore += 30;
       riskFactors.push('File deletion command');
     }
-    
+
     if (command.includes('curl') || command.includes('wget')) {
       riskScore += 20;
       riskFactors.push('Network download command');
     }
-    
+
     if (command.includes('sudo') || command.includes('su')) {
       riskScore += 50;
       riskFactors.push('Privilege escalation command');
     }
-    
+
     if (command.includes('chmod') || command.includes('chown')) {
       riskScore += 25;
       riskFactors.push('Permission modification command');
     }
-    
-    if (command.includes('|') || command.includes(';') || command.includes('&&')) {
+
+    if (
+      command.includes('|') ||
+      command.includes(';') ||
+      command.includes('&&')
+    ) {
       riskScore += 15;
       riskFactors.push('Command chaining or piping');
     }
-    
+
     if (command.includes('*') || command.includes('?')) {
       riskScore += 10;
       riskFactors.push('Wildcard patterns');
     }
-    
+
     if (command.includes('..')) {
       riskScore += 35;
       riskFactors.push('Path traversal patterns');
     }
-    
+
     // Execution time risk factors
     if (executionTime > 30000) {
       riskScore += 15;
       riskFactors.push('Long execution time');
     }
-    
+
     // Working directory risk factors
-    if (workingDirectory.includes('/tmp') || workingDirectory.includes('temp')) {
+    if (
+      workingDirectory.includes('/tmp') ||
+      workingDirectory.includes('temp')
+    ) {
       riskScore += 10;
       riskFactors.push('Temporary directory usage');
     }
-    
+
     // Determine category
     let category = 'safe';
     if (riskScore > 70) {
@@ -790,7 +802,7 @@ export class ShellErrorCategorizer {
     } else if (riskScore > 30) {
       category = 'moderate';
     }
-    
+
     return {
       riskScore: Math.min(riskScore, 100),
       riskFactors,
@@ -815,11 +827,13 @@ export class ShellErrorCategorizer {
       environmentVariables: [] as string[],
       tags: [] as string[],
     };
-    
+
     const lowerCommand = command.toLowerCase();
-    
+
     // Categorize command
-    if (lowerCommand.match(/^(npm|yarn|pnpm|node|python|pip|cargo|go|dotnet)\s/)) {
+    if (
+      lowerCommand.match(/^(npm|yarn|pnpm|node|python|pip|cargo|go|dotnet)\s/)
+    ) {
       metadata.category = 'development';
       metadata.tags.push('development');
     } else if (lowerCommand.match(/^(git)\s/)) {
@@ -844,38 +858,40 @@ export class ShellErrorCategorizer {
       metadata.category = 'network';
       metadata.tags.push('network');
     }
-    
+
     // Extract file operations
     const fileOpPatterns = [
       /\b(cp|copy|mv|move|rm|del|mkdir|rmdir|touch|ln|link)\s+([^\s;|&<>]+)/gi,
     ];
-    
+
     fileOpPatterns.forEach(pattern => {
       const matches = command.match(pattern);
       if (matches) {
         metadata.fileOperations.push(...matches);
       }
     });
-    
+
     // Extract network operations
     const networkOpPatterns = [
       /\b(curl|wget|ping|ssh|scp|rsync)\s+([^\s;|&<>]+)/gi,
     ];
-    
+
     networkOpPatterns.forEach(pattern => {
       const matches = command.match(pattern);
       if (matches) {
         metadata.networkOperations.push(...matches);
       }
     });
-    
+
     // Extract environment variables
     const envVarPattern = /\$([A-Z_][A-Z0-9_]*)/gi;
     const envMatches = command.match(envVarPattern);
     if (envMatches) {
-      metadata.environmentVariables = envMatches.map(match => match.substring(1));
+      metadata.environmentVariables = envMatches.map(match =>
+        match.substring(1)
+      );
     }
-    
+
     return metadata;
   }
 
@@ -901,40 +917,48 @@ export class ShellErrorCategorizer {
   ): ShellErrorPattern | null {
     let bestMatch: ShellErrorPattern | null = null;
     let bestPriority = -1;
-    
+
     for (const pattern of this.ERROR_PATTERNS) {
       let matches = false;
-      
+
       // Check message patterns
-      if (pattern.messagePatterns.some(p => this.matchesPattern(errorMessage, p))) {
+      if (
+        pattern.messagePatterns.some(p => this.matchesPattern(errorMessage, p))
+      ) {
         matches = true;
       }
-      
+
       // Check stderr patterns
-      if (pattern.stderrPatterns && pattern.stderrPatterns.some(p => this.matchesPattern(stderr, p))) {
+      if (
+        pattern.stderrPatterns &&
+        pattern.stderrPatterns.some(p => this.matchesPattern(stderr, p))
+      ) {
         matches = true;
       }
-      
+
       // Check exit codes
       if (pattern.exitCodes && pattern.exitCodes.includes(exitCode)) {
         matches = true;
       }
-      
+
       // Check overall text for general patterns
       if (pattern.messagePatterns.some(p => this.matchesPattern(allText, p))) {
         matches = true;
       }
-      
+
       if (matches && pattern.priority > bestPriority) {
         bestMatch = pattern;
         bestPriority = pattern.priority;
       }
     }
-    
+
     return bestMatch;
   }
 
-  private static matchesPattern(text: string, pattern: string | RegExp): boolean {
+  private static matchesPattern(
+    text: string,
+    pattern: string | RegExp
+  ): boolean {
     if (typeof pattern === 'string') {
       return text.toLowerCase().includes(pattern.toLowerCase());
     }
@@ -946,30 +970,34 @@ export class ShellErrorCategorizer {
     context: ShellErrorContext
   ): string[] {
     const enhanced = [...baseSuggestions];
-    
+
     // Add context-specific suggestions
     if (context.exitCode === 127) {
       enhanced.push('Check if the command is installed in your system');
     }
-    
+
     if (context.exitCode === 126) {
       enhanced.push('Check if the file has executable permissions');
     }
-    
+
     if (context.executionTime && context.executionTime > 30000) {
-      enhanced.push('Consider using a longer timeout for long-running commands');
+      enhanced.push(
+        'Consider using a longer timeout for long-running commands'
+      );
     }
-    
+
     if (context.command.includes('npm') || context.command.includes('yarn')) {
       enhanced.push('Try running with --verbose flag for more detailed output');
-      enhanced.push('Check if node_modules directory exists and has proper permissions');
+      enhanced.push(
+        'Check if node_modules directory exists and has proper permissions'
+      );
     }
-    
+
     if (context.command.includes('git')) {
       enhanced.push('Check if you are in a git repository');
       enhanced.push('Verify git configuration and credentials');
     }
-    
+
     return enhanced;
   }
 }
@@ -992,13 +1020,13 @@ export class DangerousCommandDetector {
     'mkfs',
     'fdisk',
     'parted',
-    
+
     // Fork bombs and resource exhaustion
     ':(){ :|:& };:',
     ':(){ :|: & };:',
     'while true; do',
     'for((;;))',
-    
+
     // Network and remote execution
     'curl.*|.*bash',
     'wget.*|.*bash',
@@ -1006,7 +1034,7 @@ export class DangerousCommandDetector {
     'wget.*|.*sh',
     'nc -l',
     'netcat -l',
-    
+
     // System access and privilege escalation
     'sudo',
     'su -',
@@ -1019,7 +1047,7 @@ export class DangerousCommandDetector {
     'sudo rm',
     'sudo systemctl',
     'chown root:root',
-    
+
     // System configuration
     'systemctl',
     'service',
@@ -1028,18 +1056,18 @@ export class DangerousCommandDetector {
     'shutdown',
     'halt',
     'poweroff',
-    
+
     // Dangerous file operations
     'truncate -s 0',
     'shred',
     'wipe',
     'srm',
-    
+
     // Process manipulation
     'kill -9 1',
     'killall -9',
     'pkill -9',
-    
+
     // System directories access
     'cd /etc',
     'cd /usr',
@@ -1049,7 +1077,7 @@ export class DangerousCommandDetector {
     'cd /root',
     'cd /home/',
     'cd ~/',
-    
+
     // Dangerous redirections
     '> /dev/sda',
     '> /dev/hda',
@@ -1069,7 +1097,7 @@ export class DangerousCommandDetector {
     /\/\.\.\/.*\/var/,
     /\.\..*\/etc\/passwd/,
     /\.\..*\/etc\/shadow/,
-    
+
     // System path access
     /^\/etc\//,
     /^\/usr\//,
@@ -1084,7 +1112,7 @@ export class DangerousCommandDetector {
     /\/usr\/bin/,
     /\/var\/log/,
     /\/tmp\/.*malicious/,
-    
+
     // Command injection patterns
     /;\s*rm\s/,
     /;\s*sudo\s/,
@@ -1093,7 +1121,7 @@ export class DangerousCommandDetector {
     /\|\s*rm\s/,
     /`.*rm\s/,
     /\$\(.*rm\s/,
-    
+
     // Privilege escalation patterns
     /sudo\s+rm/,
     /sudo\s+systemctl/,
@@ -1101,19 +1129,19 @@ export class DangerousCommandDetector {
     /sudo\s+chown/,
     /chown\s+root:root/,
     /chmod\s+777\s+\/etc/,
-    
+
     // Dangerous redirections
     />\s*\/dev\/[sh]d[a-z]/,
     />\s*\/etc\//,
     />\s*\/usr\//,
     />\s*\/bin\//,
-    
+
     // Network command patterns
     /curl\s+.*\|\s*(bash|sh)/,
     /wget\s+.*\|\s*(bash|sh)/,
     /nc\s+-l/,
     /netcat\s+-l/,
-    
+
     // Fork bomb patterns
     /:\(\)\s*\{.*\|\s*:\s*&\s*\}\s*;:\s*/,
     /while\s+true.*do/,
@@ -1122,49 +1150,609 @@ export class DangerousCommandDetector {
 
   static isDangerous(command: string): { dangerous: boolean; reason?: string } {
     const normalizedCommand = command.toLowerCase().trim();
-    
+
     // Check exact matches
     for (const dangerousCmd of this.DANGEROUS_COMMANDS) {
       if (normalizedCommand.includes(dangerousCmd.toLowerCase())) {
-        return { 
-          dangerous: true, 
-          reason: `Contains dangerous command: ${dangerousCmd}` 
+        return {
+          dangerous: true,
+          reason: `Contains dangerous command: ${dangerousCmd}`,
         };
       }
     }
-    
+
     // Check patterns
     for (const pattern of this.DANGEROUS_PATTERNS) {
       if (pattern.test(command)) {
-        return { 
-          dangerous: true, 
-          reason: `Matches dangerous pattern: ${pattern}` 
+        return {
+          dangerous: true,
+          reason: `Matches dangerous pattern: ${pattern}`,
         };
       }
     }
-    
+
     return { dangerous: false };
   }
 
   static calculateRiskScore(command: string): number {
     let score = 0;
     const normalizedCommand = command.toLowerCase();
-    
+
     // Base risk factors
     if (normalizedCommand.includes('rm')) score += 30;
     if (normalizedCommand.includes('sudo')) score += 40;
     if (normalizedCommand.includes('chmod')) score += 20;
     if (normalizedCommand.includes('chown')) score += 20;
-    if (normalizedCommand.includes('curl') || normalizedCommand.includes('wget')) score += 15;
-    if (normalizedCommand.includes('bash') || normalizedCommand.includes('sh')) score += 10;
+    if (
+      normalizedCommand.includes('curl') ||
+      normalizedCommand.includes('wget')
+    )
+      score += 15;
+    if (normalizedCommand.includes('bash') || normalizedCommand.includes('sh'))
+      score += 10;
     if (normalizedCommand.includes('|')) score += 10;
     if (normalizedCommand.includes(';')) score += 10;
     if (normalizedCommand.includes('&')) score += 10;
     if (normalizedCommand.includes('*')) score += 15;
     if (normalizedCommand.includes('..')) score += 25;
-    if (normalizedCommand.includes('/etc/') || normalizedCommand.includes('/usr/')) score += 30;
-    
+    if (
+      normalizedCommand.includes('/etc/') ||
+      normalizedCommand.includes('/usr/')
+    )
+      score += 30;
+
     return Math.min(score, 100);
+  }
+}
+
+/**
+ * Risk Categories for command execution
+ */
+export enum CommandRiskCategory {
+  SAFE = 'safe', // 0-25: Basic commands like ls, pwd, echo
+  LOW = 'low', // 26-50: Development commands like npm install, git status
+  MEDIUM = 'medium', // 51-75: Build/test commands like npm run build, pytest
+  HIGH = 'high', // 76-90: System modification like chmod, mkdir, rm (non-recursive)
+  CRITICAL = 'critical', // 91-100: Dangerous operations like rm -rf, sudo, format
+}
+
+/**
+ * Command Risk Assessment Result
+ */
+export interface CommandRiskAssessment {
+  /** Risk score from 0-100 */
+  riskScore: number;
+
+  /** Risk category based on score */
+  category: CommandRiskCategory;
+
+  /** Specific risk factors identified */
+  riskFactors: string[];
+
+  /** Whether the command requires user confirmation */
+  requiresConfirmation: boolean;
+
+  /** Whether the command should be automatically blocked */
+  shouldBlock: boolean;
+
+  /** Contextual information about the risk */
+  context: {
+    commandType: string;
+    potentialImpact: string[];
+    mitigationSuggestions: string[];
+  };
+}
+
+/**
+ * Command Risk Assessor for comprehensive command risk evaluation
+ * Builds on existing DangerousCommandDetector with enhanced risk scoring
+ */
+export class CommandRiskAssessor {
+  private config: ShellToolConfig;
+
+  constructor(config: ShellToolConfig) {
+    this.config = config;
+  }
+
+  /**
+   * Assess the risk level of a command
+   */
+  assessRisk(
+    command: string,
+    workingDirectory?: string
+  ): CommandRiskAssessment {
+    const riskScore = this.calculateRiskScore(command, workingDirectory);
+    const category = this.getRiskCategory(riskScore);
+    const riskFactors = this.identifyRiskFactors(command);
+    const requiresConfirmation = this.shouldRequireConfirmation(
+      command,
+      riskScore
+    );
+    const shouldBlock = this.shouldBlockCommand(command, riskScore);
+
+    return {
+      riskScore,
+      category,
+      riskFactors,
+      requiresConfirmation,
+      shouldBlock,
+      context: this.generateRiskContext(command, category, riskFactors),
+    };
+  }
+
+  /**
+   * Calculate comprehensive risk score (0-100)
+   */
+  private calculateRiskScore(
+    command: string,
+    workingDirectory?: string
+  ): number {
+    let score = 0;
+    const normalizedCommand = command.toLowerCase().trim();
+
+    // Start with existing dangerous command detection
+    const dangerousCheck = DangerousCommandDetector.isDangerous(command);
+    if (dangerousCheck.dangerous) {
+      score += dangerousCheck.reason?.includes('critical') ? 90 : 70;
+    }
+
+    // Use existing risk calculation as baseline
+    score = Math.max(
+      score,
+      DangerousCommandDetector.calculateRiskScore(command)
+    );
+
+    // Enhanced risk factors
+    score += this.assessCommandComplexity(normalizedCommand);
+    score += this.assessFileSystemImpact(normalizedCommand);
+    score += this.assessNetworkRisk(normalizedCommand);
+    score += this.assessSystemModification(normalizedCommand);
+    score += this.assessPrivilegeEscalation(normalizedCommand);
+    score += this.assessDataAccess(normalizedCommand, workingDirectory);
+
+    return Math.min(score, 100);
+  }
+
+  /**
+   * Assess command complexity risk
+   */
+  private assessCommandComplexity(command: string): number {
+    let score = 0;
+
+    // Command chaining increases risk
+    if (command.includes('&&') || command.includes('||')) score += 10;
+    if (command.includes(';')) score += 15;
+    if (command.includes('|')) score += 5;
+
+    // Complex redirections
+    if (command.includes('>>') || command.includes('>')) score += 8;
+    if (command.includes('<<') || command.includes('<')) score += 5;
+
+    // Background processes
+    if (command.includes(' &')) score += 12;
+
+    // Loops and conditionals
+    if (
+      command.includes('for ') ||
+      command.includes('while ') ||
+      command.includes('if ')
+    )
+      score += 20;
+
+    return score;
+  }
+
+  /**
+   * Assess file system impact risk
+   */
+  private assessFileSystemImpact(command: string): number {
+    let score = 0;
+
+    // File deletion commands
+    if (command.includes('rm ')) score += 25;
+    if (command.includes('rmdir')) score += 20;
+    if (command.includes('unlink')) score += 15;
+
+    // Mass operations
+    if (command.includes('*')) score += 15;
+    if (command.includes('**')) score += 25;
+    if (command.includes('find ') && command.includes('-delete')) score += 30;
+
+    // Permission changes
+    if (command.includes('chmod')) score += 20;
+    if (command.includes('chown')) score += 25;
+
+    // Archive operations
+    if (command.includes('tar ') && command.includes('-x')) score += 10;
+    if (command.includes('unzip')) score += 10;
+
+    return score;
+  }
+
+  /**
+   * Assess network-related risk
+   */
+  private assessNetworkRisk(command: string): number {
+    let score = 0;
+
+    // Network download commands
+    if (command.includes('wget') || command.includes('curl')) score += 15;
+    if (command.includes('git clone')) score += 10;
+
+    // Network services
+    if (command.includes('nc ') || command.includes('netcat')) score += 20;
+    if (command.includes('ssh')) score += 15;
+
+    // Potential data exfiltration
+    if (
+      (command.includes('curl') || command.includes('wget')) &&
+      command.includes('|')
+    )
+      score += 25;
+
+    return score;
+  }
+
+  /**
+   * Assess system modification risk
+   */
+  private assessSystemModification(command: string): number {
+    let score = 0;
+
+    // Package management
+    if (command.includes('npm install') || command.includes('pip install'))
+      score += 15;
+    if (
+      command.includes('apt ') ||
+      command.includes('yum ') ||
+      command.includes('brew ')
+    )
+      score += 20;
+
+    // Service management
+    if (command.includes('systemctl') || command.includes('service'))
+      score += 25;
+
+    // Environment modification
+    if (command.includes('export ') || command.includes('setenv')) score += 10;
+
+    return score;
+  }
+
+  /**
+   * Assess privilege escalation risk
+   */
+  private assessPrivilegeEscalation(command: string): number {
+    let score = 0;
+
+    // Direct privilege escalation
+    if (command.includes('sudo')) score += 30;
+    if (command.includes('su ')) score += 35;
+
+    // Potential privilege escalation vectors
+    if (command.includes('chmod +s') || command.includes('chmod 4'))
+      score += 40;
+
+    return score;
+  }
+
+  /**
+   * Assess data access risk based on paths
+   */
+  private assessDataAccess(
+    command: string,
+    _workingDirectory?: string
+  ): number {
+    let score = 0;
+
+    // System directories
+    if (
+      command.includes('/etc/') ||
+      command.includes('/usr/') ||
+      command.includes('/var/')
+    )
+      score += 20;
+    if (command.includes('/root/') || command.includes('/home/')) score += 15;
+
+    // Configuration files
+    if (
+      command.includes('.config') ||
+      command.includes('.bashrc') ||
+      command.includes('.profile')
+    )
+      score += 15;
+
+    // Sensitive file patterns
+    if (
+      command.includes('passwd') ||
+      command.includes('shadow') ||
+      command.includes('ssh_key')
+    )
+      score += 30;
+
+    // Path traversal
+    if (command.includes('../') || command.includes('..\\')) score += 25;
+
+    return score;
+  }
+
+  /**
+   * Get risk category from score
+   */
+  private getRiskCategory(score: number): CommandRiskCategory {
+    if (score <= 25) return CommandRiskCategory.SAFE;
+    if (score <= 50) return CommandRiskCategory.LOW;
+    if (score <= 75) return CommandRiskCategory.MEDIUM;
+    if (score <= 90) return CommandRiskCategory.HIGH;
+    return CommandRiskCategory.CRITICAL;
+  }
+
+  /**
+   * Identify specific risk factors
+   */
+  private identifyRiskFactors(command: string): string[] {
+    const factors: string[] = [];
+    const normalizedCommand = command.toLowerCase();
+
+    // Dangerous command patterns
+    const dangerousCheck = DangerousCommandDetector.isDangerous(command);
+    if (dangerousCheck.dangerous) {
+      factors.push(`Dangerous command pattern: ${dangerousCheck.reason}`);
+    }
+
+    // File system risks
+    if (normalizedCommand.includes('rm '))
+      factors.push('File deletion operation');
+    if (normalizedCommand.includes('*'))
+      factors.push('Wildcard operation affecting multiple files');
+    if (normalizedCommand.includes('chmod'))
+      factors.push('Permission modification');
+
+    // Network risks
+    if (
+      normalizedCommand.includes('curl') ||
+      normalizedCommand.includes('wget')
+    ) {
+      factors.push('Network download operation');
+    }
+
+    // System risks
+    if (normalizedCommand.includes('sudo'))
+      factors.push('Privilege escalation');
+    if (normalizedCommand.includes('systemctl'))
+      factors.push('System service modification');
+
+    // Complexity risks
+    if (
+      normalizedCommand.includes('&&') ||
+      normalizedCommand.includes('||') ||
+      normalizedCommand.includes(';')
+    ) {
+      factors.push('Command chaining');
+    }
+
+    return factors;
+  }
+
+  /**
+   * Determine if command requires user confirmation
+   */
+  private shouldRequireConfirmation(
+    command: string,
+    riskScore: number
+  ): boolean {
+    // Check if confirmation is globally disabled
+    if (!this.config.requireConfirmation) {
+      return false;
+    }
+
+    // Check if command is in trusted list (bypass confirmation)
+    if (this.isTrustedCommand(command)) {
+      return false;
+    }
+
+    // Check if risk score exceeds threshold
+    return riskScore >= this.config.confirmationThreshold;
+  }
+
+  /**
+   * Determine if command should be automatically blocked
+   */
+  private shouldBlockCommand(command: string, riskScore: number): boolean {
+    // Check always-block patterns
+    for (const pattern of this.config.alwaysBlockPatterns) {
+      const regex = new RegExp(pattern, 'i');
+      if (regex.test(command)) {
+        return true;
+      }
+    }
+
+    // Auto-block critical risk commands if they're not explicitly trusted
+    if (riskScore >= 95 && !this.isTrustedCommand(command)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if command is in trusted list
+   */
+  private isTrustedCommand(command: string): boolean {
+    const normalizedCommand = command.toLowerCase().trim();
+
+    for (const trustedPattern of this.config.trustedCommands) {
+      const regex = new RegExp(trustedPattern, 'i');
+      if (regex.test(normalizedCommand)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Generate risk context information
+   */
+  private generateRiskContext(
+    command: string,
+    category: CommandRiskCategory,
+    riskFactors: string[]
+  ): {
+    commandType: string;
+    potentialImpact: string[];
+    mitigationSuggestions: string[];
+  } {
+    const context = {
+      commandType: this.classifyCommandType(command),
+      potentialImpact: this.assessPotentialImpact(command, category),
+      mitigationSuggestions: this.generateMitigationSuggestions(
+        command,
+        riskFactors
+      ),
+    };
+
+    return context;
+  }
+
+  /**
+   * Classify the type of command
+   */
+  private classifyCommandType(command: string): string {
+    const normalizedCommand = command.toLowerCase();
+
+    if (
+      normalizedCommand.startsWith('npm ') ||
+      normalizedCommand.startsWith('yarn ')
+    )
+      return 'Package Management';
+    if (normalizedCommand.startsWith('git ')) return 'Version Control';
+    if (normalizedCommand.startsWith('docker ')) return 'Container Management';
+    if (
+      normalizedCommand.includes('rm ') ||
+      normalizedCommand.includes('delete')
+    )
+      return 'File Deletion';
+    if (
+      normalizedCommand.includes('chmod') ||
+      normalizedCommand.includes('chown')
+    )
+      return 'Permission Modification';
+    if (
+      normalizedCommand.includes('curl') ||
+      normalizedCommand.includes('wget')
+    )
+      return 'Network Operation';
+    if (normalizedCommand.includes('sudo') || normalizedCommand.includes('su '))
+      return 'Privilege Escalation';
+    if (
+      normalizedCommand.includes('systemctl') ||
+      normalizedCommand.includes('service')
+    )
+      return 'System Service';
+
+    return 'General Command';
+  }
+
+  /**
+   * Assess potential impact of command execution
+   */
+  private assessPotentialImpact(
+    command: string,
+    category: CommandRiskCategory
+  ): string[] {
+    const impact: string[] = [];
+    const normalizedCommand = command.toLowerCase();
+
+    switch (category) {
+      case CommandRiskCategory.CRITICAL:
+        impact.push('Potential system damage or data loss');
+        impact.push('Possible security compromise');
+        impact.push('May affect system stability');
+        break;
+      case CommandRiskCategory.HIGH:
+        impact.push('Significant file system changes');
+        impact.push('Potential permission modifications');
+        impact.push('May affect application functionality');
+        break;
+      case CommandRiskCategory.MEDIUM:
+        impact.push('Moderate file system changes');
+        impact.push('Package or dependency modifications');
+        break;
+      case CommandRiskCategory.LOW:
+        impact.push('Minor file system changes');
+        impact.push('Read-mostly operations');
+        break;
+      case CommandRiskCategory.SAFE:
+        impact.push('No significant impact expected');
+        break;
+    }
+
+    // Add specific impact based on command type
+    if (normalizedCommand.includes('rm '))
+      impact.push('Files will be permanently deleted');
+    if (normalizedCommand.includes('chmod'))
+      impact.push('File permissions will be modified');
+    if (normalizedCommand.includes('install'))
+      impact.push('New software packages will be installed');
+
+    return impact;
+  }
+
+  /**
+   * Generate mitigation suggestions for risky commands
+   */
+  private generateMitigationSuggestions(
+    command: string,
+    riskFactors: string[]
+  ): string[] {
+    const suggestions: string[] = [];
+    const normalizedCommand = command.toLowerCase();
+
+    // General suggestions based on risk factors
+    if (riskFactors.some(f => f.includes('deletion'))) {
+      suggestions.push('Consider backing up affected files first');
+      suggestions.push('Use ls to verify which files will be affected');
+    }
+
+    if (riskFactors.some(f => f.includes('wildcard'))) {
+      suggestions.push(
+        'Test with ls first to see what files match the pattern'
+      );
+      suggestions.push(
+        'Consider processing files one by one instead of using wildcards'
+      );
+    }
+
+    if (riskFactors.some(f => f.includes('privilege'))) {
+      suggestions.push('Verify that elevated privileges are necessary');
+      suggestions.push('Consider running without sudo first');
+    }
+
+    if (riskFactors.some(f => f.includes('network'))) {
+      suggestions.push('Verify the source is trusted');
+      suggestions.push('Consider downloading to a staging area first');
+    }
+
+    // Command-specific suggestions
+    if (normalizedCommand.includes('rm -rf')) {
+      suggestions.push('Double-check the target directory path');
+      suggestions.push('Consider using rm without -f flag for confirmation');
+    }
+
+    if (normalizedCommand.includes('chmod 777')) {
+      suggestions.push('Consider more restrictive permissions');
+      suggestions.push('Verify if world-writable permissions are necessary');
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * Update risk assessor configuration
+   */
+  updateConfig(config: Partial<ShellToolConfig>): void {
+    this.config = { ...this.config, ...config };
   }
 }
 
@@ -1172,84 +1760,96 @@ export class DangerousCommandDetector {
  * Command Input Sanitization and Validation System
  */
 export class CommandSanitizer {
-
   private static readonly SHELL_EXPANSION_PATTERNS = [
     // Command substitution
     /`[^`]*`/g,
     /\$\([^)]*\)/g,
-    
+
     // Variable expansion
     /\$\{[^}]*\}/g,
     /\$[A-Za-z_][A-Za-z0-9_]*/g,
-    
+
     // Glob patterns that could be dangerous
     /\*\*/g,
     /\?\?+/g,
-    
+
     // History expansion
     /![^!]*!/g,
-    
+
     // Process substitution
     /<\([^)]*\)/g,
     />\([^)]*\)/g,
   ];
 
-  static validateInput(command: string): { valid: boolean; reason?: string; sanitized?: string } {
+  static validateInput(command: string): {
+    valid: boolean;
+    reason?: string;
+    sanitized?: string;
+  } {
     if (!command || typeof command !== 'string') {
       return { valid: false, reason: 'Command must be a non-empty string' };
     }
 
     if (command.length > 1000) {
-      return { valid: false, reason: 'Command exceeds maximum length of 1000 characters' };
+      return {
+        valid: false,
+        reason: 'Command exceeds maximum length of 1000 characters',
+      };
     }
 
     if (command.trim().length === 0) {
-      return { valid: false, reason: 'Command cannot be empty or only whitespace' };
+      return {
+        valid: false,
+        reason: 'Command cannot be empty or only whitespace',
+      };
     }
 
     // Check for null bytes or control characters
     if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(command)) {
-      return { valid: false, reason: 'Command contains invalid control characters' };
+      return {
+        valid: false,
+        reason: 'Command contains invalid control characters',
+      };
     }
 
     // Check for dangerous shell expansion patterns
     for (const pattern of this.SHELL_EXPANSION_PATTERNS) {
       if (pattern.test(command)) {
-        return { 
-          valid: false, 
-          reason: `Command contains dangerous shell expansion pattern: ${pattern}` 
+        return {
+          valid: false,
+          reason: `Command contains dangerous shell expansion pattern: ${pattern}`,
         };
       }
     }
 
     // Check for command injection patterns
     if (this.containsCommandInjection(command)) {
-      return { 
-        valid: false, 
-        reason: 'Command contains potential command injection patterns' 
+      return {
+        valid: false,
+        reason: 'Command contains potential command injection patterns',
       };
     }
 
     // Sanitize the command
     const sanitized = this.sanitizeCommand(command);
-    
+
     return { valid: true, sanitized };
   }
 
   static sanitizeCommand(command: string): string {
     let sanitized = command;
-    
+
     // Remove excessive whitespace
     sanitized = sanitized.replace(/\s+/g, ' ').trim();
-    
+
     // Remove dangerous Unicode characters
     sanitized = sanitized.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
-    
+
     // Remove potentially dangerous escape sequences
     sanitized = sanitized.replace(/\\x[0-9a-fA-F]{2}/g, '');
     sanitized = sanitized.replace(/\\u[0-9a-fA-F]{4}/g, '');
     sanitized = sanitized.replace(/\\U[0-9a-fA-F]{8}/g, '');
-    
+
     return sanitized;
   }
 
@@ -1264,20 +1864,20 @@ export class CommandSanitizer {
       /;\s*chown\s/,
       /;\s*curl\s/,
       /;\s*wget\s/,
-      
+
       // Background command execution
       /&\s*rm\s/,
       /&\s*sudo\s/,
       /&\s*curl\s/,
       /&\s*wget\s/,
-      
+
       // Pipe to dangerous commands
       /\|\s*rm\s/,
       /\|\s*sudo\s/,
       /\|\s*bash\s/,
       /\|\s*sh\s/,
       /\|\s*eval\s/,
-      
+
       // Logical operators with dangerous commands
       /&&\s*rm\s/,
       /&&\s*sudo\s/,
@@ -1296,7 +1896,7 @@ export class CommandSanitizer {
 
   static extractFilePathsFromCommand(command: string): string[] {
     const paths: string[] = [];
-    
+
     // Simple regex to extract potential file paths
     // This is a basic implementation - could be enhanced
     const pathPatterns = [
@@ -1323,11 +1923,11 @@ export class CommandSanitizer {
   static isSimpleCommand(command: string): boolean {
     // Check if command is a simple command without chaining, pipes, etc.
     const complexPatterns = [
-      /[;|&]/,  // Command chaining or pipes
-      /[<>]/,   // Redirections
-      /[`$]/,   // Command substitution or variable expansion
-      /[{}]/,   // Brace expansion
-      /[*?]/,   // Glob patterns
+      /[;|&]/, // Command chaining or pipes
+      /[<>]/, // Redirections
+      /[`$]/, // Command substitution or variable expansion
+      /[{}]/, // Brace expansion
+      /[*?]/, // Glob patterns
     ];
 
     for (const pattern of complexPatterns) {
@@ -1350,8 +1950,13 @@ export class WorkspaceBoundaryEnforcer {
     this.security = security;
   }
 
-  validateCommandPaths(command: string): { valid: boolean; reason?: string; validatedPaths?: string[] } {
-    const extractedPaths = CommandSanitizer.extractFilePathsFromCommand(command);
+  validateCommandPaths(command: string): {
+    valid: boolean;
+    reason?: string;
+    validatedPaths?: string[];
+  } {
+    const extractedPaths =
+      CommandSanitizer.extractFilePathsFromCommand(command);
     const validatedPaths: string[] = [];
 
     for (const path of extractedPaths) {
@@ -1362,7 +1967,7 @@ export class WorkspaceBoundaryEnforcer {
       } catch (error) {
         return {
           valid: false,
-          reason: `Path validation failed for '${path}': ${error instanceof Error ? error.message : String(error)}`
+          reason: `Path validation failed for '${path}': ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     }
@@ -1370,7 +1975,10 @@ export class WorkspaceBoundaryEnforcer {
     return { valid: true, validatedPaths };
   }
 
-  validateWorkingDirectory(command: string, requestedCwd?: string): { valid: boolean; reason?: string; validatedCwd?: string } {
+  validateWorkingDirectory(
+    command: string,
+    requestedCwd?: string
+  ): { valid: boolean; reason?: string; validatedCwd?: string } {
     let workingDirectory = this.security.getWorkspaceRoot();
 
     if (requestedCwd) {
@@ -1379,7 +1987,7 @@ export class WorkspaceBoundaryEnforcer {
       } catch (error) {
         return {
           valid: false,
-          reason: `Working directory validation failed: ${error instanceof Error ? error.message : String(error)}`
+          reason: `Working directory validation failed: ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     }
@@ -1389,7 +1997,7 @@ export class WorkspaceBoundaryEnforcer {
     if (cdMatches) {
       for (const cdMatch of cdMatches) {
         const targetDir = cdMatch.replace(/cd\s+/, '');
-        
+
         try {
           // Resolve the target directory relative to current working directory
           const resolvedPath = this.resolvePath(targetDir, workingDirectory);
@@ -1397,7 +2005,7 @@ export class WorkspaceBoundaryEnforcer {
         } catch (error) {
           return {
             valid: false,
-            reason: `Directory change validation failed for '${targetDir}': ${error instanceof Error ? error.message : String(error)}`
+            reason: `Directory change validation failed for '${targetDir}': ${error instanceof Error ? error.message : String(error)}`,
           };
         }
       }
@@ -1413,7 +2021,7 @@ export class WorkspaceBoundaryEnforcer {
       /\/\.\.\/+/g,
       /\.\.\\+/g,
       /\\\.\.\\+/g,
-      
+
       // Absolute path patterns that might escape workspace
       /\/etc\/+/g,
       /\/usr\/+/g,
@@ -1423,7 +2031,7 @@ export class WorkspaceBoundaryEnforcer {
       /\/root\/+/g,
       /\/home\/[^\/]+\/+/g,
       /~\/+/g,
-      
+
       // Dangerous file access patterns
       /\/dev\/+/g,
       /\/proc\/+/g,
@@ -1436,7 +2044,7 @@ export class WorkspaceBoundaryEnforcer {
       if (matches) {
         return {
           safe: false,
-          reason: `Path traversal pattern detected: ${matches[0]}`
+          reason: `Path traversal pattern detected: ${matches[0]}`,
         };
       }
     }
@@ -1444,13 +2052,16 @@ export class WorkspaceBoundaryEnforcer {
     return { safe: true };
   }
 
-  enforceWorkspaceBoundary(command: string, workingDirectory: string): { allowed: boolean; reason?: string; sanitizedCommand?: string } {
+  enforceWorkspaceBoundary(
+    command: string,
+    workingDirectory: string
+  ): { allowed: boolean; reason?: string; sanitizedCommand?: string } {
     // Check for dangerous path patterns
     const pathCheck = this.checkPathTraversal(command);
     if (!pathCheck.safe) {
       return {
         allowed: false,
-        reason: pathCheck.reason || 'Path traversal detected'
+        reason: pathCheck.reason || 'Path traversal detected',
       };
     }
 
@@ -1459,25 +2070,31 @@ export class WorkspaceBoundaryEnforcer {
     if (!pathValidation.valid) {
       return {
         allowed: false,
-        reason: pathValidation.reason || 'Path validation failed'
+        reason: pathValidation.reason || 'Path validation failed',
       };
     }
 
     // Validate working directory
-    const cwdValidation = this.validateWorkingDirectory(command, workingDirectory);
+    const cwdValidation = this.validateWorkingDirectory(
+      command,
+      workingDirectory
+    );
     if (!cwdValidation.valid) {
       return {
         allowed: false,
-        reason: cwdValidation.reason || 'Working directory validation failed'
+        reason: cwdValidation.reason || 'Working directory validation failed',
       };
     }
 
     // Replace relative paths with absolute paths within workspace
-    const sanitizedCommand = this.sanitizePathsInCommand(command, workingDirectory);
+    const sanitizedCommand = this.sanitizePathsInCommand(
+      command,
+      workingDirectory
+    );
 
     return {
       allowed: true,
-      sanitizedCommand
+      sanitizedCommand,
     };
   }
 
@@ -1485,17 +2102,20 @@ export class WorkspaceBoundaryEnforcer {
     // Handle special cases
     if (targetPath === '.') return basePath;
     if (targetPath === '..') return path.dirname(basePath);
-    
+
     // Handle absolute paths
     if (path.isAbsolute(targetPath)) return targetPath;
-    
+
     // Handle relative paths
     return path.resolve(basePath, targetPath);
   }
 
-  private sanitizePathsInCommand(command: string, workingDirectory: string): string {
+  private sanitizePathsInCommand(
+    command: string,
+    workingDirectory: string
+  ): string {
     let sanitized = command;
-    
+
     // Replace relative paths with absolute paths within workspace
     const relativePaths = command.match(/\.\/[^\s;|&<>]+/g);
     if (relativePaths) {
@@ -1510,7 +2130,10 @@ export class WorkspaceBoundaryEnforcer {
     return sanitized;
   }
 
-  validateFileOperations(command: string): { allowed: boolean; reason?: string } {
+  validateFileOperations(command: string): {
+    allowed: boolean;
+    reason?: string;
+  } {
     const fileOperationPatterns = [
       // File creation/modification outside workspace
       /touch\s+\/[^\s;|&<>]+/g,
@@ -1518,11 +2141,11 @@ export class WorkspaceBoundaryEnforcer {
       /cp\s+[^\s;|&<>]+\s+\/[^\s;|&<>]+/g,
       /mv\s+[^\s;|&<>]+\s+\/[^\s;|&<>]+/g,
       /ln\s+[^\s;|&<>]+\s+\/[^\s;|&<>]+/g,
-      
+
       // File deletion outside workspace
       /rm\s+\/[^\s;|&<>]+/g,
       /rmdir\s+\/[^\s;|&<>]+/g,
-      
+
       // File reading outside workspace
       /cat\s+\/[^\s;|&<>]+/g,
       /head\s+\/[^\s;|&<>]+/g,
@@ -1543,7 +2166,7 @@ export class WorkspaceBoundaryEnforcer {
             if (!this.security.isPathSafe(path)) {
               return {
                 allowed: false,
-                reason: `File operation attempted outside workspace: ${match}`
+                reason: `File operation attempted outside workspace: ${match}`,
               };
             }
           }
@@ -1573,6 +2196,12 @@ export interface ShellToolConfig {
   autoApprovePatterns: string[];
   maxExecutionTime: number;
   allowComplexCommands: boolean;
+  // Phase 5: User Confirmation System fields
+  confirmationThreshold: number; // Risk score threshold requiring confirmation (0-100)
+  trustedCommands: string[]; // Commands that bypass confirmation
+  alwaysBlockPatterns: string[]; // Commands that are always blocked regardless of confirmation
+  confirmationTimeout: number; // Timeout for user confirmation prompts (in milliseconds)
+  sessionMemory: boolean; // Remember confirmation decisions for the current session
 }
 
 /**
@@ -1583,47 +2212,137 @@ export class CommandFilter {
   private defaultConfig: ShellToolConfig = {
     allowedCommands: [
       // Basic safe commands
-      'echo', 'cat', 'head', 'tail', 'less', 'more',
-      'ls', 'dir', 'pwd', 'find', 'grep', 'sort', 'wc',
-      'date', 'whoami', 'id', 'uname', 'which', 'where',
-      
+      'echo',
+      'cat',
+      'head',
+      'tail',
+      'less',
+      'more',
+      'ls',
+      'dir',
+      'pwd',
+      'find',
+      'grep',
+      'sort',
+      'wc',
+      'date',
+      'whoami',
+      'id',
+      'uname',
+      'which',
+      'where',
+
       // Development commands
-      'npm', 'yarn', 'pnpm', 'node', 'python', 'pip',
-      'git', 'docker', 'docker-compose',
-      'make', 'cmake', 'gcc', 'clang', 'javac', 'java',
-      'cargo', 'rustc', 'go', 'dotnet',
-      
+      'npm',
+      'yarn',
+      'pnpm',
+      'node',
+      'python',
+      'pip',
+      'git',
+      'docker',
+      'docker-compose',
+      'make',
+      'cmake',
+      'gcc',
+      'clang',
+      'javac',
+      'java',
+      'cargo',
+      'rustc',
+      'go',
+      'dotnet',
+
       // Build and test commands
-      'build', 'test', 'lint', 'format', 'compile',
-      'jest', 'mocha', 'pytest', 'phpunit', 'rspec',
-      
+      'build',
+      'test',
+      'lint',
+      'format',
+      'compile',
+      'jest',
+      'mocha',
+      'pytest',
+      'phpunit',
+      'rspec',
+
       // File operations (within workspace)
-      'touch', 'mkdir', 'cp', 'mv', 'ln',
-      'tar', 'gzip', 'gunzip', 'zip', 'unzip',
-      
+      'touch',
+      'mkdir',
+      'cp',
+      'mv',
+      'ln',
+      'tar',
+      'gzip',
+      'gunzip',
+      'zip',
+      'unzip',
+
       // Text processing
-      'awk', 'sed', 'cut', 'tr', 'diff', 'patch',
+      'awk',
+      'sed',
+      'cut',
+      'tr',
+      'diff',
+      'patch',
     ],
     blockedCommands: [
       // System commands
-      'sudo', 'su', 'passwd', 'chpasswd', 'usermod',
-      'systemctl', 'service', 'init', 'reboot', 'shutdown',
-      'halt', 'poweroff', 'mount', 'umount',
-      
+      'sudo',
+      'su',
+      'passwd',
+      'chpasswd',
+      'usermod',
+      'systemctl',
+      'service',
+      'init',
+      'reboot',
+      'shutdown',
+      'halt',
+      'poweroff',
+      'mount',
+      'umount',
+
       // Destructive commands
-      'rm', 'rmdir', 'shred', 'wipe', 'dd',
-      'format', 'fdisk', 'parted', 'mkfs',
-      
+      'rm',
+      'rmdir',
+      'shred',
+      'wipe',
+      'dd',
+      'format',
+      'fdisk',
+      'parted',
+      'mkfs',
+
       // Network commands
-      'nc', 'netcat', 'telnet', 'ftp', 'ssh', 'scp',
-      'rsync', 'curl', 'wget', 'ping', 'nmap',
-      
+      'nc',
+      'netcat',
+      'telnet',
+      'ftp',
+      'ssh',
+      'scp',
+      'rsync',
+      'curl',
+      'wget',
+      'ping',
+      'nmap',
+
       // Process control
-      'kill', 'killall', 'pkill', 'nohup', 'screen', 'tmux',
-      
+      'kill',
+      'killall',
+      'pkill',
+      'nohup',
+      'screen',
+      'tmux',
+
       // System modification
-      'chmod', 'chown', 'chgrp', 'setfacl', 'getfacl',
-      'crontab', 'at', 'batch',
+      'chmod',
+      'chown',
+      'chgrp',
+      'setfacl',
+      'getfacl',
+      'crontab',
+      'at',
+      'batch',
     ],
     requireConfirmation: true,
     autoApprovePatterns: [
@@ -1643,21 +2362,104 @@ export class CommandFilter {
     ],
     maxExecutionTime: 30,
     allowComplexCommands: false,
+    // Phase 5: User Confirmation System fields
+    confirmationThreshold: 50,
+    trustedCommands: [
+      '^ls($|\\s)',
+      '^pwd($|\\s)',
+      '^echo($|\\s)',
+      '^git status($|\\s)',
+      '^npm test($|\\s)',
+    ],
+    alwaysBlockPatterns: [
+      'rm -rf /',
+      'sudo rm -rf',
+      'format.*',
+      'dd if=/dev/zero',
+      ':(\\(\\))',
+    ],
+    confirmationTimeout: 30000,
+    sessionMemory: true,
   };
+
+  /**
+   * Validate configuration values for Phase 5 fields
+   */
+  private validateConfig(): void {
+    // Validate confirmationThreshold
+    if (
+      this.config.confirmationThreshold < 0 ||
+      this.config.confirmationThreshold > 100
+    ) {
+      throw new Error(
+        `Invalid confirmationThreshold: ${this.config.confirmationThreshold}. Must be between 0 and 100.`
+      );
+    }
+
+    // Validate confirmationTimeout
+    if (this.config.confirmationTimeout <= 0) {
+      throw new Error(
+        `Invalid confirmationTimeout: ${this.config.confirmationTimeout}. Must be greater than 0.`
+      );
+    }
+
+    // Validate trustedCommands array
+    if (!Array.isArray(this.config.trustedCommands)) {
+      throw new Error('trustedCommands must be an array');
+    }
+
+    // Validate alwaysBlockPatterns array
+    if (!Array.isArray(this.config.alwaysBlockPatterns)) {
+      throw new Error('alwaysBlockPatterns must be an array');
+    }
+
+    // Validate sessionMemory
+    if (typeof this.config.sessionMemory !== 'boolean') {
+      throw new Error('sessionMemory must be a boolean');
+    }
+
+    // Validate regex patterns in trustedCommands
+    this.config.trustedCommands.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in trustedCommands[${index}]: ${pattern}`
+        );
+      }
+    });
+
+    // Validate regex patterns in alwaysBlockPatterns
+    this.config.alwaysBlockPatterns.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in alwaysBlockPatterns[${index}]: ${pattern}`
+        );
+      }
+    });
+  }
 
   constructor(config?: Partial<ShellToolConfig>) {
     this.config = { ...this.defaultConfig, ...config };
+    this.validateConfig();
   }
 
   updateConfig(config: Partial<ShellToolConfig>): void {
     this.config = { ...this.config, ...config };
+    this.validateConfig();
   }
 
   getConfig(): ShellToolConfig {
     return { ...this.config };
   }
 
-  isCommandAllowed(command: string): { allowed: boolean; reason?: string; requiresConfirmation?: boolean } {
+  isCommandAllowed(command: string): {
+    allowed: boolean;
+    reason?: string;
+    requiresConfirmation?: boolean;
+  } {
     const normalizedCommand = command.toLowerCase().trim();
     const commandName = this.extractCommandName(normalizedCommand);
 
@@ -1665,15 +2467,19 @@ export class CommandFilter {
     if (this.isCommandBlocked(commandName, normalizedCommand)) {
       return {
         allowed: false,
-        reason: `Command '${commandName}' is blocked by security policy`
+        reason: `Command '${commandName}' is blocked by security policy`,
       };
     }
 
     // Check for complex commands if not allowed
-    if (!this.config.allowComplexCommands && !CommandSanitizer.isSimpleCommand(command)) {
+    if (
+      !this.config.allowComplexCommands &&
+      !CommandSanitizer.isSimpleCommand(command)
+    ) {
       return {
         allowed: false,
-        reason: 'Complex commands with pipes, redirections, or chaining are not allowed'
+        reason:
+          'Complex commands with pipes, redirections, or chaining are not allowed',
       };
     }
 
@@ -1683,7 +2489,10 @@ export class CommandFilter {
       if (this.matchesAutoApprovePattern(normalizedCommand)) {
         return { allowed: true, requiresConfirmation: false };
       }
-      return { allowed: true, requiresConfirmation: this.config.requireConfirmation };
+      return {
+        allowed: true,
+        requiresConfirmation: this.config.requireConfirmation,
+      };
     }
 
     // Command not in whitelist - requires confirmation if enabled
@@ -1691,7 +2500,7 @@ export class CommandFilter {
       return {
         allowed: true,
         requiresConfirmation: true,
-        reason: `Command '${commandName}' is not in the allowed list and requires confirmation`
+        reason: `Command '${commandName}' is not in the allowed list and requires confirmation`,
       };
     }
 
@@ -1720,7 +2529,10 @@ export class CommandFilter {
     return false;
   }
 
-  private isCommandWhitelisted(commandName: string, _fullCommand: string): boolean {
+  private isCommandWhitelisted(
+    commandName: string,
+    _fullCommand: string
+  ): boolean {
     // Check exact command name matches
     if (this.config.allowedCommands.includes(commandName)) {
       return true;
@@ -1795,7 +2607,14 @@ export class CommandFilter {
  */
 export interface ShellSecurityEvent {
   timestamp: Date;
-  eventType: 'COMMAND_BLOCKED' | 'COMMAND_ALLOWED' | 'PATH_TRAVERSAL' | 'INPUT_VALIDATION' | 'WORKSPACE_VIOLATION' | 'DANGEROUS_COMMAND' | 'SANITIZATION';
+  eventType:
+    | 'COMMAND_BLOCKED'
+    | 'COMMAND_ALLOWED'
+    | 'PATH_TRAVERSAL'
+    | 'INPUT_VALIDATION'
+    | 'WORKSPACE_VIOLATION'
+    | 'DANGEROUS_COMMAND'
+    | 'SANITIZATION';
   command: string;
   workingDirectory: string;
   reason?: string | undefined;
@@ -1810,49 +2629,49 @@ export interface ShellSecurityEvent {
 export interface ShellExecutionLog {
   /** Unique identifier for this execution */
   id: string;
-  
+
   /** Session identifier for grouping related executions */
   sessionId?: string;
-  
+
   /** User identifier */
   userId?: string;
-  
+
   /** Timestamp when the execution started */
   timestamp: Date;
-  
+
   /** The command that was executed */
   command: string;
-  
+
   /** Original command before any sanitization */
   originalCommand?: string;
-  
+
   /** Working directory where the command was executed */
   workingDirectory: string;
-  
+
   /** Relative path from workspace root */
   workingDirectoryRelative: string;
-  
+
   /** Command execution result */
   exitCode: number;
-  
+
   /** Execution time in milliseconds */
   executionTime: number;
-  
+
   /** Whether the execution was successful */
   success: boolean;
-  
+
   /** Standard output from the command */
   stdout?: string;
-  
+
   /** Standard error from the command */
   stderr?: string;
-  
+
   /** Output size in bytes */
   outputSize: number;
-  
+
   /** Error type if execution failed */
   errorType?: ShellErrorType;
-  
+
   /** Detailed error information */
   error?: {
     message: string;
@@ -1861,24 +2680,24 @@ export interface ShellExecutionLog {
     retryable: boolean;
     code?: number;
   };
-  
+
   /** Security events associated with this execution */
   securityEvents: ShellSecurityEvent[];
-  
+
   /** Performance metrics */
   performance: {
     /** CPU usage during execution (if available) */
     cpuUsage?: number;
-    
+
     /** Memory usage during execution (if available) */
     memoryUsage?: number;
-    
+
     /** Network activity (if available) */
     networkActivity?: {
       requests: number;
       bytesTransferred: number;
     };
-    
+
     /** File system operations */
     fileSystemOperations?: {
       reads: number;
@@ -1887,36 +2706,36 @@ export interface ShellExecutionLog {
       bytesWritten: number;
     };
   };
-  
+
   /** Risk assessment */
   riskAssessment: {
     /** Risk score (0-100) */
     riskScore: number;
-    
+
     /** Risk factors identified */
     riskFactors: string[];
-    
+
     /** Whether manual approval was required */
     manualApprovalRequired: boolean;
-    
+
     /** Whether the command was approved */
     approved: boolean;
   };
-  
+
   /** Command metadata */
   metadata: {
     /** Command category (e.g., 'build', 'test', 'file', 'network') */
     category?: string;
-    
+
     /** Detected file operations */
     fileOperations?: string[];
-    
+
     /** Detected network operations */
     networkOperations?: string[];
-    
+
     /** Environment variables used */
     environmentVariables?: string[];
-    
+
     /** Command tags for categorization */
     tags?: string[];
   };
@@ -1942,40 +2761,40 @@ export interface ShellLogQuery {
     start: Date;
     end: Date;
   };
-  
+
   /** Filter by command pattern */
   commandPattern?: string | RegExp;
-  
+
   /** Filter by success status */
   success?: boolean;
-  
+
   /** Filter by error type */
   errorType?: ShellErrorType;
-  
+
   /** Filter by risk score range */
   riskScoreRange?: {
     min: number;
     max: number;
   };
-  
+
   /** Filter by execution time range */
   executionTimeRange?: {
     min: number;
     max: number;
   };
-  
+
   /** Filter by user ID */
   userId?: string;
-  
+
   /** Filter by session ID */
   sessionId?: string;
-  
+
   /** Filter by log level */
   logLevel?: ShellLogLevel;
-  
+
   /** Maximum number of results */
   limit?: number;
-  
+
   /** Results offset for pagination */
   offset?: number;
 }
@@ -1986,47 +2805,47 @@ export interface ShellLogQuery {
 export interface ShellLogStatistics {
   /** Total number of executions */
   totalExecutions: number;
-  
+
   /** Number of successful executions */
   successfulExecutions: number;
-  
+
   /** Number of failed executions */
   failedExecutions: number;
-  
+
   /** Success rate percentage */
   successRate: number;
-  
+
   /** Average execution time */
   averageExecutionTime: number;
-  
+
   /** Most commonly executed commands */
   topCommands: Array<{
     command: string;
     count: number;
     successRate: number;
   }>;
-  
+
   /** Most common error types */
   topErrors: Array<{
     errorType: ShellErrorType;
     count: number;
     percentage: number;
   }>;
-  
+
   /** Risk score distribution */
   riskScoreDistribution: {
-    low: number;    // 0-30
+    low: number; // 0-30
     medium: number; // 31-70
-    high: number;   // 71-100
+    high: number; // 71-100
   };
-  
+
   /** Execution time distribution */
   executionTimeDistribution: {
-    fast: number;    // < 1s
-    normal: number;  // 1-10s
-    slow: number;    // > 10s
+    fast: number; // < 1s
+    normal: number; // 1-10s
+    slow: number; // > 10s
   };
-  
+
   /** Security events summary */
   securityEventsSummary: {
     totalEvents: number;
@@ -2053,19 +2872,19 @@ export enum ShellLogExportFormat {
 export interface ShellLogExportConfig {
   /** Export format */
   format: ShellLogExportFormat;
-  
+
   /** Query for filtering logs to export */
   query?: ShellLogQuery;
-  
+
   /** Whether to include sensitive data */
   includeSensitiveData?: boolean;
-  
+
   /** Whether to include performance metrics */
   includePerformanceMetrics?: boolean;
-  
+
   /** Whether to include security events */
   includeSecurityEvents?: boolean;
-  
+
   /** Output file path */
   outputPath?: string;
 }
@@ -2155,13 +2974,17 @@ export class ShellPerformanceMonitor {
     }
 
     // Calculate averages and return final metrics
-    const avgCpuUsage = this.metrics.cpuUsage.length > 0 
-      ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) / this.metrics.cpuUsage.length
-      : undefined;
+    const avgCpuUsage =
+      this.metrics.cpuUsage.length > 0
+        ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) /
+          this.metrics.cpuUsage.length
+        : undefined;
 
-    const avgMemoryUsage = this.metrics.memoryUsage.length > 0
-      ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) / this.metrics.memoryUsage.length
-      : undefined;
+    const avgMemoryUsage =
+      this.metrics.memoryUsage.length > 0
+        ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) /
+          this.metrics.memoryUsage.length
+        : undefined;
 
     const result: {
       cpuUsage?: number;
@@ -2177,7 +3000,7 @@ export class ShellPerformanceMonitor {
         bytesWritten: number;
       };
     } = {};
-    
+
     if (avgCpuUsage !== undefined) {
       result.cpuUsage = avgCpuUsage;
     }
@@ -2186,7 +3009,7 @@ export class ShellPerformanceMonitor {
     }
     result.networkActivity = this.metrics.networkActivity;
     result.fileSystemOperations = this.metrics.fileSystemOperations;
-    
+
     return result;
   }
 
@@ -2207,13 +3030,17 @@ export class ShellPerformanceMonitor {
       bytesWritten: number;
     };
   } {
-    const avgCpuUsage = this.metrics.cpuUsage.length > 0 
-      ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) / this.metrics.cpuUsage.length
-      : undefined;
+    const avgCpuUsage =
+      this.metrics.cpuUsage.length > 0
+        ? this.metrics.cpuUsage.reduce((sum, val) => sum + val, 0) /
+          this.metrics.cpuUsage.length
+        : undefined;
 
-    const avgMemoryUsage = this.metrics.memoryUsage.length > 0
-      ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) / this.metrics.memoryUsage.length
-      : undefined;
+    const avgMemoryUsage =
+      this.metrics.memoryUsage.length > 0
+        ? this.metrics.memoryUsage.reduce((sum, val) => sum + val, 0) /
+          this.metrics.memoryUsage.length
+        : undefined;
 
     const result: {
       cpuUsage?: number;
@@ -2232,14 +3059,14 @@ export class ShellPerformanceMonitor {
       networkActivity: { ...this.metrics.networkActivity },
       fileSystemOperations: { ...this.metrics.fileSystemOperations },
     };
-    
+
     if (avgCpuUsage !== undefined) {
       result.cpuUsage = avgCpuUsage;
     }
     if (avgMemoryUsage !== undefined) {
       result.memoryUsage = avgMemoryUsage;
     }
-    
+
     return result;
   }
 
@@ -2277,7 +3104,6 @@ export class ShellPerformanceMonitor {
 
       // Note: Network and file system metrics would require more complex monitoring
       // For now, we'll track basic metrics that can be estimated
-      
     } catch (error) {
       // Silent fail - performance monitoring shouldn't break execution
     }
@@ -2286,7 +3112,11 @@ export class ShellPerformanceMonitor {
   /**
    * Estimate file system operations from command content
    */
-  static estimateFileOperations(command: string, stdout: string, _stderr: string): {
+  static estimateFileOperations(
+    command: string,
+    stdout: string,
+    _stderr: string
+  ): {
     reads: number;
     writes: number;
     bytesRead: number;
@@ -2329,7 +3159,11 @@ export class ShellPerformanceMonitor {
   /**
    * Estimate network activity from command content
    */
-  static estimateNetworkActivity(command: string, stdout: string, stderr: string): {
+  static estimateNetworkActivity(
+    command: string,
+    stdout: string,
+    stderr: string
+  ): {
     requests: number;
     bytesTransferred: number;
   } {
@@ -2339,7 +3173,11 @@ export class ShellPerformanceMonitor {
     const lowerCommand = command.toLowerCase();
 
     // Network commands
-    if (lowerCommand.match(/^(curl|wget|ping|ssh|scp|rsync|git\s+(pull|push|clone|fetch))\s/)) {
+    if (
+      lowerCommand.match(
+        /^(curl|wget|ping|ssh|scp|rsync|git\s+(pull|push|clone|fetch))\s/
+      )
+    ) {
       requests = 1;
       bytesTransferred = stdout.length + stderr.length; // Rough estimate
     }
@@ -2368,7 +3206,7 @@ export class ShellExecutionLogger {
   private maxEvents: number = 1000;
   private maxExecutionLogs: number = 500;
   private sessionId: string;
-  
+
   constructor(
     sessionId: string,
     maxEvents: number = 1000,
@@ -2418,15 +3256,22 @@ export class ShellExecutionLogger {
     this.writeSecurityLogEntry(securityEvent);
 
     // Log to console in development/debug mode
-    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_SHELL_SECURITY) {
-      console.log(`[SHELL SECURITY] ${event.eventType}: ${event.command} - ${event.reason || 'No reason provided'}`);
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.DEBUG_SHELL_SECURITY
+    ) {
+      console.log(
+        `[SHELL SECURITY] ${event.eventType}: ${event.command} - ${event.reason || 'No reason provided'}`
+      );
     }
   }
 
   /**
    * Log a shell execution with comprehensive tracking
    */
-  logExecution(log: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'>): void {
+  logExecution(
+    log: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'>
+  ): void {
     const executionLog: ShellExecutionLog = {
       ...log,
       id: this.generateExecutionId(),
@@ -2445,8 +3290,13 @@ export class ShellExecutionLogger {
     this.writeExecutionLogEntry(executionLog);
 
     // Log to console in development/debug mode
-    if (process.env.NODE_ENV === 'development' || process.env.DEBUG_SHELL_SECURITY) {
-      console.log(`[SHELL EXECUTION] ${log.command} - Exit Code: ${log.exitCode}, Time: ${log.executionTime}ms`);
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.DEBUG_SHELL_SECURITY
+    ) {
+      console.log(
+        `[SHELL EXECUTION] ${log.command} - Exit Code: ${log.exitCode}, Time: ${log.executionTime}ms`
+      );
     }
   }
 
@@ -2458,16 +3308,18 @@ export class ShellExecutionLogger {
 
     // Apply filters
     if (query.dateRange) {
-      results = results.filter(log => 
-        log.timestamp >= query.dateRange!.start && 
-        log.timestamp <= query.dateRange!.end
+      results = results.filter(
+        log =>
+          log.timestamp >= query.dateRange!.start &&
+          log.timestamp <= query.dateRange!.end
       );
     }
 
     if (query.commandPattern) {
-      const pattern = typeof query.commandPattern === 'string' 
-        ? new RegExp(query.commandPattern, 'i') 
-        : query.commandPattern;
+      const pattern =
+        typeof query.commandPattern === 'string'
+          ? new RegExp(query.commandPattern, 'i')
+          : query.commandPattern;
       results = results.filter(log => pattern.test(log.command));
     }
 
@@ -2480,16 +3332,18 @@ export class ShellExecutionLogger {
     }
 
     if (query.riskScoreRange) {
-      results = results.filter(log => 
-        log.riskAssessment.riskScore >= query.riskScoreRange!.min &&
-        log.riskAssessment.riskScore <= query.riskScoreRange!.max
+      results = results.filter(
+        log =>
+          log.riskAssessment.riskScore >= query.riskScoreRange!.min &&
+          log.riskAssessment.riskScore <= query.riskScoreRange!.max
       );
     }
 
     if (query.executionTimeRange) {
-      results = results.filter(log => 
-        log.executionTime >= query.executionTimeRange!.min &&
-        log.executionTime <= query.executionTimeRange!.max
+      results = results.filter(
+        log =>
+          log.executionTime >= query.executionTimeRange!.min &&
+          log.executionTime <= query.executionTimeRange!.max
       );
     }
 
@@ -2507,7 +3361,7 @@ export class ShellExecutionLogger {
     // Apply pagination
     const offset = query.offset || 0;
     const limit = query.limit || results.length;
-    
+
     return results.slice(offset, offset + limit);
   }
 
@@ -2516,34 +3370,43 @@ export class ShellExecutionLogger {
    */
   getExecutionStatistics(): ShellLogStatistics {
     const totalExecutions = this.executionLogs.length;
-    const successfulExecutions = this.executionLogs.filter(log => log.success).length;
+    const successfulExecutions = this.executionLogs.filter(
+      log => log.success
+    ).length;
     const failedExecutions = totalExecutions - successfulExecutions;
-    const successRate = totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0;
-    
-    const averageExecutionTime = totalExecutions > 0 
-      ? this.executionLogs.reduce((sum, log) => sum + log.executionTime, 0) / totalExecutions 
-      : 0;
+    const successRate =
+      totalExecutions > 0 ? (successfulExecutions / totalExecutions) * 100 : 0;
+
+    const averageExecutionTime =
+      totalExecutions > 0
+        ? this.executionLogs.reduce((sum, log) => sum + log.executionTime, 0) /
+          totalExecutions
+        : 0;
 
     // Calculate top commands
-    const commandCounts = this.executionLogs.reduce((acc, log) => {
-      const cmd = log.command.split(' ')[0]; // Get base command
-      if (cmd && cmd.length > 0) {
-        if (!acc[cmd]) {
-          acc[cmd] = { count: 0, successful: 0 };
+    const commandCounts = this.executionLogs.reduce(
+      (acc, log) => {
+        const cmd = log.command.split(' ')[0]; // Get base command
+        if (cmd && cmd.length > 0) {
+          if (!acc[cmd]) {
+            acc[cmd] = { count: 0, successful: 0 };
+          }
+          acc[cmd]!.count++;
+          if (log.success) {
+            acc[cmd]!.successful++;
+          }
         }
-        acc[cmd]!.count++;
-        if (log.success) {
-          acc[cmd]!.successful++;
-        }
-      }
-      return acc;
-    }, {} as Record<string, { count: number; successful: number }>);
+        return acc;
+      },
+      {} as Record<string, { count: number; successful: number }>
+    );
 
     const topCommands = Object.entries(commandCounts)
       .map(([command, stats]) => ({
         command,
         count: stats.count,
-        successRate: stats.count > 0 ? (stats.successful / stats.count) * 100 : 0,
+        successRate:
+          stats.count > 0 ? (stats.successful / stats.count) * 100 : 0,
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
@@ -2551,11 +3414,14 @@ export class ShellExecutionLogger {
     // Calculate top errors
     const errorCounts = this.executionLogs
       .filter(log => log.errorType)
-      .reduce((acc, log) => {
-        const errorType = log.errorType!;
-        acc[errorType] = (acc[errorType] || 0) + 1;
-        return acc;
-      }, {} as Record<ShellErrorType, number>);
+      .reduce(
+        (acc, log) => {
+          const errorType = log.errorType!;
+          acc[errorType] = (acc[errorType] || 0) + 1;
+          return acc;
+        },
+        {} as Record<ShellErrorType, number>
+      );
 
     const topErrors = Object.entries(errorCounts)
       .map(([errorType, count]) => ({
@@ -2591,10 +3457,13 @@ export class ShellExecutionLogger {
     );
 
     // Security events summary
-    const eventsByType = this.events.reduce((acc, event) => {
-      acc[event.eventType] = (acc[event.eventType] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+    const eventsByType = this.events.reduce(
+      (acc, event) => {
+        acc[event.eventType] = (acc[event.eventType] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>
+    );
 
     const securityEventsSummary = {
       totalEvents: this.events.length,
@@ -2622,8 +3491,10 @@ export class ShellExecutionLogger {
    * Export logs in various formats
    */
   exportLogs(config: ShellLogExportConfig): string {
-    const logs = config.query ? this.queryExecutionLogs(config.query) : this.executionLogs;
-    
+    const logs = config.query
+      ? this.queryExecutionLogs(config.query)
+      : this.executionLogs;
+
     switch (config.format) {
       case ShellLogExportFormat.JSON:
         return this.exportAsJSON(logs, config);
@@ -2644,7 +3515,7 @@ export class ShellExecutionLogger {
   clearLogs(): void {
     this.events = [];
     this.executionLogs = [];
-    
+
     // Clear log files
     try {
       fs.writeFileSync(this.logFile, '');
@@ -2659,7 +3530,7 @@ export class ShellExecutionLogger {
    */
   rotateLogs(): void {
     const maxFileSize = 10 * 1024 * 1024; // 10MB
-    
+
     try {
       // Rotate execution log
       if (fs.existsSync(this.logFile)) {
@@ -2690,7 +3561,7 @@ export class ShellExecutionLogger {
 
   private writeExecutionLogEntry(log: ShellExecutionLog): void {
     const logLine = `[${log.timestamp.toISOString()}] [${log.sessionId}] [${log.id}] ${log.command} - Exit: ${log.exitCode}, Time: ${log.executionTime}ms, Success: ${log.success}`;
-    
+
     try {
       fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
     } catch (error) {
@@ -2700,7 +3571,7 @@ export class ShellExecutionLogger {
 
   private writeSecurityLogEntry(event: ShellSecurityEvent): void {
     const logLine = `[${event.timestamp.toISOString()}] [${this.sessionId}] [${event.eventType}] ${event.command} - ${event.reason || 'No reason'}`;
-    
+
     try {
       fs.appendFileSync(this.securityLogFile, logLine + '\n', 'utf8');
     } catch (error) {
@@ -2708,7 +3579,10 @@ export class ShellExecutionLogger {
     }
   }
 
-  private exportAsJSON(logs: ShellExecutionLog[], config: ShellLogExportConfig): string {
+  private exportAsJSON(
+    logs: ShellExecutionLog[],
+    config: ShellLogExportConfig
+  ): string {
     const exportData = {
       generatedAt: new Date().toISOString(),
       sessionId: this.sessionId,
@@ -2720,10 +3594,20 @@ export class ShellExecutionLogger {
     return JSON.stringify(exportData, null, 2);
   }
 
-  private exportAsCSV(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+  private exportAsCSV(
+    logs: ShellExecutionLog[],
+    _config: ShellLogExportConfig
+  ): string {
     const headers = [
-      'id', 'timestamp', 'command', 'workingDirectory', 'exitCode',
-      'executionTime', 'success', 'errorType', 'riskScore'
+      'id',
+      'timestamp',
+      'command',
+      'workingDirectory',
+      'exitCode',
+      'executionTime',
+      'success',
+      'errorType',
+      'riskScore',
     ];
 
     const rows = logs.map(log => [
@@ -2735,13 +3619,16 @@ export class ShellExecutionLogger {
       log.executionTime,
       log.success,
       log.errorType || '',
-      log.riskAssessment.riskScore
+      log.riskAssessment.riskScore,
     ]);
 
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
   }
 
-  private exportAsText(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+  private exportAsText(
+    logs: ShellExecutionLog[],
+    _config: ShellLogExportConfig
+  ): string {
     const lines = logs.map(log => {
       const timestamp = log.timestamp.toISOString();
       const status = log.success ? 'SUCCESS' : 'FAILED';
@@ -2752,12 +3639,16 @@ export class ShellExecutionLogger {
     return lines.join('\n');
   }
 
-  private exportAsHTML(logs: ShellExecutionLog[], _config: ShellLogExportConfig): string {
+  private exportAsHTML(
+    logs: ShellExecutionLog[],
+    _config: ShellLogExportConfig
+  ): string {
     const stats = this.getExecutionStatistics();
-    const rows = logs.map(log => {
-      const status = log.success ? 'success' : 'error';
-      const timestamp = log.timestamp.toISOString();
-      return `
+    const rows = logs
+      .map(log => {
+        const status = log.success ? 'success' : 'error';
+        const timestamp = log.timestamp.toISOString();
+        return `
         <tr class="${status}">
           <td>${timestamp}</td>
           <td><code>${log.command}</code></td>
@@ -2769,7 +3660,8 @@ export class ShellExecutionLogger {
           <td>${log.riskAssessment.riskScore}</td>
         </tr>
       `;
-    }).join('');
+      })
+      .join('');
 
     return `
       <!DOCTYPE html>
@@ -2818,7 +3710,10 @@ export class ShellExecutionLogger {
     `;
   }
 
-  private sanitizeLogForExport(log: ShellExecutionLog, config: ShellLogExportConfig): Partial<ShellExecutionLog> {
+  private sanitizeLogForExport(
+    log: ShellExecutionLog,
+    config: ShellLogExportConfig
+  ): Partial<ShellExecutionLog> {
     const sanitized: Partial<ShellExecutionLog> = {
       id: log.id,
       timestamp: log.timestamp,
@@ -2882,7 +3777,12 @@ export class ShellExecutionLogger {
   }
 
   // Helper methods for common security events
-  logCommandBlocked(command: string, workingDirectory: string, reason: string, riskScore?: number): void {
+  logCommandBlocked(
+    command: string,
+    workingDirectory: string,
+    reason: string,
+    riskScore?: number
+  ): void {
     this.logSecurityEvent({
       eventType: 'COMMAND_BLOCKED',
       command,
@@ -2892,7 +3792,11 @@ export class ShellExecutionLogger {
     });
   }
 
-  logCommandAllowed(command: string, workingDirectory: string, reason?: string): void {
+  logCommandAllowed(
+    command: string,
+    workingDirectory: string,
+    reason?: string
+  ): void {
     this.logSecurityEvent({
       eventType: 'COMMAND_ALLOWED',
       command,
@@ -2901,7 +3805,11 @@ export class ShellExecutionLogger {
     });
   }
 
-  logPathTraversal(command: string, workingDirectory: string, reason: string): void {
+  logPathTraversal(
+    command: string,
+    workingDirectory: string,
+    reason: string
+  ): void {
     this.logSecurityEvent({
       eventType: 'PATH_TRAVERSAL',
       command,
@@ -2910,7 +3818,11 @@ export class ShellExecutionLogger {
     });
   }
 
-  logInputValidation(command: string, workingDirectory: string, reason: string): void {
+  logInputValidation(
+    command: string,
+    workingDirectory: string,
+    reason: string
+  ): void {
     this.logSecurityEvent({
       eventType: 'INPUT_VALIDATION',
       command,
@@ -2919,7 +3831,11 @@ export class ShellExecutionLogger {
     });
   }
 
-  logWorkspaceViolation(command: string, workingDirectory: string, reason: string): void {
+  logWorkspaceViolation(
+    command: string,
+    workingDirectory: string,
+    reason: string
+  ): void {
     this.logSecurityEvent({
       eventType: 'WORKSPACE_VIOLATION',
       command,
@@ -2928,7 +3844,12 @@ export class ShellExecutionLogger {
     });
   }
 
-  logDangerousCommand(command: string, workingDirectory: string, reason: string, riskScore?: number): void {
+  logDangerousCommand(
+    command: string,
+    workingDirectory: string,
+    reason: string,
+    riskScore?: number
+  ): void {
     this.logSecurityEvent({
       eventType: 'DANGEROUS_COMMAND',
       command,
@@ -2938,7 +3859,11 @@ export class ShellExecutionLogger {
     });
   }
 
-  logSanitization(command: string, workingDirectory: string, reason: string): void {
+  logSanitization(
+    command: string,
+    workingDirectory: string,
+    reason: string
+  ): void {
     this.logSecurityEvent({
       eventType: 'SANITIZATION',
       command,
@@ -2950,7 +3875,7 @@ export class ShellExecutionLogger {
 
 /**
  * ShellMCPClient - MCP client for shell command execution
- * 
+ *
  * Phase 3: Complete security integration with comprehensive protection
  * Provides secure shell command execution within workspace boundaries
  */
@@ -2998,17 +3923,20 @@ export class ShellMCPClient extends MCPClient {
     return [
       {
         name: 'ExecuteCommand',
-        description: 'Execute shell commands safely within workspace boundaries with comprehensive security protection including dangerous command detection, input sanitization, path traversal prevention, and audit logging',
+        description:
+          'Execute shell commands safely within workspace boundaries with comprehensive security protection including dangerous command detection, input sanitization, path traversal prevention, and audit logging',
         inputSchema: {
           type: 'object',
           properties: {
             command: {
               type: 'string',
-              description: 'The shell command to execute (subject to security validation)',
+              description:
+                'The shell command to execute (subject to security validation)',
             },
             cwd: {
               type: 'string',
-              description: 'Working directory for command execution (default: workspace root, must be within workspace)',
+              description:
+                'Working directory for command execution (default: workspace root, must be within workspace)',
             },
             timeout: {
               type: 'number',
@@ -3077,7 +4005,7 @@ export class ShellMCPClient extends MCPClient {
     const securityEvents: ShellSecurityEvent[] = [];
     const performanceMonitor = new ShellPerformanceMonitor();
     const startTime = performance.now();
-    
+
     let workingDirectory = this.security.getWorkspaceRoot();
     let sanitizedCommand = command;
     let finalCommand = command;
@@ -3091,7 +4019,11 @@ export class ShellMCPClient extends MCPClient {
           workingDirectory,
           timestamp: new Date(),
         };
-        throw new ShellInputValidationError(String(command), 'Command parameter is required and must be a string', context);
+        throw new ShellInputValidationError(
+          String(command),
+          'Command parameter is required and must be a string',
+          context
+        );
       }
 
       if (timeout < 1 || timeout > 300) {
@@ -3101,72 +4033,125 @@ export class ShellMCPClient extends MCPClient {
           timeout,
           timestamp: new Date(),
         };
-        throw new ShellInputValidationError(String(timeout), 'Timeout must be between 1 and 300 seconds', context);
+        throw new ShellInputValidationError(
+          String(timeout),
+          'Timeout must be between 1 and 300 seconds',
+          context
+        );
       }
 
       // 2. Input validation and sanitization
       const inputValidation = CommandSanitizer.validateInput(command);
       if (!inputValidation.valid) {
-        this.executionLogger.logInputValidation(command, workingDirectory, inputValidation.reason!);
+        this.executionLogger.logInputValidation(
+          command,
+          workingDirectory,
+          inputValidation.reason!
+        );
         const context: ShellErrorContext = {
           command,
           workingDirectory,
           timestamp: new Date(),
         };
-        throw new ShellInputValidationError(command, inputValidation.reason!, context);
+        throw new ShellInputValidationError(
+          command,
+          inputValidation.reason!,
+          context
+        );
       }
 
       sanitizedCommand = inputValidation.sanitized!;
       if (sanitizedCommand !== command) {
-        this.executionLogger.logSanitization(command, workingDirectory, 'Command input sanitized');
+        this.executionLogger.logSanitization(
+          command,
+          workingDirectory,
+          'Command input sanitized'
+        );
       }
 
       // 3. Dangerous command detection
-      const dangerCheck = DangerousCommandDetector.isDangerous(sanitizedCommand);
+      const dangerCheck =
+        DangerousCommandDetector.isDangerous(sanitizedCommand);
       if (dangerCheck.dangerous) {
-        const riskScore = DangerousCommandDetector.calculateRiskScore(sanitizedCommand);
-        this.executionLogger.logDangerousCommand(sanitizedCommand, workingDirectory, dangerCheck.reason!, riskScore);
+        const riskScore =
+          DangerousCommandDetector.calculateRiskScore(sanitizedCommand);
+        this.executionLogger.logDangerousCommand(
+          sanitizedCommand,
+          workingDirectory,
+          dangerCheck.reason!,
+          riskScore
+        );
         const context: ShellErrorContext = {
           command: sanitizedCommand,
           workingDirectory,
           riskScore,
           timestamp: new Date(),
         };
-        throw new ShellCommandBlockedError(sanitizedCommand, dangerCheck.reason!, context);
+        throw new ShellCommandBlockedError(
+          sanitizedCommand,
+          dangerCheck.reason!,
+          context
+        );
       }
 
       // 4. Command filtering (whitelist/blacklist)
       const filterCheck = this.commandFilter.isCommandAllowed(sanitizedCommand);
       if (!filterCheck.allowed) {
-        this.executionLogger.logCommandBlocked(sanitizedCommand, workingDirectory, filterCheck.reason!);
+        this.executionLogger.logCommandBlocked(
+          sanitizedCommand,
+          workingDirectory,
+          filterCheck.reason!
+        );
         const context: ShellErrorContext = {
           command: sanitizedCommand,
           workingDirectory,
           timestamp: new Date(),
         };
-        throw new ShellCommandBlockedError(sanitizedCommand, filterCheck.reason!, context);
+        throw new ShellCommandBlockedError(
+          sanitizedCommand,
+          filterCheck.reason!,
+          context
+        );
       }
 
       // 5. Working directory validation
       if (cwd) {
         try {
-          workingDirectory = await this.security.validateFileAccess(cwd, 'read');
+          workingDirectory = await this.security.validateFileAccess(
+            cwd,
+            'read'
+          );
         } catch (error) {
-          this.executionLogger.logWorkspaceViolation(sanitizedCommand, cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`);
+          this.executionLogger.logWorkspaceViolation(
+            sanitizedCommand,
+            cwd,
+            `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`
+          );
           const context: ShellErrorContext = {
             command: sanitizedCommand,
             workingDirectory: cwd,
             timestamp: new Date(),
             originalError: error,
           };
-          throw new ShellInputValidationError(cwd, `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`, context);
+          throw new ShellInputValidationError(
+            cwd,
+            `Invalid working directory: ${error instanceof Error ? error.message : String(error)}`,
+            context
+          );
         }
       }
 
       // 6. Workspace boundary enforcement
-      const boundaryCheck = this.boundaryEnforcer.enforceWorkspaceBoundary(sanitizedCommand, workingDirectory);
+      const boundaryCheck = this.boundaryEnforcer.enforceWorkspaceBoundary(
+        sanitizedCommand,
+        workingDirectory
+      );
       if (!boundaryCheck.allowed) {
-        this.executionLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, boundaryCheck.reason!);
+        this.executionLogger.logWorkspaceViolation(
+          sanitizedCommand,
+          workingDirectory,
+          boundaryCheck.reason!
+        );
         const context: ShellErrorContext = {
           command: sanitizedCommand,
           workingDirectory,
@@ -3176,9 +4161,14 @@ export class ShellMCPClient extends MCPClient {
       }
 
       // 7. File operation validation
-      const fileOpCheck = this.boundaryEnforcer.validateFileOperations(sanitizedCommand);
+      const fileOpCheck =
+        this.boundaryEnforcer.validateFileOperations(sanitizedCommand);
       if (!fileOpCheck.allowed) {
-        this.executionLogger.logWorkspaceViolation(sanitizedCommand, workingDirectory, fileOpCheck.reason!);
+        this.executionLogger.logWorkspaceViolation(
+          sanitizedCommand,
+          workingDirectory,
+          fileOpCheck.reason!
+        );
         const context: ShellErrorContext = {
           command: sanitizedCommand,
           workingDirectory,
@@ -3189,34 +4179,59 @@ export class ShellMCPClient extends MCPClient {
 
       // 8. Final command preparation
       finalCommand = boundaryCheck.sanitizedCommand || sanitizedCommand;
-      this.executionLogger.logCommandAllowed(finalCommand, workingDirectory, filterCheck.reason);
+      this.executionLogger.logCommandAllowed(
+        finalCommand,
+        workingDirectory,
+        filterCheck.reason
+      );
 
       // 9. Start performance monitoring
       performanceMonitor.startMonitoring();
 
       // 10. Execute command with timeout and error handling
-      result = await this.executeCommandWithTimeout(finalCommand, workingDirectory, timeout);
+      result = await this.executeCommandWithTimeout(
+        finalCommand,
+        workingDirectory,
+        timeout
+      );
 
       // 11. Stop performance monitoring
       const performanceMetrics = performanceMonitor.stopMonitoring();
 
       // 12. Analyze command risk and extract metadata
-      const riskAnalysis = ShellErrorCategorizer.analyzeCommandRisk(finalCommand, workingDirectory, result.executionTime);
-      const commandMetadata = ShellErrorCategorizer.extractCommandMetadata(finalCommand);
-      const fileOperations = ShellPerformanceMonitor.estimateFileOperations(finalCommand, result.stdout, result.stderr);
-      const networkActivity = ShellPerformanceMonitor.estimateNetworkActivity(finalCommand, result.stdout, result.stderr);
+      const riskAnalysis = ShellErrorCategorizer.analyzeCommandRisk(
+        finalCommand,
+        workingDirectory,
+        result.executionTime
+      );
+      const commandMetadata =
+        ShellErrorCategorizer.extractCommandMetadata(finalCommand);
+      const fileOperations = ShellPerformanceMonitor.estimateFileOperations(
+        finalCommand,
+        result.stdout,
+        result.stderr
+      );
+      const networkActivity = ShellPerformanceMonitor.estimateNetworkActivity(
+        finalCommand,
+        result.stdout,
+        result.stderr
+      );
 
       // 13. Log comprehensive execution details
-      const logEntry: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'> = {
+      const logEntry: Omit<
+        ShellExecutionLog,
+        'timestamp' | 'id' | 'sessionId'
+      > = {
         command: finalCommand,
         workingDirectory,
-        workingDirectoryRelative: this.security.getRelativePathFromWorkspace(workingDirectory),
+        workingDirectoryRelative:
+          this.security.getRelativePathFromWorkspace(workingDirectory),
         exitCode: result.exitCode,
         executionTime: result.executionTime,
         success: result.success,
         stdout: result.stdout,
         stderr: result.stderr,
-        outputSize: (result.stdout.length + result.stderr.length),
+        outputSize: result.stdout.length + result.stderr.length,
         securityEvents,
         performance: {
           networkActivity: {
@@ -3254,7 +4269,10 @@ export class ShellMCPClient extends MCPClient {
         logEntry.error = {
           message: result.stderr || 'Command execution failed',
           type: ShellErrorType.EXECUTION_ERROR,
-          suggestions: ['Check command output for error details', 'Verify command syntax'],
+          suggestions: [
+            'Check command output for error details',
+            'Verify command syntax',
+          ],
           retryable: true,
           code: result.exitCode,
         };
@@ -3274,28 +4292,31 @@ export class ShellMCPClient extends MCPClient {
         content: [
           {
             type: 'text',
-            text: JSON.stringify({
-              command: finalCommand,
-              originalCommand: command !== finalCommand ? command : undefined,
-              workingDirectory: this.security.getRelativePathFromWorkspace(workingDirectory),
-              timeout,
-              result,
-              security: {
-                validated: true,
-                sanitized: sanitizedCommand !== command,
-                riskScore: riskAnalysis.riskScore,
-                riskFactors: riskAnalysis.riskFactors,
-                phase: 'Phase 4 - Enhanced Logging and Error Handling',
+            text: JSON.stringify(
+              {
+                command: finalCommand,
+                originalCommand: command !== finalCommand ? command : undefined,
+                workingDirectory:
+                  this.security.getRelativePathFromWorkspace(workingDirectory),
+                timeout,
+                result,
+                security: {
+                  validated: true,
+                  sanitized: sanitizedCommand !== command,
+                  riskScore: riskAnalysis.riskScore,
+                  riskFactors: riskAnalysis.riskFactors,
+                  phase: 'Phase 4 - Enhanced Logging and Error Handling',
+                },
+                performance: performanceMetrics,
+                metadata: commandMetadata,
               },
-              performance: performanceMetrics,
-              metadata: commandMetadata,
-            }, null, 2),
+              null,
+              2
+            ),
           },
         ],
       };
-
     } catch (error) {
-      
       // Stop performance monitoring if it was started
       performanceMonitor.stopMonitoring();
 
@@ -3304,7 +4325,7 @@ export class ShellMCPClient extends MCPClient {
 
       // Use error categorization for better error handling
       let categorizedError: ShellExecutionError;
-      
+
       if (error instanceof ShellExecutionError) {
         categorizedError = error;
       } else {
@@ -3322,16 +4343,23 @@ export class ShellMCPClient extends MCPClient {
       }
 
       // Log failed execution with comprehensive details
-      const failedLogEntry: Omit<ShellExecutionLog, 'timestamp' | 'id' | 'sessionId'> = {
+      const failedLogEntry: Omit<
+        ShellExecutionLog,
+        'timestamp' | 'id' | 'sessionId'
+      > = {
         command: finalCommand,
         workingDirectory,
-        workingDirectoryRelative: this.security.getRelativePathFromWorkspace(workingDirectory),
+        workingDirectoryRelative:
+          this.security.getRelativePathFromWorkspace(workingDirectory),
         exitCode: categorizedError.code || -1,
         executionTime,
         success: false,
         stdout: result?.stdout || '',
         stderr: result?.stderr || categorizedError.message,
-        outputSize: (result?.stdout?.length || 0) + (result?.stderr?.length || 0) + categorizedError.message.length,
+        outputSize:
+          (result?.stdout?.length || 0) +
+          (result?.stderr?.length || 0) +
+          categorizedError.message.length,
         errorType: categorizedError.errorType,
         error: {
           message: categorizedError.message,
@@ -3537,7 +4565,10 @@ export class ShellMCPClient extends MCPClient {
     return this.sessionId;
   }
 
-  analyzeCommandRisk(command: string, workingDirectory?: string): {
+  analyzeCommandRisk(
+    command: string,
+    workingDirectory?: string
+  ): {
     riskScore: number;
     riskFactors: string[];
     category: string;

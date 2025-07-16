@@ -254,7 +254,9 @@ export const chatCommand = new Command('chat')
       // Initialize MCP tool service
       const toolService = new MCPToolService([mcpClient, shellClient]);
       await toolService.initialize();
-      showLoader('MCP tool service initialized with filesystem and shell tools');
+      showLoader(
+        'MCP tool service initialized with filesystem and shell tools'
+      );
 
       const toolExecutor = new ToolExecutor(
         toolService,
