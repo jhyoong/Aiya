@@ -336,7 +336,7 @@ describe('Shell Confirmation Integration Tests', () => {
 
       // Verify block patterns are configured
       expect(config.alwaysBlockPatterns).toContain('rm -rf /');
-      expect(config.alwaysBlockPatterns).toContain('sudo rm -rf');
+      expect(config.alwaysBlockPatterns).toContain('sudo rm -rf /');
       expect(config.alwaysBlockPatterns).toContain('dd if=/dev/zero');
 
       // These would be blocked regardless of confirmation

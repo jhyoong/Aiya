@@ -188,7 +188,10 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
     { label: 'Deny', value: 'deny' },
     { label: 'Trust pattern (remember for session)', value: 'trust' },
     { label: 'Block pattern (remember for session)', value: 'block' },
-    { label: state.showDetails ? 'Hide details' : 'Show details', value: 'toggle_details' },
+    {
+      label: state.showDetails ? 'Hide details' : 'Show details',
+      value: 'toggle_details',
+    },
   ];
 
   // Handle select change
@@ -407,4 +410,3 @@ export function useConfirmationPrompt() {
 }
 
 export default ConfirmationPrompt;
-

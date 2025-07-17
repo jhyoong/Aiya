@@ -13,20 +13,79 @@ global.console = {
   error: vi.fn(),
 };
 
-// Mock process.env for consistent test environment
-const originalEnv = process.env;
+// Environment variable isolation for consistent test environment
+const originalEnv = { ...process.env };
+
+// Store all AIYA-related environment variables for cleanup
+const AIYA_ENV_VARS = [
+  'AIYA_SHELL_CONFIRMATION_THRESHOLD',
+  'AIYA_SHELL_CONFIRMATION_TIMEOUT', 
+  'AIYA_SHELL_SESSION_MEMORY',
+  'AIYA_SHELL_REQUIRE_CONFIRMATION',
+  'AIYA_SHELL_ALLOW_COMPLEX_COMMANDS',
+  'AIYA_SHELL_MAX_EXECUTION_TIME',
+  'AIYA_SHELL_TRUSTED_COMMANDS',
+  'AIYA_SHELL_ALWAYS_BLOCK_PATTERNS',
+  'AIYA_API_KEY',
+  'AIYA_MODEL',
+  'AIYA_BASE_URL',
+  'AIYA_STREAMING',
+] as const;
+
+/**
+ * Clear all AIYA-related environment variables to ensure test isolation
+ */
+function clearAiyaEnvironmentVariables(): void {
+  AIYA_ENV_VARS.forEach(varName => {
+    delete process.env[varName];
+  });
+}
+
+/**
+ * Set test environment variables with validation
+ */
+function setTestEnvironmentVariables(vars: Record<string, string>): void {
+  Object.entries(vars).forEach(([key, value]) => {
+    process.env[key] = value;
+  });
+}
+
+/**
+ * Validate that environment is clean for testing
+ */
+function validateCleanEnvironment(): void {
+  const contamination = AIYA_ENV_VARS.filter(varName => 
+    process.env[varName] !== undefined
+  );
+  
+  if (contamination.length > 0) {
+    console.warn(
+      `[TEST SETUP] Environment contamination detected: ${contamination.join(', ')}`
+    );
+  }
+}
 
 beforeEach(() => {
-  // Reset environment variables before each test
-  process.env = { ...originalEnv };
+  // Clear all AIYA environment variables to prevent external contamination
+  clearAiyaEnvironmentVariables();
+  
+  // Validate environment is clean
+  validateCleanEnvironment();
 
   // Clear all mocks
   vi.clearAllMocks();
 });
 
 afterEach(() => {
-  // Restore original environment
-  process.env = originalEnv;
+  // Clear any environment variables set during the test
+  clearAiyaEnvironmentVariables();
+  
+  // Restore only the original AIYA environment variables that existed before tests
+  AIYA_ENV_VARS.forEach(varName => {
+    if (originalEnv[varName] !== undefined) {
+      process.env[varName] = originalEnv[varName];
+    }
+  });
 });
 
 // Global test utilities - extending Vitest's expect interface
@@ -87,6 +146,13 @@ expect.extend({
     };
   },
 });
+
+// Export environment utilities for use in tests
+export { 
+  clearAiyaEnvironmentVariables, 
+  setTestEnvironmentVariables, 
+  validateCleanEnvironment 
+};
 
 // Test environment configuration
 export const TEST_CONFIG = {

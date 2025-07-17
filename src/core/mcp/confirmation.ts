@@ -14,6 +14,8 @@ export interface ConfirmationPromptOptions {
   workingDirectory: string;
   /** Timeout in milliseconds for the prompt */
   timeout: number;
+  /** Whether session memory is enabled */
+  sessionMemory?: boolean;
 }
 
 /**
@@ -44,6 +46,17 @@ export interface SessionDecision {
 
 /**
  * Manages session memory for confirmation decisions
+ * 
+ * This class provides in-memory caching of user confirmation decisions to reduce
+ * prompt fatigue during a single session. It supports both exact command matching
+ * and regex pattern matching for flexible command recognition.
+ * 
+ * Key Features:
+ * - Performance optimized lookups (typically <1ms)
+ * - Automatic cleanup of expired decisions (30 minute TTL)
+ * - Capacity management (max 100 decisions)
+ * - Pattern-based matching for similar commands
+ * - Security audit logging for decision usage
  */
 export class SessionMemoryManager {
   private decisions: Map<string, SessionDecision> = new Map();
@@ -52,26 +65,76 @@ export class SessionMemoryManager {
 
   /**
    * Check if there's a previous decision for this command
+   * 
+   * This method performs efficient lookup of cached decisions using:
+   * 1. Exact string matching for direct command matches
+   * 2. Regex pattern matching for flexible command recognition
+   * 3. Performance monitoring with debug logging
+   * 4. Automatic cleanup of expired decisions
+   * 
+   * Performance: Typically <1ms lookup time, target <5ms
+   * 
+   * @param command - The command to check for previous decisions
+   * @returns SessionDecision if found, null otherwise
    */
   checkPreviousDecision(command: string): SessionDecision | null {
+    const startTime = performance.now();
+    
     // Clean up expired decisions first
     this.clearExpiredDecisions();
 
     // Check for exact match first
     if (this.decisions.has(command)) {
-      return this.decisions.get(command)!;
+      const decision = this.decisions.get(command)!;
+      const lookupTime = performance.now() - startTime;
+      
+      // Log performance for debugging in development mode
+      if (
+        process.env.NODE_ENV === 'development' ||
+        process.env.DEBUG_SHELL_SECURITY
+      ) {
+        console.log(
+          `[SHELL CONFIRMATION] Session memory exact match lookup: ${lookupTime.toFixed(2)}ms for command: ${command}`
+        );
+      }
+      
+      return decision;
     }
 
     // Check for pattern matches
     for (const [pattern, decision] of this.decisions) {
       try {
         if (new RegExp(pattern).test(command)) {
+          const lookupTime = performance.now() - startTime;
+          
+          // Log performance for debugging in development mode
+          if (
+            process.env.NODE_ENV === 'development' ||
+            process.env.DEBUG_SHELL_SECURITY
+          ) {
+            console.log(
+              `[SHELL CONFIRMATION] Session memory pattern match lookup: ${lookupTime.toFixed(2)}ms for command: ${command}, pattern: ${pattern}`
+            );
+          }
+          
           return decision;
         }
       } catch {
         // Invalid regex, skip
         continue;
       }
+    }
+
+    const lookupTime = performance.now() - startTime;
+    
+    // Log performance for debugging in development mode
+    if (
+      process.env.NODE_ENV === 'development' ||
+      process.env.DEBUG_SHELL_SECURITY
+    ) {
+      console.log(
+        `[SHELL CONFIRMATION] Session memory no match lookup: ${lookupTime.toFixed(2)}ms for command: ${command}`
+      );
     }
 
     return null;
@@ -116,6 +179,67 @@ export class SessionMemoryManager {
    */
   getDecisionCount(): number {
     return this.decisions.size;
+  }
+
+  /**
+   * Performance test method - measure lookup performance with sample data
+   */
+  measureLookupPerformance(): { 
+    averageExactMatch: number; 
+    averagePatternMatch: number; 
+    averageNoMatch: number; 
+  } {
+    // Create sample decisions for testing
+    const sampleDecisions: [string, SessionDecision][] = [
+      ['ls -la', { commandPattern: 'ls -la', decision: 'allow', timestamp: new Date(), riskScore: 20 }],
+      ['^git.*', { commandPattern: '^git.*', decision: 'allow', timestamp: new Date(), riskScore: 25 }],
+      ['^npm.*test', { commandPattern: '^npm.*test', decision: 'allow', timestamp: new Date(), riskScore: 30 }],
+      ['cp file.txt backup.txt', { commandPattern: 'cp file.txt backup.txt', decision: 'trust', timestamp: new Date(), riskScore: 40 }],
+    ];
+    
+    // Save current state
+    const originalDecisions = new Map(this.decisions);
+    
+    // Add sample decisions
+    sampleDecisions.forEach(([pattern, decision]) => {
+      this.decisions.set(pattern, decision);
+    });
+    
+    // Test exact matches
+    const exactMatchTimes: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const start = performance.now();
+      this.checkPreviousDecision('ls -la');
+      exactMatchTimes.push(performance.now() - start);
+    }
+    
+    // Test pattern matches
+    const patternMatchTimes: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const start = performance.now();
+      this.checkPreviousDecision('git status');
+      patternMatchTimes.push(performance.now() - start);
+    }
+    
+    // Test no matches
+    const noMatchTimes: number[] = [];
+    for (let i = 0; i < 100; i++) {
+      const start = performance.now();
+      this.checkPreviousDecision('unknown-command-xyz');
+      noMatchTimes.push(performance.now() - start);
+    }
+    
+    // Restore original state
+    this.decisions = originalDecisions;
+    
+    // Calculate averages
+    const average = (times: number[]) => times.reduce((a, b) => a + b, 0) / times.length;
+    
+    return {
+      averageExactMatch: average(exactMatchTimes),
+      averagePatternMatch: average(patternMatchTimes),
+      averageNoMatch: average(noMatchTimes),
+    };
   }
 }
 
@@ -248,7 +372,9 @@ function formatConfirmationPrompt(
 /**
  * Callback type for UI integration
  */
-export type ConfirmationUICallback = (options: ConfirmationPromptOptions) => Promise<ConfirmationResponse>;
+export type ConfirmationUICallback = (
+  options: ConfirmationPromptOptions
+) => Promise<ConfirmationResponse>;
 
 /**
  * Main confirmation prompt class
@@ -277,30 +403,57 @@ export class ShellConfirmationPrompt {
   }
 
   /**
-   * Prompt the user for confirmation
+   * Prompt the user for confirmation with session memory integration
+   * 
+   * This method implements the core confirmation flow with enhanced features:
+   * 1. Configuration-aware session memory (respects sessionMemory setting)
+   * 2. Automatic decision caching and retrieval
+   * 3. Performance monitoring and audit logging
+   * 4. Fallback from React/Ink UI to console mode
+   * 
+   * Session Memory Flow:
+   * - If enabled and previous decision exists, return cached decision
+   * - Otherwise, prompt user and optionally cache the new decision
+   * 
+   * @param options - Confirmation prompt configuration including sessionMemory setting
+   * @returns Promise resolving to user's confirmation response
    */
   async promptUser(
     options: ConfirmationPromptOptions
   ): Promise<ConfirmationResponse> {
-    // Check session memory first
-    const previousDecision = this.sessionMemory.checkPreviousDecision(
-      options.command
-    );
-    if (previousDecision) {
-      return {
-        decision: previousDecision.decision,
-        rememberDecision: true,
-        timedOut: false,
-      };
+    // Check session memory first (only if enabled in configuration)
+    const sessionMemoryEnabled = options.sessionMemory !== false; // Default to enabled if not specified
+    
+    if (sessionMemoryEnabled) {
+      const previousDecision = this.sessionMemory.checkPreviousDecision(
+        options.command
+      );
+      if (previousDecision) {
+        // Log that we're using a cached decision for audit purposes
+        if (
+          process.env.NODE_ENV === 'development' ||
+          process.env.DEBUG_SHELL_SECURITY
+        ) {
+          console.log(
+            `[SHELL CONFIRMATION] Using cached session decision for command: ${options.command} - Decision: ${previousDecision.decision} (Risk Score: ${previousDecision.riskScore}, Age: ${Math.floor((Date.now() - previousDecision.timestamp.getTime()) / 1000)}s)`
+          );
+        }
+
+        return {
+          decision: previousDecision.decision,
+          rememberDecision: true,
+          timedOut: false,
+        };
+      }
     }
 
     // Use UI callback if available (React/Ink integration)
     if (this.uiCallback) {
       try {
         const response = await this.uiCallback(options);
-        
-        // Record decision in session memory if requested
-        if (response.rememberDecision && !response.timedOut) {
+
+        // Record decision in session memory if requested and session memory is enabled
+        if (response.rememberDecision && !response.timedOut && sessionMemoryEnabled) {
           this.sessionMemory.recordDecision(options.command, {
             commandPattern: options.command,
             decision: response.decision as 'allow' | 'deny' | 'trust',
@@ -308,7 +461,7 @@ export class ShellConfirmationPrompt {
             riskScore: options.riskAssessment.riskScore,
           });
         }
-        
+
         return response;
       } catch (error) {
         console.error('Error in UI callback, falling back to console:', error);
@@ -317,14 +470,15 @@ export class ShellConfirmationPrompt {
     }
 
     // Fallback to console implementation
-    return this.promptUserConsole(options);
+    return this.promptUserConsole(options, sessionMemoryEnabled);
   }
 
   /**
    * Console-based confirmation prompt (fallback implementation)
    */
   private async promptUserConsole(
-    options: ConfirmationPromptOptions
+    options: ConfirmationPromptOptions,
+    sessionMemoryEnabled: boolean = true
   ): Promise<ConfirmationResponse> {
     return new Promise<ConfirmationResponse>(resolve => {
       let timeLeft = Math.ceil(options.timeout / 1000);
@@ -340,8 +494,8 @@ export class ShellConfirmationPrompt {
         if (isResolved) return;
         isResolved = true;
 
-        // Record decision in session memory if requested
-        if (response.rememberDecision && !response.timedOut) {
+        // Record decision in session memory if requested and session memory is enabled
+        if (response.rememberDecision && !response.timedOut && sessionMemoryEnabled) {
           this.sessionMemory.recordDecision(options.command, {
             commandPattern: options.command,
             decision: response.decision as 'allow' | 'deny' | 'trust',

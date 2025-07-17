@@ -243,15 +243,22 @@ export class ConfigurationGenerator {
       }
 
       if (trimmed.startsWith('confirmationThreshold:')) {
-        return line + '  # Risk score threshold for confirmation prompts (0-100)';
+        return (
+          line + '  # Risk score threshold for confirmation prompts (0-100)'
+        );
       }
 
       if (trimmed.startsWith('trustedCommands:')) {
-        return line + '  # Regex patterns for commands that bypass confirmation';
+        return (
+          line + '  # Regex patterns for commands that bypass confirmation'
+        );
       }
 
       if (trimmed.startsWith('alwaysBlockPatterns:')) {
-        return line + '  # Commands that are always blocked regardless of confirmation';
+        return (
+          line +
+          '  # Commands that are always blocked regardless of confirmation'
+        );
       }
 
       if (trimmed.startsWith('confirmationTimeout:')) {
@@ -267,7 +274,9 @@ export class ConfigurationGenerator {
       }
 
       if (trimmed.startsWith('allowComplexCommands:')) {
-        return line + '  # Allow complex command patterns (pipes, redirects, etc.)';
+        return (
+          line + '  # Allow complex command patterns (pipes, redirects, etc.)'
+        );
       }
 
       if (trimmed.startsWith('maxExecutionTime:')) {
@@ -283,7 +292,9 @@ export class ConfigurationGenerator {
       }
 
       if (trimmed.startsWith('autoApprovePatterns:')) {
-        return line + '  # Patterns for commands that are automatically approved';
+        return (
+          line + '  # Patterns for commands that are automatically approved'
+        );
       }
 
       // Provider-specific comments

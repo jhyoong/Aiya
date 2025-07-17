@@ -582,7 +582,10 @@ export class ConfigManager {
     }
 
     if (process.env.AIYA_SHELL_CONFIRMATION_THRESHOLD) {
-      const threshold = parseInt(process.env.AIYA_SHELL_CONFIRMATION_THRESHOLD, 10);
+      const threshold = parseInt(
+        process.env.AIYA_SHELL_CONFIRMATION_THRESHOLD,
+        10
+      );
       if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
         this.config.shell.confirmationThreshold = threshold;
       }
@@ -596,15 +599,18 @@ export class ConfigManager {
     }
 
     if (process.env.AIYA_SHELL_SESSION_MEMORY) {
-      this.config.shell.sessionMemory = process.env.AIYA_SHELL_SESSION_MEMORY === 'true';
+      this.config.shell.sessionMemory =
+        process.env.AIYA_SHELL_SESSION_MEMORY === 'true';
     }
 
     if (process.env.AIYA_SHELL_REQUIRE_CONFIRMATION) {
-      this.config.shell.requireConfirmation = process.env.AIYA_SHELL_REQUIRE_CONFIRMATION === 'true';
+      this.config.shell.requireConfirmation =
+        process.env.AIYA_SHELL_REQUIRE_CONFIRMATION === 'true';
     }
 
     if (process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS) {
-      this.config.shell.allowComplexCommands = process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS === 'true';
+      this.config.shell.allowComplexCommands =
+        process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS === 'true';
     }
 
     if (process.env.AIYA_SHELL_MAX_EXECUTION_TIME) {

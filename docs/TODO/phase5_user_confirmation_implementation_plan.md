@@ -315,7 +315,7 @@ class SessionMemoryManager {
 }
 ```
 
-#### Task 7: Configuration Persistence ⏳
+#### Task 7: Configuration Persistence ⏳ **DROPPED, NOT DOING**
 **Location**: Integration with existing `ConfigManager`
 **Requirements**:
 - Save trusted command patterns to user config

@@ -12,7 +12,10 @@ import { performance } from 'perf_hooks';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
-import { ShellConfirmationPrompt, ConfirmationResponse } from './confirmation.js';
+import {
+  ShellConfirmationPrompt,
+  ConfirmationResponse,
+} from './confirmation.js';
 
 /**
  * Parameters for shell command execution
@@ -2369,6 +2372,7 @@ export class CommandFilter {
       // Only truly catastrophic commands that should never be allowed
       'rm -rf /',
       'rm -rf /*',
+      'sudo rm -rf',
       'sudo rm -rf /',
       'sudo rm -rf /*',
       'format.*',
@@ -4015,9 +4019,11 @@ export class ShellMCPClient extends MCPClient {
   /**
    * ExecuteCommand with confirmation checkpoint (Phase 5: User Confirmation System)
    */
-  private async executeCommandWithConfirmation(params: any): Promise<ToolResult> {
+  private async executeCommandWithConfirmation(
+    params: any
+  ): Promise<ToolResult> {
     const { command, cwd } = params as ShellExecuteParams;
-    
+
     // Skip confirmation system if disabled in config
     const config = this.commandFilter.getConfig();
     if (!config.requireConfirmation) {
@@ -4036,8 +4042,11 @@ export class ShellMCPClient extends MCPClient {
 
     try {
       // 1. Risk assessment
-      const riskAssessment = this.riskAssessor.assessRisk(command, workingDirectory);
-      
+      const riskAssessment = this.riskAssessor.assessRisk(
+        command,
+        workingDirectory
+      );
+
       // 2. Check bypass logic first (trusted commands and risk threshold)
       if (this.shouldBypassConfirmation(command, riskAssessment, config)) {
         return await this.executeCommand(params);
@@ -4045,6 +4054,21 @@ export class ShellMCPClient extends MCPClient {
 
       // 3. Check always-block patterns for truly catastrophic commands only
       if (this.shouldAlwaysBlock(command, config)) {
+        // Get the specific pattern that matched for detailed logging
+        const matchedPattern = this.getMatchedAlwaysBlockPattern(
+          command,
+          config
+        );
+
+        // Log the catastrophic command attempt for security audit
+        this.executionLogger.logSecurityEvent({
+          eventType: 'COMMAND_BLOCKED',
+          command,
+          workingDirectory,
+          reason: `Catastrophic command blocked by always-block pattern: ${matchedPattern}`,
+          riskScore: 100, // Always maximum risk for catastrophic commands
+        });
+
         return {
           content: [
             {
@@ -4062,11 +4086,15 @@ export class ShellMCPClient extends MCPClient {
         riskAssessment,
         workingDirectory,
         timeout: config.confirmationTimeout,
+        sessionMemory: config.sessionMemory,
       });
 
       // 5. Handle user decision
-      return await this.handleConfirmationResponse(confirmationResponse, params, config);
-
+      return await this.handleConfirmationResponse(
+        confirmationResponse,
+        params,
+        config
+      );
     } catch (error) {
       // Log confirmation system errors but don't block execution completely
       this.executionLogger.logSecurityEvent({
@@ -4075,7 +4103,7 @@ export class ShellMCPClient extends MCPClient {
         workingDirectory,
         reason: `Confirmation system error: ${error instanceof Error ? error.message : String(error)}`,
       });
-      
+
       // Fall back to original executeCommand if confirmation system fails
       return await this.executeCommand(params);
     }
@@ -4093,6 +4121,29 @@ export class ShellMCPClient extends MCPClient {
         return command.includes(pattern);
       }
     });
+  }
+
+  /**
+   * Get the specific always-block pattern that matched the command
+   * Used for detailed security logging
+   */
+  private getMatchedAlwaysBlockPattern(
+    command: string,
+    config: ShellToolConfig
+  ): string {
+    for (const pattern of config.alwaysBlockPatterns) {
+      try {
+        if (new RegExp(pattern).test(command)) {
+          return pattern;
+        }
+      } catch {
+        // Invalid regex, treat as literal string match
+        if (command.includes(pattern)) {
+          return pattern;
+        }
+      }
+    }
+    return 'unknown-pattern'; // Fallback if no pattern matched (shouldn't happen)
   }
 
   /**
@@ -4140,7 +4191,7 @@ export class ShellMCPClient extends MCPClient {
           content: [
             {
               type: 'text',
-              text: response.timedOut 
+              text: response.timedOut
                 ? `Command timed out waiting for confirmation: ${command}`
                 : `Command execution denied by user: ${command}`,
             },
@@ -4183,18 +4234,24 @@ export class ShellMCPClient extends MCPClient {
   /**
    * Add command pattern to trusted commands
    */
-  private async addToTrustedCommands(command: string, config: ShellToolConfig): Promise<void> {
+  private async addToTrustedCommands(
+    command: string,
+    config: ShellToolConfig
+  ): Promise<void> {
     try {
       // Create a simple pattern that matches the command
       const pattern = `^${command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`;
-      
+
       // Add to current config
       if (!config.trustedCommands.includes(pattern)) {
-        config.trustedCommands.push(pattern);
-        
+        // Create a new array with the new pattern to avoid reference issues
+        const newTrustedCommands = [...config.trustedCommands, pattern];
+
         // Update the command filter configuration
-        this.commandFilter.updateConfig({ trustedCommands: config.trustedCommands });
-        
+        this.commandFilter.updateConfig({
+          trustedCommands: newTrustedCommands,
+        });
+
         // Log the addition
         this.executionLogger.logCommandAllowed(
           command,
@@ -4216,18 +4273,23 @@ export class ShellMCPClient extends MCPClient {
   /**
    * Add command pattern to blocked commands
    */
-  private async addToBlockedCommands(command: string, config: ShellToolConfig): Promise<void> {
+  private async addToBlockedCommands(
+    command: string,
+    config: ShellToolConfig
+  ): Promise<void> {
     try {
       // Create a simple pattern that matches the command
       const pattern = `^${command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`;
-      
+
       // Add to current config
       if (!config.alwaysBlockPatterns.includes(pattern)) {
         config.alwaysBlockPatterns.push(pattern);
-        
+
         // Update the command filter configuration
-        this.commandFilter.updateConfig({ alwaysBlockPatterns: config.alwaysBlockPatterns });
-        
+        this.commandFilter.updateConfig({
+          alwaysBlockPatterns: config.alwaysBlockPatterns,
+        });
+
         // Log the addition
         this.executionLogger.logCommandBlocked(
           command,
@@ -4249,7 +4311,10 @@ export class ShellMCPClient extends MCPClient {
   /**
    * ExecuteCommand tool implementation (Phase 4: enhanced logging and error handling)
    */
-  private async executeCommand(params: any, bypassCommandFilter: boolean = false): Promise<ToolResult> {
+  private async executeCommand(
+    params: any,
+    bypassCommandFilter: boolean = false
+  ): Promise<ToolResult> {
     const { command, cwd, timeout = 30 } = params as ShellExecuteParams;
     const securityEvents: ShellSecurityEvent[] = [];
     const performanceMonitor = new ShellPerformanceMonitor();
@@ -4344,7 +4409,11 @@ export class ShellMCPClient extends MCPClient {
       }
 
       // 4. Command filtering (whitelist/blacklist) - skip if user explicitly allowed via confirmation
-      let filterCheck: { allowed: boolean; reason?: string; requiresConfirmation?: boolean } = { allowed: true, reason: 'Bypassed via user confirmation' };
+      let filterCheck: {
+        allowed: boolean;
+        reason?: string;
+        requiresConfirmation?: boolean;
+      } = { allowed: true, reason: 'Bypassed via user confirmation' };
       if (!bypassCommandFilter) {
         filterCheck = this.commandFilter.isCommandAllowed(sanitizedCommand);
         if (!filterCheck.allowed) {

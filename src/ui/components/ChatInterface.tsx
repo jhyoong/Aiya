@@ -11,7 +11,10 @@ import {
   SubscriptionManager,
   MEMORY_LIMITS,
 } from '../utils/memoryManagement.js';
-import { ConfirmationPromptOptions, ConfirmationResponse } from '../../core/mcp/confirmation.js';
+import {
+  ConfirmationPromptOptions,
+  ConfirmationResponse,
+} from '../../core/mcp/confirmation.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -62,7 +65,9 @@ interface ChatInterfaceProps {
     | ((provider: { name: string; type: string; model: string }) => void)
     | undefined;
   confirmationPrompt?: ConfirmationPromptOptions | null;
-  onConfirmationResponse?: ((response: ConfirmationResponse) => void) | undefined;
+  onConfirmationResponse?:
+    | ((response: ConfirmationResponse) => void)
+    | undefined;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
