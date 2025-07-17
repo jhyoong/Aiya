@@ -652,4 +652,234 @@ describe('Shell MCP Security Tests', () => {
       expect(error.code).toBe(403);
     });
   });
+
+  describe('callTool Integration with Confirmation System', () => {
+    let client: ShellMCPClient;
+    let mockPromptUser: any;
+
+    beforeEach(() => {
+      client = new ShellMCPClient(security, {
+        requireConfirmation: true,
+        confirmationThreshold: 50,
+        confirmationTimeout: 1000,
+        trustedCommands: ['^ls($|\\s)', '^pwd($|\\s)'],
+        alwaysBlockPatterns: ['rm -rf /'],
+        sessionMemory: true,
+      });
+
+      // Mock the confirmation prompt
+      mockPromptUser = vi.fn();
+      (client as any).confirmationPrompt = {
+        promptUser: mockPromptUser,
+      };
+    });
+
+    test('should bypass confirmation for low-risk commands', async () => {
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'echo "hello"',
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(mockPromptUser).not.toHaveBeenCalled();
+    });
+
+    test('should bypass confirmation for trusted commands', async () => {
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'ls -la',
+      });
+
+      expect(result.isError).not.toBe(true);
+      expect(mockPromptUser).not.toHaveBeenCalled();
+    });
+
+    test('should block always-block commands immediately', async () => {
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'rm -rf /',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('blocked by security policy');
+      expect(mockPromptUser).not.toHaveBeenCalled();
+    });
+
+    test('should prompt for confirmation on risky commands', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'allow',
+        rememberDecision: false,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'rm test.txt',
+      });
+
+      expect(mockPromptUser).toHaveBeenCalledWith({
+        command: 'rm test.txt',
+        riskAssessment: expect.objectContaining({
+          riskScore: expect.any(Number),
+          category: expect.any(String),
+        }),
+        workingDirectory: expect.any(String),
+        timeout: 1000,
+      });
+    });
+
+    test('should handle allow decision correctly', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'allow',
+        rememberDecision: false,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'mkdir test',
+      });
+
+      expect(result.isError).not.toBe(true);
+    });
+
+    test('should handle deny decision correctly', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'deny',
+        rememberDecision: false,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'rm test.txt',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('denied by user');
+    });
+
+    test('should handle timeout correctly', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'deny',
+        rememberDecision: false,
+        timedOut: true,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'rm test.txt',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('timed out waiting for confirmation');
+    });
+
+    test('should handle trust decision correctly', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'trust',
+        rememberDecision: true,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'cp large-file.txt backup.txt',
+      });
+
+      expect(result.isError).not.toBe(true);
+      
+      // Verify the command was added to trusted commands
+      const config = client.getConfiguration();
+      const expectedPattern = '^cp large-file\\.txt backup\\.txt($|\\s)';
+      // Debug output to see what patterns are actually in the config
+      expect(config.trustedCommands).toContain(expectedPattern);
+    });
+
+    test('should handle block decision correctly', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'block',
+        rememberDecision: true,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'chmod 777 dangerous-file.txt',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('added to blocked patterns');
+      
+      // Verify the command was added to blocked patterns
+      const config = client.getConfiguration();
+      const expectedPattern = '^chmod 777 dangerous-file\\.txt($|\\s)';
+      expect(config.alwaysBlockPatterns.some(pattern => pattern === expectedPattern)).toBe(true);
+    });
+
+    test('should skip confirmation when disabled in config', async () => {
+      const clientWithoutConfirmation = new ShellMCPClient(security, {
+        requireConfirmation: false,
+      });
+
+      const result = await clientWithoutConfirmation.callTool('ExecuteCommand', {
+        command: 'mkdir test-dir',
+      });
+
+      expect(result.isError).not.toBe(true);
+    });
+
+    test('should fallback to normal execution on confirmation system error', async () => {
+      mockPromptUser.mockRejectedValue(new Error('Confirmation system error'));
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'echo "fallback test"',
+      });
+
+      // Should still execute successfully due to fallback
+      expect(result.isError).not.toBe(true);
+    });
+
+    test('should handle regex patterns in trusted commands correctly', async () => {
+      const clientWithRegexPatterns = new ShellMCPClient(security, {
+        requireConfirmation: true,
+        confirmationThreshold: 50,
+        trustedCommands: ['^test-.*', 'valid-command'],
+      });
+
+      // Mock the prompt to avoid actual prompting
+      (clientWithRegexPatterns as any).confirmationPrompt = {
+        promptUser: mockPromptUser,
+      };
+
+      const result = await clientWithRegexPatterns.callTool('ExecuteCommand', {
+        command: 'test-command',
+      });
+
+      // Should bypass confirmation due to regex pattern match
+      expect(result.isError).not.toBe(true);
+      expect(mockPromptUser).not.toHaveBeenCalled();
+    });
+
+    test('should handle regex patterns in always-block patterns correctly', async () => {
+      const clientWithRegexPatterns = new ShellMCPClient(security, {
+        requireConfirmation: true,
+        confirmationThreshold: 50,
+        alwaysBlockPatterns: ['^dangerous-.*', 'blocked-command'],
+      });
+
+      const result = await clientWithRegexPatterns.callTool('ExecuteCommand', {
+        command: 'dangerous-operation',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('blocked by security policy');
+    });
+
+    test('should handle unknown confirmation response gracefully', async () => {
+      mockPromptUser.mockResolvedValue({
+        decision: 'unknown' as any,
+        rememberDecision: false,
+        timedOut: false,
+      });
+
+      const result = await client.callTool('ExecuteCommand', {
+        command: 'rm test.txt',
+      });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Unknown confirmation response');
+    });
+  });
 });

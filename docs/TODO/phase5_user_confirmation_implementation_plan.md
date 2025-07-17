@@ -267,22 +267,32 @@ Choice (timeout in 30s): _
 ### ⏳ Phase 5C: Integration and Persistence
 **Target**: Complete integration with existing systems
 
-#### Task 5: callTool Method Integration ⏳
+#### Task 5: callTool Method Integration ✅ **COMPLETED (2025-07-17)**
 **Location**: `/src/core/mcp/shell.ts` - `ShellMCPClient.callTool()`
 **Requirements**:
-- Integrate risk assessment before command execution
-- Add confirmation checkpoint for risky commands
-- Implement bypass logic for trusted commands
-- Update error handling for user denials
-- Maintain existing functionality for approved commands
+- ✅ Integrate risk assessment before command execution
+- ✅ Add confirmation checkpoint for risky commands
+- ✅ Implement bypass logic for trusted commands
+- ✅ Update error handling for user denials
+- ✅ Maintain existing functionality for approved commands
+- ✅ Replace character-based UI with ink-ui Select component
+- ✅ Fix command filter bypass for user-confirmed commands
 
-**Integration Flow**:
+**Implementation Summary**:
+- **UI Enhancement**: Replaced keyboard character input (A/D/T/B/S) with ink-ui Select component using arrow keys and Enter
+- **Command Blocking Fix**: Fixed issue where commands were still blocked after user confirmation due to separate command filter logic
+- **Execution Flow**: Modified to check bypass logic before always-block patterns, allowing confirmed commands to execute
+- **Filter Bypass**: Added `bypassCommandFilter` parameter to `executeCommand()` method to skip command filtering when user explicitly allows
+- **React/Ink Integration**: Successfully integrated confirmation prompts with existing React/Ink UI system
+
+**Integration Flow** (Updated):
 1. **Pre-execution**: Risk assessment using `CommandRiskAssessor`
-2. **Bypass Check**: Check trusted patterns and session memory
-3. **Confirmation**: Prompt user if risk threshold exceeded
-4. **Decision Handling**: Allow/deny based on user response
-5. **Session Update**: Cache decision if session memory enabled
-6. **Execution**: Proceed with existing execution flow if approved
+2. **Bypass Check**: Check trusted patterns and session memory first
+3. **Always-Block Check**: Check catastrophic commands (only `rm -rf /`, `format.*`, etc.)
+4. **Confirmation**: Show ink-ui Select prompt for risky commands
+5. **Decision Handling**: Allow/deny with command filter bypass for user approvals
+6. **Session Update**: Cache decision if session memory enabled
+7. **Execution**: Proceed with existing execution flow if approved
 
 #### Task 6: Session Memory Manager ⏳
 **Location**: New class in `/src/core/mcp/confirmation.ts`
@@ -291,6 +301,7 @@ Choice (timeout in 30s): _
 - Pattern matching for similar commands
 - Decision expiration and cleanup
 - Integration with confirmation prompt
+- **⚠️ LOGGING ENHANCEMENT NEEDED**: Add comprehensive logging for catastrophic command attempts (e.g., `rm -rf /`) that are blocked without confirmation. Currently, these attempts are silently blocked but should be logged for security audit purposes.
 
 **Implementation**:
 ```typescript

@@ -21,6 +21,8 @@ import {
   CommandContext,
   ChatSession,
 } from '../CommandExecutor.js';
+import { confirmationBridge } from '../../ui/utils/confirmationBridge.js';
+import { ConfirmationPromptOptions } from '../../core/mcp/confirmation.js';
 import * as fs from 'fs';
 
 interface ChatWrapperProps {
@@ -120,6 +122,18 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
     []
   );
 
+  // Add confirmation prompt state
+  const [confirmationPrompt, setConfirmationPrompt] =
+    React.useState<ConfirmationPromptOptions | null>(null);
+
+  // Set up confirmation bridge callback
+  React.useEffect(() => {
+    confirmationBridge.setPromptUpdateCallback(setConfirmationPrompt);
+    return () => {
+      confirmationBridge.setPromptUpdateCallback(() => {});
+    };
+  }, []);
+
   const isValidPath = React.useCallback((filePath: string): boolean => {
     try {
       return fs.existsSync(filePath) && fs.statSync(filePath).isFile();
@@ -153,6 +167,9 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
     provider: currentProvider.type,
     model: currentProvider.model,
     contextLength: contextLength,
+    confirmationPrompt,
+    onConfirmationResponse:
+      confirmationBridge.handleResponse.bind(confirmationBridge),
   });
 };
 
@@ -238,6 +255,12 @@ export const chatCommand = new Command('chat')
       const shellClient = new ShellMCPClient(security, config.shell);
       await shellClient.connect();
       showLoader('Shell MCP client connected successfully');
+
+      // Set up confirmation UI callback
+      shellClient.getConfirmationPrompt().setUICallback(async options => {
+        return await confirmationBridge.showConfirmation(options);
+      });
+      showLoader('Confirmation UI bridge configured');
 
       // Verify connection
       showLoader('Verifying provider health...');

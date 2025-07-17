@@ -246,13 +246,34 @@ function formatConfirmationPrompt(
 }
 
 /**
+ * Callback type for UI integration
+ */
+export type ConfirmationUICallback = (options: ConfirmationPromptOptions) => Promise<ConfirmationResponse>;
+
+/**
  * Main confirmation prompt class
  */
 export class ShellConfirmationPrompt {
   private sessionMemory: SessionMemoryManager;
+  private uiCallback: ConfirmationUICallback | null = null;
 
   constructor() {
     this.sessionMemory = new SessionMemoryManager();
+  }
+
+  /**
+   * Register a UI callback for handling confirmation prompts
+   * This allows the React/Ink UI to handle the confirmation instead of raw console
+   */
+  setUICallback(callback: ConfirmationUICallback): void {
+    this.uiCallback = callback;
+  }
+
+  /**
+   * Clear the UI callback (fallback to console mode)
+   */
+  clearUICallback(): void {
+    this.uiCallback = null;
   }
 
   /**
@@ -273,6 +294,38 @@ export class ShellConfirmationPrompt {
       };
     }
 
+    // Use UI callback if available (React/Ink integration)
+    if (this.uiCallback) {
+      try {
+        const response = await this.uiCallback(options);
+        
+        // Record decision in session memory if requested
+        if (response.rememberDecision && !response.timedOut) {
+          this.sessionMemory.recordDecision(options.command, {
+            commandPattern: options.command,
+            decision: response.decision as 'allow' | 'deny' | 'trust',
+            timestamp: new Date(),
+            riskScore: options.riskAssessment.riskScore,
+          });
+        }
+        
+        return response;
+      } catch (error) {
+        console.error('Error in UI callback, falling back to console:', error);
+        // Fall through to console implementation
+      }
+    }
+
+    // Fallback to console implementation
+    return this.promptUserConsole(options);
+  }
+
+  /**
+   * Console-based confirmation prompt (fallback implementation)
+   */
+  private async promptUserConsole(
+    options: ConfirmationPromptOptions
+  ): Promise<ConfirmationResponse> {
     return new Promise<ConfirmationResponse>(resolve => {
       let timeLeft = Math.ceil(options.timeout / 1000);
       let showDetails = false;

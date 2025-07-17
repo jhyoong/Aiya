@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
+import { ConfirmationPrompt } from './ConfirmationPrompt.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
 import { TextBuffer } from '../core/TextBuffer.js';
 import {
@@ -10,6 +11,7 @@ import {
   SubscriptionManager,
   MEMORY_LIMITS,
 } from '../utils/memoryManagement.js';
+import { ConfirmationPromptOptions, ConfirmationResponse } from '../../core/mcp/confirmation.js';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -59,6 +61,8 @@ interface ChatInterfaceProps {
   onProviderChange?:
     | ((provider: { name: string; type: string; model: string }) => void)
     | undefined;
+  confirmationPrompt?: ConfirmationPromptOptions | null;
+  onConfirmationResponse?: ((response: ConfirmationResponse) => void) | undefined;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -74,6 +78,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   tokenUsage,
   currentProvider,
   onProviderChange,
+  confirmationPrompt,
+  onConfirmationResponse,
 }) => {
   const messagesRef = useRef(
     new BoundedArray<Message>(MEMORY_LIMITS.MAX_MESSAGE_HISTORY)
@@ -421,7 +427,20 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
       </Box>
 
-      {status !== 'processing' ? (
+      {/* Confirmation Prompt */}
+      {confirmationPrompt && (
+        <ConfirmationPrompt
+          command={confirmationPrompt.command}
+          riskAssessment={confirmationPrompt.riskAssessment}
+          workingDirectory={confirmationPrompt.workingDirectory}
+          timeout={confirmationPrompt.timeout}
+          isVisible={true}
+          onResponse={onConfirmationResponse || (() => {})}
+          focus={true}
+        />
+      )}
+
+      {status !== 'processing' && !confirmationPrompt ? (
         <UnifiedInput
           buffer={buffer}
           inputWidth={inputWidth}
@@ -430,7 +449,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
           onEscape={handleCancel}
           placeholder="Type your message... (double ESC to exit, or type 'exit')"
           suggestionEngine={suggestionEngine}
-          focus={true}
+          focus={!confirmationPrompt}
           showSuggestions={true}
         />
       ) : null}

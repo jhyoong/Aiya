@@ -12,6 +12,7 @@ import { performance } from 'perf_hooks';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import * as fs from 'fs';
+import { ShellConfirmationPrompt, ConfirmationResponse } from './confirmation.js';
 
 /**
  * Parameters for shell command execution
@@ -1559,15 +1560,8 @@ export class CommandRiskAssessor {
    * Determine if command should be automatically blocked
    */
   private shouldBlockCommand(command: string, riskScore: number): boolean {
-    // Check always-block patterns
-    for (const pattern of this.config.alwaysBlockPatterns) {
-      const regex = new RegExp(pattern, 'i');
-      if (regex.test(command)) {
-        return true;
-      }
-    }
-
     // Auto-block critical risk commands if they're not explicitly trusted
+    // Note: alwaysBlockPatterns are now handled in the main execution flow
     if (riskScore >= 95 && !this.isTrustedCommand(command)) {
       return true;
     }
@@ -2372,11 +2366,21 @@ export class CommandFilter {
       '^npm test($|\\s)',
     ],
     alwaysBlockPatterns: [
+      // Only truly catastrophic commands that should never be allowed
       'rm -rf /',
-      'sudo rm -rf',
+      'rm -rf /*',
+      'sudo rm -rf /',
+      'sudo rm -rf /*',
       'format.*',
       'dd if=/dev/zero',
-      ':(\\(\\))',
+      'dd if=/dev/zero.*of=.*',
+      ':(\\(\\))', // fork bomb
+      'mkfs.*',
+      'fdisk.*',
+      'shutdown.*',
+      'reboot.*',
+      'halt.*',
+      'poweroff.*',
     ],
     confirmationTimeout: 30000,
     sessionMemory: true,
@@ -3885,6 +3889,8 @@ export class ShellMCPClient extends MCPClient {
   private commandFilter: CommandFilter;
   private executionLogger: ShellExecutionLogger;
   private sessionId: string;
+  private riskAssessor: CommandRiskAssessor;
+  private confirmationPrompt: ShellConfirmationPrompt;
 
   constructor(security: WorkspaceSecurity, config?: Partial<ShellToolConfig>) {
     super('shell');
@@ -3893,6 +3899,8 @@ export class ShellMCPClient extends MCPClient {
     this.commandFilter = new CommandFilter(config);
     this.sessionId = randomUUID();
     this.executionLogger = new ShellExecutionLogger(this.sessionId);
+    this.riskAssessor = new CommandRiskAssessor(this.commandFilter.getConfig());
+    this.confirmationPrompt = new ShellConfirmationPrompt();
   }
 
   async connect(): Promise<void> {
@@ -3917,6 +3925,13 @@ export class ShellMCPClient extends MCPClient {
         prompts: false,
       },
     };
+  }
+
+  /**
+   * Get the confirmation prompt instance for UI integration
+   */
+  getConfirmationPrompt(): ShellConfirmationPrompt {
+    return this.confirmationPrompt;
   }
 
   async listTools(): Promise<Tool[]> {
@@ -3956,7 +3971,7 @@ export class ShellMCPClient extends MCPClient {
     try {
       switch (name) {
         case 'ExecuteCommand':
-          return await this.executeCommand(args);
+          return await this.executeCommandWithConfirmation(args);
         default:
           return {
             content: [
@@ -3998,9 +4013,243 @@ export class ShellMCPClient extends MCPClient {
   }
 
   /**
+   * ExecuteCommand with confirmation checkpoint (Phase 5: User Confirmation System)
+   */
+  private async executeCommandWithConfirmation(params: any): Promise<ToolResult> {
+    const { command, cwd } = params as ShellExecuteParams;
+    
+    // Skip confirmation system if disabled in config
+    const config = this.commandFilter.getConfig();
+    if (!config.requireConfirmation) {
+      return await this.executeCommand(params);
+    }
+
+    let workingDirectory = this.security.getWorkspaceRoot();
+    if (cwd) {
+      try {
+        workingDirectory = await this.security.validateFileAccess(cwd, 'read');
+      } catch (error) {
+        // Continue with default workspace root if cwd validation fails
+        // The detailed validation will happen in executeCommand
+      }
+    }
+
+    try {
+      // 1. Risk assessment
+      const riskAssessment = this.riskAssessor.assessRisk(command, workingDirectory);
+      
+      // 2. Check bypass logic first (trusted commands and risk threshold)
+      if (this.shouldBypassConfirmation(command, riskAssessment, config)) {
+        return await this.executeCommand(params);
+      }
+
+      // 3. Check always-block patterns for truly catastrophic commands only
+      if (this.shouldAlwaysBlock(command, config)) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Command blocked by security policy: ${command}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // 4. Prompt for user confirmation for risky commands
+      const confirmationResponse = await this.confirmationPrompt.promptUser({
+        command,
+        riskAssessment,
+        workingDirectory,
+        timeout: config.confirmationTimeout,
+      });
+
+      // 5. Handle user decision
+      return await this.handleConfirmationResponse(confirmationResponse, params, config);
+
+    } catch (error) {
+      // Log confirmation system errors but don't block execution completely
+      this.executionLogger.logSecurityEvent({
+        eventType: 'COMMAND_BLOCKED',
+        command,
+        workingDirectory,
+        reason: `Confirmation system error: ${error instanceof Error ? error.message : String(error)}`,
+      });
+      
+      // Fall back to original executeCommand if confirmation system fails
+      return await this.executeCommand(params);
+    }
+  }
+
+  /**
+   * Check if command should always be blocked
+   */
+  private shouldAlwaysBlock(command: string, config: ShellToolConfig): boolean {
+    return config.alwaysBlockPatterns.some(pattern => {
+      try {
+        return new RegExp(pattern).test(command);
+      } catch {
+        // Invalid regex, treat as literal string match
+        return command.includes(pattern);
+      }
+    });
+  }
+
+  /**
+   * Check if command should bypass confirmation (trusted commands or low risk)
+   */
+  private shouldBypassConfirmation(
+    command: string,
+    riskAssessment: CommandRiskAssessment,
+    config: ShellToolConfig
+  ): boolean {
+    // Check risk threshold
+    if (riskAssessment.riskScore < config.confirmationThreshold) {
+      return true;
+    }
+
+    // Check trusted command patterns
+    return config.trustedCommands.some(pattern => {
+      try {
+        return new RegExp(pattern).test(command);
+      } catch {
+        // Invalid regex, treat as literal string match
+        return command.includes(pattern);
+      }
+    });
+  }
+
+  /**
+   * Handle user confirmation response
+   */
+  private async handleConfirmationResponse(
+    response: ConfirmationResponse,
+    params: any,
+    config: ShellToolConfig
+  ): Promise<ToolResult> {
+    const { command } = params as ShellExecuteParams;
+
+    switch (response.decision) {
+      case 'allow':
+        // Execute command once (bypass command filter since user explicitly allowed)
+        return await this.executeCommand(params, true);
+
+      case 'deny':
+        // Block execution
+        return {
+          content: [
+            {
+              type: 'text',
+              text: response.timedOut 
+                ? `Command timed out waiting for confirmation: ${command}`
+                : `Command execution denied by user: ${command}`,
+            },
+          ],
+          isError: true,
+        };
+
+      case 'trust':
+        // Add to trusted patterns and execute (bypass command filter since user explicitly allowed)
+        await this.addToTrustedCommands(command, config);
+        return await this.executeCommand(params, true);
+
+      case 'block':
+        // Add to always-block patterns and deny
+        await this.addToBlockedCommands(command, config);
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Command added to blocked patterns and denied: ${command}`,
+            },
+          ],
+          isError: true,
+        };
+
+      default:
+        // Should not reach here, but handle gracefully
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Unknown confirmation response, denying command: ${command}`,
+            },
+          ],
+          isError: true,
+        };
+    }
+  }
+
+  /**
+   * Add command pattern to trusted commands
+   */
+  private async addToTrustedCommands(command: string, config: ShellToolConfig): Promise<void> {
+    try {
+      // Create a simple pattern that matches the command
+      const pattern = `^${command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`;
+      
+      // Add to current config
+      if (!config.trustedCommands.includes(pattern)) {
+        config.trustedCommands.push(pattern);
+        
+        // Update the command filter configuration
+        this.commandFilter.updateConfig({ trustedCommands: config.trustedCommands });
+        
+        // Log the addition
+        this.executionLogger.logCommandAllowed(
+          command,
+          this.security.getWorkspaceRoot(),
+          `Added to trusted commands: ${pattern}`
+        );
+      }
+    } catch (error) {
+      // Log error but don't block execution
+      this.executionLogger.logSecurityEvent({
+        eventType: 'COMMAND_BLOCKED',
+        command,
+        workingDirectory: this.security.getWorkspaceRoot(),
+        reason: `Failed to add to trusted commands: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  /**
+   * Add command pattern to blocked commands
+   */
+  private async addToBlockedCommands(command: string, config: ShellToolConfig): Promise<void> {
+    try {
+      // Create a simple pattern that matches the command
+      const pattern = `^${command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}($|\\s)`;
+      
+      // Add to current config
+      if (!config.alwaysBlockPatterns.includes(pattern)) {
+        config.alwaysBlockPatterns.push(pattern);
+        
+        // Update the command filter configuration
+        this.commandFilter.updateConfig({ alwaysBlockPatterns: config.alwaysBlockPatterns });
+        
+        // Log the addition
+        this.executionLogger.logCommandBlocked(
+          command,
+          this.security.getWorkspaceRoot(),
+          `Added to blocked commands: ${pattern}`
+        );
+      }
+    } catch (error) {
+      // Log error but don't block execution
+      this.executionLogger.logSecurityEvent({
+        eventType: 'COMMAND_BLOCKED',
+        command,
+        workingDirectory: this.security.getWorkspaceRoot(),
+        reason: `Failed to add to blocked commands: ${error instanceof Error ? error.message : String(error)}`,
+      });
+    }
+  }
+
+  /**
    * ExecuteCommand tool implementation (Phase 4: enhanced logging and error handling)
    */
-  private async executeCommand(params: any): Promise<ToolResult> {
+  private async executeCommand(params: any, bypassCommandFilter: boolean = false): Promise<ToolResult> {
     const { command, cwd, timeout = 30 } = params as ShellExecuteParams;
     const securityEvents: ShellSecurityEvent[] = [];
     const performanceMonitor = new ShellPerformanceMonitor();
@@ -4094,24 +4343,27 @@ export class ShellMCPClient extends MCPClient {
         );
       }
 
-      // 4. Command filtering (whitelist/blacklist)
-      const filterCheck = this.commandFilter.isCommandAllowed(sanitizedCommand);
-      if (!filterCheck.allowed) {
-        this.executionLogger.logCommandBlocked(
-          sanitizedCommand,
-          workingDirectory,
-          filterCheck.reason!
-        );
-        const context: ShellErrorContext = {
-          command: sanitizedCommand,
-          workingDirectory,
-          timestamp: new Date(),
-        };
-        throw new ShellCommandBlockedError(
-          sanitizedCommand,
-          filterCheck.reason!,
-          context
-        );
+      // 4. Command filtering (whitelist/blacklist) - skip if user explicitly allowed via confirmation
+      let filterCheck: { allowed: boolean; reason?: string; requiresConfirmation?: boolean } = { allowed: true, reason: 'Bypassed via user confirmation' };
+      if (!bypassCommandFilter) {
+        filterCheck = this.commandFilter.isCommandAllowed(sanitizedCommand);
+        if (!filterCheck.allowed) {
+          this.executionLogger.logCommandBlocked(
+            sanitizedCommand,
+            workingDirectory,
+            filterCheck.reason!
+          );
+          const context: ShellErrorContext = {
+            command: sanitizedCommand,
+            workingDirectory,
+            timestamp: new Date(),
+          };
+          throw new ShellCommandBlockedError(
+            sanitizedCommand,
+            filterCheck.reason!,
+            context
+          );
+        }
       }
 
       // 5. Working directory validation
