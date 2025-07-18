@@ -1,5 +1,5 @@
 import * as readline from 'readline';
-import { CommandRiskAssessment, CommandRiskCategory } from './shell.js';
+import { CommandCategorization, CommandCategory } from './shell/index.js';
 import chalk from 'chalk';
 
 /**
@@ -8,8 +8,8 @@ import chalk from 'chalk';
 export interface ConfirmationPromptOptions {
   /** The command to be executed */
   command: string;
-  /** Risk assessment details */
-  riskAssessment: CommandRiskAssessment;
+  /** Command categorization details */
+  categorization: CommandCategorization;
   /** Current working directory */
   workingDirectory: string;
   /** Timeout in milliseconds for the prompt */
@@ -22,8 +22,8 @@ export interface ConfirmationPromptOptions {
  * Response from the confirmation prompt
  */
 export interface ConfirmationResponse {
-  /** User's decision */
-  decision: 'allow' | 'deny' | 'trust' | 'block';
+  /** User's action */
+  action: 'allow' | 'deny' | 'trust' | 'block';
   /** Whether to remember this decision for the session */
   rememberDecision: boolean;
   /** Whether the prompt timed out */
@@ -36,12 +36,12 @@ export interface ConfirmationResponse {
 export interface SessionDecision {
   /** Command pattern that was decided on */
   commandPattern: string;
-  /** The decision made */
-  decision: 'allow' | 'deny' | 'trust';
+  /** The action taken */
+  action: 'allow' | 'deny' | 'trust';
   /** When the decision was made */
   timestamp: Date;
-  /** Risk score of the original command */
-  riskScore: number;
+  /** Category of the original command */
+  category: CommandCategory;
 }
 
 /**
@@ -191,10 +191,10 @@ export class SessionMemoryManager {
   } {
     // Create sample decisions for testing
     const sampleDecisions: [string, SessionDecision][] = [
-      ['ls -la', { commandPattern: 'ls -la', decision: 'allow', timestamp: new Date(), riskScore: 20 }],
-      ['^git.*', { commandPattern: '^git.*', decision: 'allow', timestamp: new Date(), riskScore: 25 }],
-      ['^npm.*test', { commandPattern: '^npm.*test', decision: 'allow', timestamp: new Date(), riskScore: 30 }],
-      ['cp file.txt backup.txt', { commandPattern: 'cp file.txt backup.txt', decision: 'trust', timestamp: new Date(), riskScore: 40 }],
+      ['ls -la', { commandPattern: 'ls -la', action: 'allow', timestamp: new Date(), category: CommandCategory.SAFE }],
+      ['^git.*', { commandPattern: '^git.*', action: 'allow', timestamp: new Date(), category: CommandCategory.SAFE }],
+      ['^npm.*test', { commandPattern: '^npm.*test', action: 'allow', timestamp: new Date(), category: CommandCategory.RISKY }],
+      ['cp file.txt backup.txt', { commandPattern: 'cp file.txt backup.txt', action: 'trust', timestamp: new Date(), category: CommandCategory.RISKY }],
     ];
     
     // Save current state
@@ -246,17 +246,15 @@ export class SessionMemoryManager {
 /**
  * Get risk color based on category
  */
-function getRiskColor(category: CommandRiskCategory): string {
+function getCategoryColor(category: CommandCategory): string {
   switch (category) {
-    case CommandRiskCategory.SAFE:
+    case CommandCategory.SAFE:
       return 'green';
-    case CommandRiskCategory.LOW:
+    case CommandCategory.RISKY:
       return 'yellow';
-    case CommandRiskCategory.MEDIUM:
-      return 'orange';
-    case CommandRiskCategory.HIGH:
+    case CommandCategory.DANGEROUS:
       return 'red';
-    case CommandRiskCategory.CRITICAL:
+    case CommandCategory.BLOCKED:
       return 'magenta';
     default:
       return 'white';
@@ -283,73 +281,48 @@ function formatConfirmationPrompt(
     `${chalk.white.bold('Working Directory:')} ${chalk.gray(options.workingDirectory)}`
   );
 
-  const riskColor = getRiskColor(options.riskAssessment.category);
-  const riskText = `${options.riskAssessment.category.toUpperCase()} (Score: ${options.riskAssessment.riskScore})`;
+  const categoryColor = getCategoryColor(options.categorization.category);
+  const categoryText = `${options.categorization.category.toUpperCase()}`;
 
-  // Apply color based on risk category
-  let coloredRiskText: string;
-  switch (riskColor) {
+  // Apply color based on category
+  let coloredCategoryText: string;
+  switch (categoryColor) {
     case 'green':
-      coloredRiskText = chalk.green.bold(riskText);
+      coloredCategoryText = chalk.green.bold(categoryText);
       break;
     case 'yellow':
-      coloredRiskText = chalk.yellow.bold(riskText);
-      break;
-    case 'orange':
-      coloredRiskText = chalk.hex('#FFA500').bold(riskText); // Orange color
+      coloredCategoryText = chalk.yellow.bold(categoryText);
       break;
     case 'red':
-      coloredRiskText = chalk.red.bold(riskText);
+      coloredCategoryText = chalk.red.bold(categoryText);
       break;
     case 'magenta':
-      coloredRiskText = chalk.magenta.bold(riskText);
+      coloredCategoryText = chalk.magenta.bold(categoryText);
       break;
     default:
-      coloredRiskText = chalk.white.bold(riskText);
+      coloredCategoryText = chalk.white.bold(categoryText);
       break;
   }
 
-  lines.push(`${chalk.white.bold('Risk Level:')} ${coloredRiskText}`);
+  lines.push(`${chalk.white.bold('Category:')} ${coloredCategoryText}`);
   lines.push('');
 
-  // Risk factors
-  if (options.riskAssessment.riskFactors.length > 0) {
-    lines.push(chalk.white.bold('Risk Factors:'));
-    options.riskAssessment.riskFactors.forEach(factor => {
-      lines.push(chalk.yellow(`• ${factor}`));
-    });
-    lines.push('');
+  // Categorization reason
+  lines.push(chalk.white.bold('Reason:'));
+  lines.push(chalk.yellow(`• ${options.categorization.reason}`));
+  if (options.categorization.matchedPattern) {
+    lines.push(chalk.gray(`• Matched pattern: ${options.categorization.matchedPattern}`));
   }
-
-  // Potential impact
-  if (options.riskAssessment.context.potentialImpact.length > 0) {
-    lines.push(chalk.white.bold('Potential Impact:'));
-    options.riskAssessment.context.potentialImpact.forEach(impact => {
-      lines.push(chalk.red(`• ${impact}`));
-    });
-    lines.push('');
-  }
-
-  // Suggestions
-  if (options.riskAssessment.context.mitigationSuggestions.length > 0) {
-    lines.push(chalk.white.bold('Suggestions:'));
-    options.riskAssessment.context.mitigationSuggestions.forEach(suggestion => {
-      lines.push(chalk.green(`• ${suggestion}`));
-    });
-    lines.push('');
-  }
+  lines.push('');
 
   // Additional details if requested
   if (showDetails) {
     lines.push(chalk.white.bold('Additional Details:'));
     lines.push(
-      `${chalk.gray.bold('Command Type:')} ${chalk.gray(options.riskAssessment.context.commandType)}`
+      `${chalk.gray.bold('Requires Confirmation:')} ${chalk.gray(options.categorization.requiresConfirmation ? 'Yes' : 'No')}`
     );
     lines.push(
-      `${chalk.gray.bold('Requires Confirmation:')} ${chalk.gray(options.riskAssessment.requiresConfirmation ? 'Yes' : 'No')}`
-    );
-    lines.push(
-      `${chalk.gray.bold('Should Block:')} ${chalk.gray(options.riskAssessment.shouldBlock ? 'Yes' : 'No')}`
+      `${chalk.gray.bold('Allow Execution:')} ${chalk.gray(options.categorization.allowExecution ? 'Yes' : 'No')}`
     );
     lines.push('');
   }
@@ -435,12 +408,12 @@ export class ShellConfirmationPrompt {
           process.env.DEBUG_SHELL_SECURITY
         ) {
           console.log(
-            `[SHELL CONFIRMATION] Using cached session decision for command: ${options.command} - Decision: ${previousDecision.decision} (Risk Score: ${previousDecision.riskScore}, Age: ${Math.floor((Date.now() - previousDecision.timestamp.getTime()) / 1000)}s)`
+            `[SHELL CONFIRMATION] Using cached session decision for command: ${options.command} - Action: ${previousDecision.action} (Category: ${previousDecision.category}, Age: ${Math.floor((Date.now() - previousDecision.timestamp.getTime()) / 1000)}s)`
           );
         }
 
         return {
-          decision: previousDecision.decision,
+          action: previousDecision.action,
           rememberDecision: true,
           timedOut: false,
         };
@@ -456,9 +429,9 @@ export class ShellConfirmationPrompt {
         if (response.rememberDecision && !response.timedOut && sessionMemoryEnabled) {
           this.sessionMemory.recordDecision(options.command, {
             commandPattern: options.command,
-            decision: response.decision as 'allow' | 'deny' | 'trust',
+            action: response.action as 'allow' | 'deny' | 'trust',
             timestamp: new Date(),
-            riskScore: options.riskAssessment.riskScore,
+            category: options.categorization.category,
           });
         }
 
@@ -498,9 +471,9 @@ export class ShellConfirmationPrompt {
         if (response.rememberDecision && !response.timedOut && sessionMemoryEnabled) {
           this.sessionMemory.recordDecision(options.command, {
             commandPattern: options.command,
-            decision: response.decision as 'allow' | 'deny' | 'trust',
+            action: response.action as 'allow' | 'deny' | 'trust',
             timestamp: new Date(),
-            riskScore: options.riskAssessment.riskScore,
+            category: options.categorization.category,
           });
         }
 
@@ -523,28 +496,28 @@ export class ShellConfirmationPrompt {
         switch (keyLower) {
           case 'a':
             handleResponse({
-              decision: 'allow',
+              action: 'allow',
               rememberDecision: false,
               timedOut: false,
             });
             break;
           case 'd':
             handleResponse({
-              decision: 'deny',
+              action: 'deny',
               rememberDecision: false,
               timedOut: false,
             });
             break;
           case 't':
             handleResponse({
-              decision: 'trust',
+              action: 'trust',
               rememberDecision: true,
               timedOut: false,
             });
             break;
           case 'b':
             handleResponse({
-              decision: 'block',
+              action: 'block',
               rememberDecision: true,
               timedOut: false,
             });
@@ -573,7 +546,7 @@ export class ShellConfirmationPrompt {
       // Set up timeout
       const timeoutHandle = setTimeout(() => {
         handleResponse({
-          decision: 'deny',
+          action: 'deny',
           rememberDecision: false,
           timedOut: true,
         });
@@ -602,7 +575,7 @@ export class ShellConfirmationPrompt {
           // Handle Ctrl+C
           if (key === '\u0003') {
             handleResponse({
-              decision: 'deny',
+              action: 'deny',
               rememberDecision: false,
               timedOut: false,
             });

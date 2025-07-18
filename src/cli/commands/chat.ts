@@ -5,7 +5,7 @@ import { ConfigManager } from '../../core/config/manager.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
-import { ShellMCPClient } from '../../core/mcp/shell.js';
+import { ShellMCPClient } from '../../core/mcp/shell/index.js';
 import { Message } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';

@@ -1,7 +1,7 @@
 1. More tests and coverage breakdown
 2. Debug logs - to be added/enhanced
 3. Agent capabilities
-    - Shell commands
+    ~~- Shell commands~~
     - Planner mode
     - - Todo list feature
     - Error checking and fixing

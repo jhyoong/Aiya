@@ -436,7 +436,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {confirmationPrompt && (
         <ConfirmationPrompt
           command={confirmationPrompt.command}
-          riskAssessment={confirmationPrompt.riskAssessment}
+          categorization={confirmationPrompt.categorization}
           workingDirectory={confirmationPrompt.workingDirectory}
           timeout={confirmationPrompt.timeout}
           isVisible={true}

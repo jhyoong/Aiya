@@ -62,7 +62,7 @@ export class UIConfirmationBridge implements ConfirmationBridge {
     const timeoutId = setTimeout(() => {
       if (this.activePromise) {
         this.handleResponse({
-          decision: 'deny',
+          action: 'deny',
           rememberDecision: false,
           timedOut: true,
         });
@@ -92,7 +92,7 @@ export class UIConfirmationBridge implements ConfirmationBridge {
   hideConfirmation(): void {
     if (this.activePromise && this.resolveFunction) {
       this.resolveFunction({
-        decision: 'deny',
+        action: 'deny',
         rememberDecision: false,
         timedOut: false,
       });

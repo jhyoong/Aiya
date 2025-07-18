@@ -16,6 +16,7 @@ import {
   ShellConfirmationPrompt,
   ConfirmationResponse,
 } from './confirmation.js';
+import { categorizeCommand, CommandCategory } from './shell/command-categorization.js';
 
 /**
  * Parameters for shell command execution
@@ -3893,7 +3894,6 @@ export class ShellMCPClient extends MCPClient {
   private commandFilter: CommandFilter;
   private executionLogger: ShellExecutionLogger;
   private sessionId: string;
-  private riskAssessor: CommandRiskAssessor;
   private confirmationPrompt: ShellConfirmationPrompt;
 
   constructor(security: WorkspaceSecurity, config?: Partial<ShellToolConfig>) {
@@ -3903,7 +3903,6 @@ export class ShellMCPClient extends MCPClient {
     this.commandFilter = new CommandFilter(config);
     this.sessionId = randomUUID();
     this.executionLogger = new ShellExecutionLogger(this.sessionId);
-    this.riskAssessor = new CommandRiskAssessor(this.commandFilter.getConfig());
     this.confirmationPrompt = new ShellConfirmationPrompt();
   }
 
@@ -4041,14 +4040,24 @@ export class ShellMCPClient extends MCPClient {
     }
 
     try {
-      // 1. Risk assessment
-      const riskAssessment = this.riskAssessor.assessRisk(
-        command,
-        workingDirectory
-      );
+      // 1. Command categorization
+      const categorization = categorizeCommand(command);
 
-      // 2. Check bypass logic first (trusted commands and risk threshold)
-      if (this.shouldBypassConfirmation(command, riskAssessment, config)) {
+      // 2. Check if command should be blocked entirely
+      if (categorization.category === CommandCategory.BLOCKED) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Command blocked by security policy: ${command}. Reason: ${categorization.reason}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // 3. Check bypass logic first (safe commands)
+      if (categorization.category === CommandCategory.SAFE) {
         return await this.executeCommand(params);
       }
 
@@ -4080,10 +4089,10 @@ export class ShellMCPClient extends MCPClient {
         };
       }
 
-      // 4. Prompt for user confirmation for risky commands
+      // 4. Prompt for user confirmation for risky/dangerous commands
       const confirmationResponse = await this.confirmationPrompt.promptUser({
         command,
-        riskAssessment,
+        categorization: categorization,
         workingDirectory,
         timeout: config.confirmationTimeout,
         sessionMemory: config.sessionMemory,
@@ -4146,29 +4155,6 @@ export class ShellMCPClient extends MCPClient {
     return 'unknown-pattern'; // Fallback if no pattern matched (shouldn't happen)
   }
 
-  /**
-   * Check if command should bypass confirmation (trusted commands or low risk)
-   */
-  private shouldBypassConfirmation(
-    command: string,
-    riskAssessment: CommandRiskAssessment,
-    config: ShellToolConfig
-  ): boolean {
-    // Check risk threshold
-    if (riskAssessment.riskScore < config.confirmationThreshold) {
-      return true;
-    }
-
-    // Check trusted command patterns
-    return config.trustedCommands.some(pattern => {
-      try {
-        return new RegExp(pattern).test(command);
-      } catch {
-        // Invalid regex, treat as literal string match
-        return command.includes(pattern);
-      }
-    });
-  }
 
   /**
    * Handle user confirmation response
@@ -4180,7 +4166,7 @@ export class ShellMCPClient extends MCPClient {
   ): Promise<ToolResult> {
     const { command } = params as ShellExecuteParams;
 
-    switch (response.decision) {
+    switch (response.action) {
       case 'allow':
         // Execute command once (bypass command filter since user explicitly allowed)
         return await this.executeCommand(params, true);

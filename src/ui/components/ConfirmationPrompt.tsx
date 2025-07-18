@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Box, Text } from 'ink';
 import { Select } from '@inkjs/ui';
 import {
-  CommandRiskAssessment,
-  CommandRiskCategory,
-} from '../../core/mcp/shell.js';
+  CommandCategorization,
+  CommandCategory,
+} from '../../core/mcp/shell/index.js';
 import { ConfirmationResponse } from '../../core/mcp/confirmation.js';
 import chalk from 'chalk';
 
@@ -14,8 +14,8 @@ import chalk from 'chalk';
 export interface ConfirmationPromptProps {
   /** The command to be executed */
   command: string;
-  /** Risk assessment details */
-  riskAssessment: CommandRiskAssessment;
+  /** Command categorization details */
+  categorization: CommandCategorization;
   /** Current working directory */
   workingDirectory: string;
   /** Whether the prompt is visible */
@@ -81,19 +81,17 @@ export const DEFAULT_CONFIG: Required<ConfirmationPromptConfig> = {
 };
 
 /**
- * Get risk color based on category
+ * Get category color based on categorization
  */
-function getRiskColor(category: CommandRiskCategory): string {
+function getCategoryColor(category: CommandCategory): string {
   switch (category) {
-    case CommandRiskCategory.SAFE:
+    case CommandCategory.SAFE:
       return 'green';
-    case CommandRiskCategory.LOW:
+    case CommandCategory.RISKY:
       return 'yellow';
-    case CommandRiskCategory.MEDIUM:
-      return 'orange';
-    case CommandRiskCategory.HIGH:
+    case CommandCategory.DANGEROUS:
       return 'red';
-    case CommandRiskCategory.CRITICAL:
+    case CommandCategory.BLOCKED:
       return 'magenta';
     default:
       return 'white';
@@ -108,7 +106,7 @@ function getRiskColor(category: CommandRiskCategory): string {
  */
 export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
   command,
-  riskAssessment,
+  categorization,
   workingDirectory,
   isVisible,
   timeout,
@@ -143,7 +141,7 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
       if (!state.isResolved) {
         setState(prev => ({ ...prev, isResolved: true }));
         onResponseRef.current({
-          decision: 'deny',
+          action: 'deny',
           rememberDecision: false,
           timedOut: true,
         });
@@ -206,7 +204,7 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
 
       const rememberDecision = value === 'trust' || value === 'block';
       handleResponse({
-        decision: value as 'allow' | 'deny' | 'trust' | 'block',
+        action: value as 'allow' | 'deny' | 'trust' | 'block',
         rememberDecision,
         timedOut: false,
       });
@@ -219,29 +217,26 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
     return null;
   }
 
-  const riskColor = getRiskColor(riskAssessment.category);
-  const riskText = `${riskAssessment.category.toUpperCase()} (Score: ${riskAssessment.riskScore})`;
+  const categoryColor = getCategoryColor(categorization.category);
+  const categoryText = `${categorization.category.toUpperCase()}`;
 
-  // Apply color based on risk category
-  let coloredRiskText: string;
-  switch (riskColor) {
+  // Apply color based on category
+  let coloredCategoryText: string;
+  switch (categoryColor) {
     case 'green':
-      coloredRiskText = chalk.green.bold(riskText);
+      coloredCategoryText = chalk.green.bold(categoryText);
       break;
     case 'yellow':
-      coloredRiskText = chalk.yellow.bold(riskText);
-      break;
-    case 'orange':
-      coloredRiskText = chalk.hex('#FFA500').bold(riskText);
+      coloredCategoryText = chalk.yellow.bold(categoryText);
       break;
     case 'red':
-      coloredRiskText = chalk.red.bold(riskText);
+      coloredCategoryText = chalk.red.bold(categoryText);
       break;
     case 'magenta':
-      coloredRiskText = chalk.magenta.bold(riskText);
+      coloredCategoryText = chalk.magenta.bold(categoryText);
       break;
     default:
-      coloredRiskText = chalk.white.bold(riskText);
+      coloredCategoryText = chalk.white.bold(categoryText);
       break;
   }
 
@@ -278,55 +273,27 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
         </Box>
         <Box marginBottom={1}>
           <Text color='white' bold>
-            Risk Level:
+            Category:
           </Text>
-          <Text> {coloredRiskText}</Text>
+          <Text> {coloredCategoryText}</Text>
         </Box>
       </Box>
 
-      {/* Risk Factors */}
-      {riskAssessment.riskFactors.length > 0 && (
-        <Box flexDirection='column' marginBottom={1}>
-          <Text color='white' bold>
-            Risk Factors:
+      {/* Categorization Reason */}
+      <Box flexDirection='column' marginBottom={1}>
+        <Text color='white' bold>
+          Reason:
+        </Text>
+        <Text color='yellow'>
+          • {categorization.reason}
+        </Text>
+        {categorization.matchedPattern && (
+          <Text color='gray'>
+            • Matched pattern: {categorization.matchedPattern}
           </Text>
-          {riskAssessment.riskFactors.map((factor, index) => (
-            <Text key={index} color='yellow'>
-              • {factor}
-            </Text>
-          ))}
-        </Box>
-      )}
+        )}
+      </Box>
 
-      {/* Potential Impact */}
-      {riskAssessment.context.potentialImpact.length > 0 && (
-        <Box flexDirection='column' marginBottom={1}>
-          <Text color='white' bold>
-            Potential Impact:
-          </Text>
-          {riskAssessment.context.potentialImpact.map((impact, index) => (
-            <Text key={index} color='red'>
-              • {impact}
-            </Text>
-          ))}
-        </Box>
-      )}
-
-      {/* Mitigation Suggestions */}
-      {riskAssessment.context.mitigationSuggestions.length > 0 && (
-        <Box flexDirection='column' marginBottom={1}>
-          <Text color='white' bold>
-            Suggestions:
-          </Text>
-          {riskAssessment.context.mitigationSuggestions.map(
-            (suggestion, index) => (
-              <Text key={index} color='green'>
-                • {suggestion}
-              </Text>
-            )
-          )}
-        </Box>
-      )}
 
       {/* Additional Details (if requested) */}
       {state.showDetails && (
@@ -335,15 +302,12 @@ export const ConfirmationPrompt: React.FC<ConfirmationPromptProps> = ({
             Additional Details:
           </Text>
           <Text color='gray'>
-            <Text bold>Command Type:</Text> {riskAssessment.context.commandType}
-          </Text>
-          <Text color='gray'>
             <Text bold>Requires Confirmation:</Text>{' '}
-            {riskAssessment.requiresConfirmation ? 'Yes' : 'No'}
+            {categorization.requiresConfirmation ? 'Yes' : 'No'}
           </Text>
           <Text color='gray'>
-            <Text bold>Should Block:</Text>{' '}
-            {riskAssessment.shouldBlock ? 'Yes' : 'No'}
+            <Text bold>Allow Execution:</Text>{' '}
+            {categorization.allowExecution ? 'Yes' : 'No'}
           </Text>
         </Box>
       )}
