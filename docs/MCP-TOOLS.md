@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Model Context Protocol (MCP) tool system in Aiya provides a structured way for AI models to interact with the file system and other external resources. It implements a comprehensive set of file operations with security, validation, and advanced functionality.
+The Model Context Protocol (MCP) tool system in Aiya provides a structured way for AI models to interact with the file system, execute shell commands, and access other external resources. It implements comprehensive file operations and secure command execution with validation, security measures, and advanced functionality.
 
 ## Core Architecture
 
@@ -113,7 +113,14 @@ The primary MCP client implementation providing comprehensive file system operat
 
 **Architecture Pattern**: The client follows a **Tool-per-Method** pattern where each file operation is implemented as a separate tool with its own validation, execution, and error handling.
 
-#### Five Core Tools
+#### Six Core Tools
+
+The MCP system provides two main client implementations:
+
+1. **FilesystemMCPClient** - Five file operation tools
+2. **ShellMCPClient** - One command execution tool
+
+### Filesystem Tools (FilesystemMCPClient)
 
 ### 1. ReadFile Tool
 
@@ -322,6 +329,135 @@ The primary MCP client implementation providing comprehensive file system operat
 - `.git`, `.vscode`, `.idea`
 - `__pycache__`, `.pytest_cache`
 - Custom exclude patterns
+
+---
+
+## Shell MCP Client
+
+### 6. ExecuteCommand Tool
+
+**Location**: `src/core/mcp/shell.ts`
+
+**Purpose**: Execute shell commands safely within workspace boundaries with comprehensive security measures
+
+**Parameters**:
+```typescript
+{
+  command: string;
+  cwd?: string;
+  timeout?: number;
+}
+```
+
+**Features**:
+- **Safe Command Execution**: Execute commands within workspace directory only
+- **Security Validation**: Block dangerous commands and patterns
+- **User Confirmation**: Interactive prompts for risky operations
+- **Structured Output**: Return stdout, stderr, exit code, and execution time
+- **Timeout Protection**: Configurable timeout with automatic termination
+- **Working Directory Control**: Restrict operations to workspace boundaries
+- **Comprehensive Logging**: Full audit trail of all command executions
+
+**Response Structure**:
+```typescript
+{
+  success: boolean;
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  executionTime: number;
+}
+```
+
+**Security Measures**:
+
+**1. Dangerous Command Detection**:
+- System destruction: `rm -rf /`, `format`, `dd if=/dev/zero`
+- Network access: `curl`, `wget`, `ssh`
+- Privilege escalation: `sudo`, `su`
+- Fork bombs: `:(){:|:&};:`
+- Process manipulation: `kill -9`, `killall`
+
+**2. Command Sanitization**:
+- Input validation and sanitization
+- Prevention of command injection
+- Shell expansion attack prevention
+- Special character filtering
+
+**3. Workspace Boundary Enforcement**:
+- All operations restricted to project workspace
+- Working directory validation
+- Path traversal prevention
+- Symbolic link protection
+
+**4. User Confirmation System**:
+- **Risk Assessment**: Commands scored 0-100 based on danger level
+- **Interactive Prompts**: Allow/Deny/Trust/Block options
+- **Session Memory**: Cache decisions with 30-minute TTL
+- **Trusted Commands**: Bypass confirmation for safe patterns
+- **Always Block**: Critical commands blocked regardless of confirmation
+
+**Risk Categories**:
+- **0-25**: Safe commands (ls, pwd, echo, git status)
+- **26-50**: Low risk (npm test, grep, find)
+- **51-75**: Medium risk (npm install, git push)
+- **76-100**: High risk (rm, chmod, sudo commands)
+
+**Configuration Options**:
+```typescript
+interface ShellToolConfig {
+  confirmationThreshold: number;     // Risk score requiring confirmation (0-100)
+  confirmationTimeout: number;       // Timeout for user prompts (ms)
+  sessionMemory: boolean;            // Remember confirmation decisions
+  trustedCommands: string[];         // Commands that bypass confirmation
+  alwaysBlockPatterns: string[];     // Commands always blocked
+  maxExecutionTime: number;          // Maximum command execution time
+}
+```
+
+**Execution Logging**:
+```typescript
+interface ShellExecutionLog {
+  timestamp: Date;
+  command: string;
+  cwd: string;
+  exitCode: number;
+  executionTime: number;
+  success: boolean;
+  riskScore: number;
+  securityEvents: string[];
+  sessionId: string;
+  userId?: string;
+}
+```
+
+**Error Handling**:
+- **ShellExecutionError**: Base execution errors with context
+- **ShellSecurityError**: Security violation errors
+- **ShellTimeoutError**: Command timeout errors  
+- **ShellPermissionError**: Permission-related errors
+- 11 total error categories with intelligent suggestions
+
+**Usage Examples (of how the LLM would call the tool)**:
+```bash
+# Development commands (typically auto-approved)
+npm test
+npm run build
+git status
+ls -la
+
+# Medium risk commands (may require confirmation)
+npm install
+git push origin main
+mkdir new-directory
+
+# High risk commands (require confirmation or blocked)
+rm -rf node_modules
+chmod 777 file.txt
+sudo apt install package
+```
+
+---
 
 ### Supporting Components
 

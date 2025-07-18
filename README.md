@@ -2,14 +2,19 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-**Version 1.3.0** - Reworked MCP tools system and added some docs.
+**Version 1.4.0** - Added Shell MCP tool for command execution with comprehensive security features.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Features
 
-- Aiya.. this is just a budget version of all the other fancy LLM tools out there. Building this just for myself to test Ollama models.
+- **Multi-Provider Support**: Seamless integration with Ollama, OpenAI, Anthropic, and Google Gemini
+- **Secure File Operations**: Comprehensive MCP tool system for reading, writing, editing, and searching files
+- **Shell Command Execution**: Safe command execution with security validation and user confirmation
+- **Interactive Terminal UI**: Modern React-based terminal interface with real-time streaming
+- **Workspace Security**: All operations restricted to project workspace with configurable safety measures
+- **Development Workflow Support**: Built for AI-assisted development with tools for testing, building, and debugging
 
 ## Prerequisites
 
@@ -165,6 +170,23 @@ security:
   restrictToWorkspace: true
   maxFileSize: 1048576
 
+shell:
+  confirmationThreshold: 50
+  confirmationTimeout: 30000
+  sessionMemory: true
+  trustedCommands:
+    - 'ls*'
+    - 'pwd'
+    - 'echo*'
+    - 'git status'
+    - 'npm test'
+  alwaysBlockPatterns:
+    - 'rm -rf /'
+    - 'sudo rm -rf'
+    - 'dd if=/dev/zero'
+    - 'format*'
+    - 'shutdown*'
+
 ui:
   streaming: true
   showTokens: true
@@ -174,7 +196,7 @@ Refer to [init process](/docs/INIT-PROCESS.md) for more details.
 
 ## MCP Tool System
 
-Aiya includes a built-in Model Context Protocol (MCP) tool system that enables file operations:
+Aiya includes a built-in Model Context Protocol (MCP) tool system that enables comprehensive development operations:
 
 ### Available Tools
 
@@ -183,9 +205,42 @@ Aiya includes a built-in Model Context Protocol (MCP) tool system that enables f
 - **WriteFile**: Write content to file with safety features and mode options (overwrite/create-only/append)
 - **EditFile**: Apply targeted edits using replace/insert/delete operations with fuzzy matching
 - **SearchFiles**: Search files with literal and regex patterns, including context lines
+- **ListDirectory**: Browse directory contents with smart filtering and project-focused views
 
-### Tool Usage
-The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, and batch processing for complex file manipulation tasks.
+#### Shell Command Execution
+- **ExecuteCommand**: Run shell commands safely within workspace boundaries
+  - Security validation with dangerous command detection
+  - User confirmation prompts for risky operations
+  - Comprehensive execution logging and audit trails
+  - Timeout protection and error handling
+  - Working directory control and path restrictions
+
+### Tool Usage Examples
+
+#### Development Workflow Commands
+```bash
+# The AI can execute these commands after user confirmation:
+npm test              # Run project tests
+npm run build         # Build the project
+git status            # Check repository status
+ls -la src/          # List source files
+grep -r "TODO" .     # Search for TODO comments
+```
+
+#### File Operations
+The AI can read, edit, and manage files directly:
+- Read configuration files to understand project setup
+- Make targeted code edits with precise find-and-replace
+- Search across the codebase for specific patterns
+- Create new files following project conventions
+
+### Security Features
+All tools operate within strict security boundaries:
+- **Workspace Restriction**: All operations limited to current project directory
+- **Command Validation**: Dangerous commands (rm -rf, format, etc.) are blocked
+- **User Confirmation**: Risky operations require explicit user approval
+- **Audit Logging**: All commands and file operations are logged
+- **Timeout Protection**: Long-running commands are automatically terminated
 
 ## Basic Security
 
@@ -223,6 +278,7 @@ npm run format:check      # Check code formatting
 
 ## Changelog
 
+- **Version 1.4.0** - Added comprehensive Shell MCP tool for secure command execution. Features include dangerous command detection, user confirmation prompts, risk assessment, execution logging, and workspace boundary enforcement. Enables full development workflows with AI assistance.
 - **Version 1.3.0** - Reworked MCP tools system with improved file operations and better error handling. Also added more documentation.
 - **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), vitest setup, and improved setup wizard.
 - **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.

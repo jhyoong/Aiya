@@ -54,7 +54,7 @@ src/
 ├── core/                  # Core business logic
 │   ├── config/           # Configuration management
 │   ├── providers/        # AI provider implementations
-│   ├── mcp/             # Model Context Protocol tools
+│   ├── mcp/             # Model Context Protocol tools (filesystem, shell)
 │   ├── security/        # Security and validation
 │   ├── operations/      # File operations
 │   ├── tokens/          # Token counting and logging
@@ -128,6 +128,16 @@ src/
   - Support advanced search capabilities (fuzzy, AST, regex)
   - Provide atomic operations and rollback capabilities
 - **Pattern**: Strategy Pattern + Command Pattern + Facade Pattern
+
+#### ShellMCPClient - Command Execution
+- **Purpose**: Provide secure shell command execution within workspace boundaries
+- **Responsibilities**:
+  - Execute shell commands with structured output (stdout, stderr, exitCode)
+  - Implement comprehensive security measures and dangerous command detection
+  - Provide user confirmation system with risk assessment
+  - Maintain execution logging and audit trails
+  - Enforce workspace restrictions and timeout protection
+- **Pattern**: Command Pattern + Security Pattern + Observer Pattern
 
 #### WorkspaceSecurity - Security Layer
 - **Purpose**: Ensure secure file operations within workspace boundaries
@@ -214,13 +224,26 @@ src/
 ## Security Architecture
 
 ### Multi-Layer Security
+
+#### File Operations Security
 1. **Workspace Validation**: All file operations restricted to workspace
 2. **Extension Filtering**: Configurable allowed file extensions
 3. **Size Limits**: Maximum file size enforcement
 4. **Path Validation**: Secure path resolution and validation
 5. **Access Control**: Read/write permission validation
 
+#### Shell Command Security
+1. **Dangerous Command Detection**: Block harmful patterns (rm -rf, format, etc.)
+2. **Command Sanitization**: Prevent injection and shell expansion attacks
+3. **Workspace Boundary Enforcement**: Restrict command execution to workspace
+4. **User Confirmation System**: Interactive prompts for risky commands
+5. **Risk Assessment**: Score commands 0-100 based on danger level
+6. **Session Memory**: Cache confirmation decisions to reduce prompt fatigue
+7. **Audit Logging**: Comprehensive logging of all command executions
+
 ### Security Flow
+
+#### File Operations
 ```
 File Operation Request
         ↓
@@ -233,6 +256,25 @@ Extension & Size Checking
 Permission Validation
         ↓
 Approved Operation
+```
+
+#### Shell Command Execution
+```
+Shell Command Request
+        ↓
+DangerousCommandDetector.check()
+        ↓
+CommandSanitizer.sanitize()
+        ↓
+WorkspaceBoundaryEnforcer.validate()
+        ↓
+CommandRiskAssessor.assess()
+        ↓
+User Confirmation (if risk > threshold)
+        ↓
+ShellExecutionLogger.log()
+        ↓
+Command Execution
 ```
 
 ## Extension Points
