@@ -485,4 +485,53 @@ export class ShellMCPClient extends MCPClient {
     config.alwaysBlockPatterns = config.alwaysBlockPatterns || [];
     config.alwaysBlockPatterns.push(`^${command.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
   }
+
+  /**
+   * Get current configuration
+   */
+  getConfiguration(): ShellToolConfig {
+    return this.commandFilter.getConfig();
+  }
+
+  /**
+   * Update configuration
+   */
+  updateConfiguration(config: Partial<ShellToolConfig>): void {
+    this.commandFilter.updateConfig(config);
+  }
+
+  /**
+   * Add command to allowed commands
+   */
+  addAllowedCommand(command: string): void {
+    this.commandFilter.addAllowedCommand(command);
+  }
+
+  /**
+   * Add command to blocked commands
+   */
+  addBlockedCommand(command: string): void {
+    this.commandFilter.addBlockedCommand(command);
+  }
+
+  /**
+   * Get security summary
+   */
+  getSecuritySummary() {
+    return this.executionLogger.getSecuritySummary();
+  }
+
+  /**
+   * Get security events
+   */
+  getSecurityEvents(limit?: number) {
+    return this.executionLogger.getSecurityEvents(limit);
+  }
+
+  /**
+   * Export security report
+   */
+  exportSecurityReport(): string {
+    return this.executionLogger.exportSecurityReport();
+  }
 }

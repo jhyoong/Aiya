@@ -1,39 +1,20 @@
 /**
- * Performance tests for Risk Assessment System (Task 8)
+ * Performance tests for Command Categorization System (Task 8)
  * 
  * Tests the performance requirements from Phase 5 Task 8:
- * - Risk assessment must complete in < 10ms
- * - Performance testing for risk assessment accuracy
+ * - Command categorization must complete in < 10ms
+ * - Performance testing for categorization accuracy
  * - Integration with existing shell execution flow
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { CommandRiskAssessor } from '../../src/core/mcp/shell.js';
+import { categorizeCommand, CommandCategory } from '../../src/core/mcp/shell/command-categorization.js';
 
-describe('Risk Assessment Performance Tests', () => {
-  let riskAssessor: CommandRiskAssessor;
+describe('Command Categorization Performance Tests', () => {
+  // No setup needed for categorization system - it's stateless
 
-  beforeEach(() => {
-    // Use default configuration for consistent performance testing
-    const defaultConfig = {
-      allowedCommands: [],
-      blockedCommands: [],
-      requireConfirmation: true,
-      autoApprovePatterns: [],
-      maxExecutionTime: 30,
-      allowComplexCommands: false,
-      confirmationThreshold: 50,
-      trustedCommands: [],
-      alwaysBlockPatterns: [],
-      confirmationTimeout: 30000,
-      sessionMemory: true,
-    };
-    
-    riskAssessor = new CommandRiskAssessor(defaultConfig);
-  });
-
-  describe('Risk Assessment Performance Requirements', () => {
-    it('should assess simple commands in < 10ms', () => {
+  describe('Command Categorization Performance Requirements', () => {
+    it('should categorize simple commands in < 10ms', () => {
       const commands = [
         'ls',
         'pwd',
@@ -48,20 +29,20 @@ describe('Risk Assessment Performance Tests', () => {
 
       commands.forEach(command => {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         const duration = endTime - startTime;
 
         expect(duration).toBeLessThan(10);
         expect(result).toBeDefined();
-        expect(result.riskScore).toBeGreaterThanOrEqual(0);
-        expect(result.riskScore).toBeLessThanOrEqual(100);
         expect(result.category).toBeDefined();
-        expect(result.riskFactors).toBeDefined();
+        expect(result.reason).toBeDefined();
+        expect(result.requiresConfirmation).toBeDefined();
+        expect(result.allowExecution).toBeDefined();
       });
     });
 
-    it('should assess medium complexity commands in < 10ms', () => {
+    it('should categorize medium complexity commands in < 10ms', () => {
       const commands = [
         'cp file1.txt file2.txt',
         'mv old.txt new.txt',
@@ -77,20 +58,20 @@ describe('Risk Assessment Performance Tests', () => {
 
       commands.forEach(command => {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         const duration = endTime - startTime;
 
         expect(duration).toBeLessThan(10);
         expect(result).toBeDefined();
-        expect(result.riskScore).toBeGreaterThanOrEqual(0);
-        expect(result.riskScore).toBeLessThanOrEqual(100);
         expect(result.category).toBeDefined();
-        expect(result.riskFactors).toBeDefined();
+        expect(result.reason).toBeDefined();
+        expect(result.requiresConfirmation).toBeDefined();
+        expect(result.allowExecution).toBeDefined();
       });
     });
 
-    it('should assess high-risk commands in < 10ms', () => {
+    it('should categorize high-risk commands in < 10ms', () => {
       const commands = [
         'rm file.txt',
         'rmdir directory',
@@ -106,20 +87,20 @@ describe('Risk Assessment Performance Tests', () => {
 
       commands.forEach(command => {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         const duration = endTime - startTime;
 
         expect(duration).toBeLessThan(10);
         expect(result).toBeDefined();
-        expect(result.riskScore).toBeGreaterThanOrEqual(0);
-        expect(result.riskScore).toBeLessThanOrEqual(100);
         expect(result.category).toBeDefined();
-        expect(result.riskFactors).toBeDefined();
+        expect(result.reason).toBeDefined();
+        expect(result.requiresConfirmation).toBeDefined();
+        expect(result.allowExecution).toBeDefined();
       });
     });
 
-    it('should assess complex commands with pipes and redirects in < 10ms', () => {
+    it('should categorize complex commands with pipes and redirects in < 10ms', () => {
       const commands = [
         'ls -la | grep txt',
         'cat file.txt | head -10 | tail -5',
@@ -135,56 +116,57 @@ describe('Risk Assessment Performance Tests', () => {
 
       commands.forEach(command => {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         const duration = endTime - startTime;
 
         expect(duration).toBeLessThan(10);
         expect(result).toBeDefined();
-        expect(result.riskScore).toBeGreaterThanOrEqual(0);
-        expect(result.riskScore).toBeLessThanOrEqual(100);
         expect(result.category).toBeDefined();
-        expect(result.riskFactors).toBeDefined();
+        expect(result.reason).toBeDefined();
+        expect(result.requiresConfirmation).toBeDefined();
+        expect(result.allowExecution).toBeDefined();
       });
     });
   });
 
-  describe('Risk Assessment Accuracy Performance', () => {
+  describe('Command Categorization Accuracy Performance', () => {
     it('should maintain 95%+ accuracy while meeting performance targets', () => {
-      // Test a variety of commands with realistic risk levels
+      // Test a variety of commands with expected categories
       const testCases = [
         // SAFE commands - very basic read-only operations
-        { command: 'ls', expectedRange: [0, 30] },
-        { command: 'pwd', expectedRange: [0, 30] },
-        { command: 'echo hello', expectedRange: [0, 30] },
+        { command: 'ls', expectedCategory: CommandCategory.SAFE },
+        { command: 'pwd', expectedCategory: CommandCategory.SAFE },
+        { command: 'echo hello', expectedCategory: CommandCategory.SAFE },
+        { command: 'cat file.txt', expectedCategory: CommandCategory.SAFE },
+        { command: 'date', expectedCategory: CommandCategory.SAFE },
         
-        // LOW risk commands - safe development operations
-        { command: 'cat file.txt', expectedRange: [0, 40] },
-        { command: 'git status', expectedRange: [0, 40] },
-        { command: 'npm test', expectedRange: [0, 50] },
-        { command: 'node --version', expectedRange: [0, 30] },
+        // RISKY commands - operations that modify filesystem
+        { command: 'npm install', expectedCategory: CommandCategory.RISKY },
+        { command: 'mkdir directory', expectedCategory: CommandCategory.RISKY },
+        { command: 'cp file1 file2', expectedCategory: CommandCategory.RISKY },
+        { command: 'mv old new', expectedCategory: CommandCategory.RISKY },
+        { command: 'touch newfile', expectedCategory: CommandCategory.RISKY },
         
-        // MEDIUM risk commands - operations that modify filesystem
-        { command: 'npm install', expectedRange: [20, 70] },
-        { command: 'mkdir directory', expectedRange: [15, 60] },
-        { command: 'cp file1 file2', expectedRange: [10, 50] },
+        // DANGEROUS commands - high-risk operations
+        { command: 'rm file.txt', expectedCategory: CommandCategory.DANGEROUS },
+        { command: 'chmod 755 file', expectedCategory: CommandCategory.DANGEROUS },
+        { command: 'sudo apt update', expectedCategory: CommandCategory.DANGEROUS },
+        { command: 'chown user file', expectedCategory: CommandCategory.DANGEROUS },
         
-        // HIGH risk commands - dangerous operations
-        { command: 'rm file.txt', expectedRange: [40, 90] },
-        { command: 'chmod 755 file', expectedRange: [30, 80] },
-        
-        // CRITICAL commands - extremely dangerous
-        { command: 'sudo rm -rf', expectedRange: [80, 100] },
-        { command: 'format c:', expectedRange: [85, 100] },
-        { command: 'dd if=/dev/zero', expectedRange: [85, 100] },
+        // BLOCKED commands - extremely dangerous
+        { command: 'dd if=/dev/zero of=/dev/sda', expectedCategory: CommandCategory.BLOCKED },
+        { command: 'format c:', expectedCategory: CommandCategory.BLOCKED },
+        { command: 'mkfs.ext4 /dev/sda', expectedCategory: CommandCategory.BLOCKED },
+        { command: 'fdisk /dev/sda', expectedCategory: CommandCategory.BLOCKED },
       ];
 
       let correctlyAssessed = 0;
       const totalAssessments = testCases.length;
 
-      testCases.forEach(({ command, expectedRange }) => {
+      testCases.forEach(({ command, expectedCategory }) => {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         const duration = endTime - startTime;
 
@@ -192,7 +174,7 @@ describe('Risk Assessment Performance Tests', () => {
         expect(duration).toBeLessThan(10);
 
         // Accuracy assessment
-        const isAccurate = result.riskScore >= expectedRange[0] && result.riskScore <= expectedRange[1];
+        const isAccurate = result.category === expectedCategory;
         if (isAccurate) {
           correctlyAssessed++;
         }
@@ -200,17 +182,17 @@ describe('Risk Assessment Performance Tests', () => {
 
       const accuracy = (correctlyAssessed / totalAssessments) * 100;
       
-      // For integration testing, we verify that the risk assessment system is working
-      // and providing reasonable categorization. 60%+ accuracy shows the system is functioning.
+      // For integration testing, we verify that the categorization system is working
+      // and providing reasonable categorization. 60%+ accuracy shows the system is functioning well.
       expect(accuracy).toBeGreaterThanOrEqual(60);
       
       // Most importantly, verify that all assessments completed within performance requirements
-      expect(totalAssessments).toBeGreaterThan(10); // We tested a meaningful number of commands
+      expect(totalAssessments).toBeGreaterThan(15); // We tested a meaningful number of commands
     });
   });
 
-  describe('Risk Assessment Batch Performance', () => {
-    it('should handle multiple consecutive assessments efficiently', () => {
+  describe('Command Categorization Batch Performance', () => {
+    it('should handle multiple consecutive categorizations efficiently', () => {
       const commands = [
         'ls', 'pwd', 'cat file.txt', 'rm file.txt', 'sudo command',
         'npm install', 'git status', 'docker run', 'mkdir dir', 'echo hello'
@@ -218,7 +200,7 @@ describe('Risk Assessment Performance Tests', () => {
 
       const startTime = performance.now();
       
-      const results = commands.map(command => riskAssessor.assessRisk(command, '/tmp/test-workspace'));
+      const results = commands.map(command => categorizeCommand(command));
       
       const endTime = performance.now();
       const totalDuration = endTime - startTime;
@@ -233,47 +215,49 @@ describe('Risk Assessment Performance Tests', () => {
       // All results should be valid
       results.forEach(result => {
         expect(result).toBeDefined();
-        expect(result.riskScore).toBeGreaterThanOrEqual(0);
-        expect(result.riskScore).toBeLessThanOrEqual(100);
+        expect(result.category).toBeDefined();
+        expect(result.reason).toBeDefined();
+        expect(result.requiresConfirmation).toBeDefined();
+        expect(result.allowExecution).toBeDefined();
       });
     });
 
-    it('should maintain consistent performance across 100 assessments', () => {
-      const command = 'rm test-file.txt'; // Medium-high risk command
-      const assessmentTimes: number[] = [];
+    it('should maintain consistent performance across 100 categorizations', () => {
+      const command = 'rm test-file.txt'; // Dangerous command
+      const categorizationTimes: number[] = [];
 
       for (let i = 0; i < 100; i++) {
         const startTime = performance.now();
-        const result = riskAssessor.assessRisk(command);
+        const result = categorizeCommand(command);
         const endTime = performance.now();
         
         const duration = endTime - startTime;
-        assessmentTimes.push(duration);
+        categorizationTimes.push(duration);
         
         expect(result).toBeDefined();
         expect(duration).toBeLessThan(10);
       }
 
       // Calculate statistics
-      const averageTime = assessmentTimes.reduce((a, b) => a + b, 0) / assessmentTimes.length;
-      const maxTime = Math.max(...assessmentTimes);
-      const minTime = Math.min(...assessmentTimes);
+      const averageTime = categorizationTimes.reduce((a, b) => a + b, 0) / categorizationTimes.length;
+      const maxTime = Math.max(...categorizationTimes);
+      const minTime = Math.min(...categorizationTimes);
 
       // Performance should be consistent
       expect(averageTime).toBeLessThan(5); // Well under the 10ms target
-      expect(maxTime).toBeLessThan(10); // No single assessment should exceed 10ms
+      expect(maxTime).toBeLessThan(10); // No single categorization should exceed 10ms
       expect(minTime).toBeGreaterThan(0); // Should take some measurable time
     });
   });
 
-  describe('Risk Assessment Memory Performance', () => {
-    it('should not cause memory leaks during repeated assessments', () => {
+  describe('Command Categorization Memory Performance', () => {
+    it('should not cause memory leaks during repeated categorizations', () => {
       const command = 'npm install package';
       const initialMemory = process.memoryUsage().heapUsed;
 
-      // Perform many assessments
+      // Perform many categorizations
       for (let i = 0; i < 1000; i++) {
-        const result = riskAssessor.assessRisk(command);
+        const result = categorizeCommand(command);
         expect(result).toBeDefined();
       }
 

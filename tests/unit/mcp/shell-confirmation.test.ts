@@ -10,6 +10,9 @@ import {
   CommandRiskAssessment,
   CommandRiskCategory,
 } from '../../../src/core/mcp/shell.js';
+import {
+  CommandCategory,
+} from '../../../src/core/mcp/shell/command-categorization.js';
 
 // Mock React and Ink components for testing
 vi.mock('react', () => ({
@@ -73,7 +76,13 @@ describe('ShellConfirmationPrompt', () => {
 
     mockOptions = {
       command: 'rm -rf ./temp/',
-      riskAssessment: mockRiskAssessment,
+      categorization: {
+        category: CommandCategory.DANGEROUS,
+        reason: 'File deletion command',
+        matchedPattern: 'rm -rf',
+        requiresConfirmation: true,
+        allowExecution: true
+      },
       workingDirectory: '/home/user/project',
       timeout: 30000,
     };
@@ -119,7 +128,7 @@ describe('ShellConfirmationPrompt', () => {
       };
 
       const result = await prompt.promptUser(shortTimeoutOptions);
-      expect(result.decision).toBe('deny');
+      expect(result.action).toBe('deny');
       expect(result.timedOut).toBe(true);
       expect(result.rememberDecision).toBe(false);
     });
@@ -134,9 +143,9 @@ describe('SessionMemoryManager', () => {
     sessionMemory = new SessionMemoryManager();
     mockDecision = {
       commandPattern: 'ls -la',
-      decision: 'allow',
+      action: 'allow',
       timestamp: new Date(),
-      riskScore: 25,
+      category: CommandCategory.SAFE,
     };
   });
 
@@ -146,7 +155,7 @@ describe('SessionMemoryManager', () => {
       const retrieved = sessionMemory.checkPreviousDecision('ls -la');
 
       expect(retrieved).toBeDefined();
-      expect(retrieved!.decision).toBe('allow');
+      expect(retrieved!.action).toBe('allow');
       expect(retrieved!.commandPattern).toBe('ls -la');
     });
 
@@ -161,9 +170,9 @@ describe('SessionMemoryManager', () => {
       // Record a decision with a regex pattern
       const regexDecision: SessionDecision = {
         commandPattern: '^ls($|\\s)',
-        decision: 'allow',
+        action: 'allow',
         timestamp: new Date(),
-        riskScore: 25,
+        category: CommandCategory.SAFE,
       };
 
       sessionMemory.recordDecision('^ls($|\\s)', regexDecision);
@@ -171,15 +180,15 @@ describe('SessionMemoryManager', () => {
       // Should match commands that start with 'ls'
       const result = sessionMemory.checkPreviousDecision('ls -la');
       expect(result).toBeDefined();
-      expect(result!.decision).toBe('allow');
+      expect(result!.action).toBe('allow');
     });
 
     test('should handle invalid regex patterns gracefully', () => {
       const invalidRegexDecision: SessionDecision = {
         commandPattern: '[invalid-regex',
-        decision: 'allow',
+        action: 'allow',
         timestamp: new Date(),
-        riskScore: 25,
+        category: CommandCategory.SAFE,
       };
 
       sessionMemory.recordDecision('[invalid-regex', invalidRegexDecision);
@@ -193,10 +202,9 @@ describe('SessionMemoryManager', () => {
       // Create an old decision
       const oldDecision: SessionDecision = {
         commandPattern: 'old-command',
-        decision: 'allow',
+        action: 'allow',
         timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-        riskScore: 25,
-      };
+        };
 
       sessionMemory.recordDecision('old-command', oldDecision);
 
@@ -227,10 +235,9 @@ describe('SessionMemoryManager', () => {
       for (let i = 0; i < 105; i++) {
         const decision: SessionDecision = {
           commandPattern: `command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: new Date(),
-          riskScore: 25,
-        };
+            };
         sessionMemory.recordDecision(`command-${i}`, decision);
       }
 
@@ -286,18 +293,18 @@ describe('ConfirmationPromptOptions Interface', () => {
 describe('ConfirmationResponse Interface', () => {
   test('should have all required properties', () => {
     const response: ConfirmationResponse = {
-      decision: 'allow',
+      action: 'allow',
       rememberDecision: true,
       timedOut: false,
     };
 
-    expect(response).toHaveProperty('decision');
+    expect(response).toHaveProperty('action');
     expect(response).toHaveProperty('rememberDecision');
     expect(response).toHaveProperty('timedOut');
   });
 
   test('should accept all valid decision types', () => {
-    const decisions: ConfirmationResponse['decision'][] = [
+    const decisions: ConfirmationResponse['action'][] = [
       'allow',
       'deny',
       'trust',
@@ -320,29 +327,29 @@ describe('SessionDecision Interface', () => {
   test('should have all required properties', () => {
     const decision: SessionDecision = {
       commandPattern: 'test-pattern',
-      decision: 'allow',
+      action: 'allow',
       timestamp: new Date(),
-      riskScore: 42,
+      category: CommandCategory.SAFE,
     };
 
     expect(decision).toHaveProperty('commandPattern');
-    expect(decision).toHaveProperty('decision');
+    expect(decision).toHaveProperty('action');
     expect(decision).toHaveProperty('timestamp');
-    expect(decision).toHaveProperty('riskScore');
+    expect(decision).toHaveProperty('category');
   });
 
   test('should accept all valid decision types', () => {
-    const decisions: SessionDecision['decision'][] = ['allow', 'deny', 'trust'];
+    const decisions: SessionDecision['action'][] = ['allow', 'deny', 'trust'];
 
     decisions.forEach(decisionType => {
       const decision: SessionDecision = {
         commandPattern: 'test-pattern',
-        decision: decisionType,
+        action: decisionType,
         timestamp: new Date(),
-        riskScore: 42,
+        category: CommandCategory.SAFE,
       };
 
-      expect(decision.decision).toBe(decisionType);
+      expect(decision.action).toBe(decisionType);
     });
   });
 });
@@ -384,7 +391,6 @@ describe('Risk Assessment Integration', () => {
 
   test('should handle empty risk factors and suggestions', () => {
     const assessment: CommandRiskAssessment = {
-      riskScore: 25,
       category: CommandRiskCategory.SAFE,
       riskFactors: [],
       requiresConfirmation: false,

@@ -5,6 +5,8 @@
  * All magic numbers and constant arrays are organized here for better maintainability.
  */
 
+import { ShellToolConfig } from './types.js';
+
 // =============================================================================
 // COMMAND CATEGORIZATION PATTERNS
 // =============================================================================
@@ -442,7 +444,7 @@ export const PATH_TRAVERSAL_PATTERNS = [
 /**
  * Default configuration values for the shell tool
  */
-export const DEFAULT_SHELL_CONFIG = {
+export const DEFAULT_SHELL_CONFIG: ShellToolConfig = {
   /** Require confirmation for risky commands */
   requireConfirmationForRisky: true,
   

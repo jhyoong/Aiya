@@ -326,6 +326,10 @@ export class CommandFilter {
       throw new Error('autoApprovePatterns must be an array');
     }
 
+    if (!Array.isArray(this.config.alwaysBlockPatterns)) {
+      throw new Error('alwaysBlockPatterns must be an array');
+    }
+
     // Validate boolean fields
     if (typeof this.config.sessionMemory !== 'boolean') {
       throw new Error('sessionMemory must be a boolean');
@@ -365,6 +369,17 @@ export class CommandFilter {
       } catch (error) {
         throw new Error(
           `Invalid regex pattern in autoApprovePatterns[${index}]: ${pattern}`
+        );
+      }
+    });
+
+    // Validate regex patterns in alwaysBlockPatterns
+    this.config.alwaysBlockPatterns.forEach((pattern, index) => {
+      try {
+        new RegExp(pattern);
+      } catch (error) {
+        throw new Error(
+          `Invalid regex pattern in alwaysBlockPatterns[${index}]: ${pattern}`
         );
       }
     });

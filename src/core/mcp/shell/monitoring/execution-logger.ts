@@ -384,6 +384,40 @@ export class ShellExecutionLogger {
     };
   }
 
+  /**
+   * Get security events with optional limit
+   */
+  getSecurityEvents(limit?: number): ShellSecurityEvent[] {
+    const events = [...this.events].reverse();
+    return limit ? events.slice(0, limit) : events;
+  }
+
+  /**
+   * Get execution logs with optional limit
+   */
+  getExecutionLogs(limit?: number): ShellExecutionLog[] {
+    const logs = [...this.executionLogs].reverse();
+    return limit ? logs.slice(0, limit) : logs;
+  }
+
+  /**
+   * Get security summary from execution statistics
+   */
+  getSecuritySummary() {
+    return this.getExecutionStatistics().securityEventsSummary;
+  }
+
+  /**
+   * Export security report in JSON format
+   */
+  exportSecurityReport(): string {
+    return this.exportLogs({
+      format: ShellLogExportFormat.JSON,
+      includeSecurityEvents: true,
+      includePerformanceMetrics: true,
+    });
+  }
+
   // Private helper methods
 
   private generateExecutionId(): string {
@@ -399,7 +433,8 @@ export class ShellExecutionLogger {
   }
 
   private writeExecutionLogEntry(log: ShellExecutionLog): void {
-    const logLine = `[${log.timestamp.toISOString()}] [${log.sessionId}] [${log.id}] ${log.command} - Exit: ${log.exitCode}, Time: ${log.executionTime}ms, Success: ${log.success}, Category: ${log.categoryAssessment.category || 'unknown'}`;
+    const category = log.categoryAssessment?.category || 'unknown';
+    const logLine = `[${log.timestamp.toISOString()}] [${log.sessionId}] [${log.id}] ${log.command} - Exit: ${log.exitCode}, Time: ${log.executionTime}ms, Success: ${log.success}, Category: ${category}`;
 
     try {
       fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
@@ -592,5 +627,59 @@ export class ShellExecutionLogger {
     }
 
     return sanitized;
+  }
+
+  /**
+   * Log a blocked command event
+   */
+  logCommandBlocked(
+    command: string,
+    workingDirectory: string,
+    reason: string,
+    riskScore?: number
+  ): void {
+    this.logSecurityEvent({
+      eventType: 'COMMAND_BLOCKED',
+      command,
+      workingDirectory,
+      reason,
+      sessionId: this.sessionId,
+      severity: 'HIGH',
+      category: CommandCategory.BLOCKED,
+    });
+  }
+
+  /**
+   * Log an allowed command event
+   */
+  logCommandAllowed(command: string, workingDirectory: string): void {
+    this.logSecurityEvent({
+      eventType: 'COMMAND_ALLOWED',
+      command,
+      workingDirectory,
+      reason: 'Command allowed by security policy',
+      sessionId: this.sessionId,
+      severity: 'LOW',
+      category: CommandCategory.SAFE,
+    });
+  }
+
+  /**
+   * Log a path traversal attempt
+   */
+  logPathTraversal(
+    command: string,
+    workingDirectory: string,
+    path: string
+  ): void {
+    this.logSecurityEvent({
+      eventType: 'PATH_TRAVERSAL',
+      command,
+      workingDirectory,
+      reason: `Path traversal attempt detected: ${path}`,
+      sessionId: this.sessionId,
+      severity: 'CRITICAL',
+      category: CommandCategory.BLOCKED,
+    });
   }
 }
