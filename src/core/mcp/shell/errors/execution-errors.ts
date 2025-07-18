@@ -290,8 +290,8 @@ export class ShellErrorCategorizer {
 
     // General execution errors (lowest priority)
     {
-      messagePatterns: [/error/i, /failed/i, /exception/i, /abort/i, /crash/i],
-      stderrPatterns: [/error/i, /failed/i, /exception/i, /abort/i],
+      messagePatterns: [/failed/i, /exception/i, /abort/i, /crash/i],
+      stderrPatterns: [/failed/i, /exception/i, /abort/i],
       exitCodes: [1, 2, 3, 4, 5],
       errorType: ShellErrorType.EXECUTION_ERROR,
       retryable: true,
@@ -573,35 +573,42 @@ export class ShellErrorCategorizer {
 
     for (const pattern of this.ERROR_PATTERNS) {
       let matches = false;
+      let matchScore = 0;
 
-      // Check message patterns
+      // Check message patterns first (higher priority)
       if (
         pattern.messagePatterns.some((p: RegExp) => this.matchesPattern(errorMessage, p))
       ) {
         matches = true;
+        matchScore += 10;
       }
 
-      // Check stderr patterns
+      // Check stderr patterns (medium priority)
       if (
         pattern.stderrPatterns &&
         pattern.stderrPatterns.some((p: RegExp) => this.matchesPattern(stderr, p))
       ) {
         matches = true;
+        matchScore += 8;
       }
 
-      // Check exit codes
+      // Check exit codes (lower priority)
       if (pattern.exitCodes && pattern.exitCodes.includes(exitCode)) {
         matches = true;
+        matchScore += 5;
       }
 
-      // Check overall text for general patterns
+      // Check overall text for general patterns (lowest priority)
       if (pattern.messagePatterns.some((p: RegExp) => this.matchesPattern(allText, p))) {
         matches = true;
+        matchScore += 2;
       }
 
-      if (matches && pattern.priority > bestPriority) {
+      // Use both pattern priority and match score for best match
+      const totalScore = pattern.priority + matchScore;
+      if (matches && totalScore > bestPriority) {
         bestMatch = pattern;
-        bestPriority = pattern.priority;
+        bestPriority = totalScore;
       }
     }
 

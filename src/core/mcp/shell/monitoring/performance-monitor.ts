@@ -213,7 +213,7 @@ export class ShellPerformanceMonitor {
     const lowerCommand = command.toLowerCase();
 
     // Read operations
-    if (lowerCommand.match(/^(cat|head|tail|less|more|grep|find|ls|dir)\s/)) {
+    if (lowerCommand.match(/^(cat|head|tail|less|more|grep|find|ls|dir)(\s|$)/)) {
       reads = 1;
       bytesRead = stdout.length; // Approximate based on output
     }

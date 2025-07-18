@@ -50,6 +50,7 @@ export const RISKY_COMMAND_PATTERNS = [
   '^yarn install',
   '^mkdir($|\\s)',
   '^rmdir($|\\s)',
+  '^rm($|\\s)',
   '^touch($|\\s)',
   '^cp($|\\s)',
   '^mv($|\\s)',
@@ -226,9 +227,9 @@ export const ERROR_PRIORITIES = {
   COMMAND_NOT_FOUND: 90,
   SECURITY_ERROR: 85,
   WORKSPACE_VIOLATION: 85,
+  CONFIGURATION_ERROR: 82,
   INPUT_VALIDATION: 80,
   EXECUTION_ERROR: 70,
-  CONFIGURATION_ERROR: 60,
   UNKNOWN_ERROR: 10,
 };
 

@@ -177,11 +177,8 @@ export class ShellMCPClient extends MCPClient {
   ): Promise<ToolResult> {
     const { command, cwd } = params as ShellExecuteParams;
 
-    // Skip confirmation system if disabled in config
+    // Get configuration for confirmation behavior
     const config = this.commandFilter.getConfig();
-    if (!config.requireConfirmation) {
-      return await this.executeCommand(params);
-    }
 
     let workingDirectory = this.security.getWorkspaceRoot();
     if (cwd) {
@@ -201,7 +198,6 @@ export class ShellMCPClient extends MCPClient {
       if (categorization.category === CommandCategory.BLOCKED) {
         // Log the blocked command attempt for security audit
         this.executionLogger.logSecurityEvent({
-          id: randomUUID(),
           eventType: 'COMMAND_BLOCKED',
           command,
           workingDirectory,
@@ -223,7 +219,7 @@ export class ShellMCPClient extends MCPClient {
       }
 
       // 3. Check bypass logic for safe commands and trusted patterns
-      if (this.shouldBypassConfirmation(command, categorization, config)) {
+      if (!config.requireConfirmation || this.shouldBypassConfirmation(command, categorization, config)) {
         return await this.executeCommand(params);
       }
 
@@ -245,7 +241,6 @@ export class ShellMCPClient extends MCPClient {
     } catch (error) {
       // Log confirmation system errors but don't block execution completely
       this.executionLogger.logSecurityEvent({
-        id: randomUUID(),
         eventType: 'COMMAND_BLOCKED',
         command,
         workingDirectory,
@@ -312,7 +307,6 @@ export class ShellMCPClient extends MCPClient {
       case 'deny':
         // Log the denied command
         this.executionLogger.logSecurityEvent({
-          id: randomUUID(),
           eventType: 'COMMAND_DENIED',
           command,
           workingDirectory: this.security.getWorkspaceRoot(),
@@ -369,6 +363,33 @@ export class ShellMCPClient extends MCPClient {
     const { command, cwd, timeout = TIMEOUTS.DEFAULT_COMMAND_EXECUTION } = params;
 
     try {
+      // Validate timeout parameter
+      if (timeout <= 0) {
+        throw new ShellExecutionError(
+          `Invalid timeout: ${timeout}. Must be greater than 0.`,
+          ShellErrorType.INPUT_VALIDATION,
+          {
+            command,
+            workingDirectory: this.security.getWorkspaceRoot(),
+            timestamp: new Date(),
+            category: CommandCategory.RISKY,
+          }
+        );
+      }
+
+      if (timeout > TIMEOUTS.MAX_COMMAND_EXECUTION) {
+        throw new ShellExecutionError(
+          `Command failed: timeout exceeds maximum allowed: ${timeout}s > ${TIMEOUTS.MAX_COMMAND_EXECUTION}s`,
+          ShellErrorType.INPUT_VALIDATION,
+          {
+            command,
+            workingDirectory: this.security.getWorkspaceRoot(),
+            timestamp: new Date(),
+            category: CommandCategory.RISKY,
+          }
+        );
+      }
+
       // Validate workspace access
       let workingDirectory = this.security.getWorkspaceRoot();
       if (cwd) {
@@ -423,11 +444,32 @@ export class ShellMCPClient extends MCPClient {
         },
       });
 
+      // Create security information for response
+      const securityInfo = {
+        validated: true,
+        phase: 'Phase 4 - Enhanced Logging and Error Handling',
+        category: categorization.category,
+        requiresConfirmation: categorization.requiresConfirmation,
+        approved: true,
+        approvalMethod: 'automatic',
+        executionTime: Math.round(executionTime),
+        workingDirectory
+      };
+
+      // Create response with security information
+      const response = {
+        output: result.stdout || 'Command executed successfully (no output)',
+        security: securityInfo,
+        command,
+        timestamp: new Date().toISOString(),
+        exitCode: 0
+      };
+
       return {
         content: [
           {
             type: 'text',
-            text: result.stdout || 'Command executed successfully (no output)',
+            text: JSON.stringify(response, null, 2),
           },
         ],
         isError: false,

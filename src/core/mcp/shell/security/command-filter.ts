@@ -266,7 +266,7 @@ export class CommandFilter {
           return true;
         }
       } catch (error) {
-        // Invalid regex pattern, skip
+        // Invalid regex pattern, skip (should not happen due to validation)
         continue;
       }
     }

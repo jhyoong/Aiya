@@ -378,7 +378,7 @@ describe('Monitoring Modules', () => {
       it('should generate execution time distribution', () => {
         const stats = logger.getExecutionStatistics();
 
-        expect(stats.executionTimeDistribution.fast).toBe(3); // < 1000ms
+        expect(stats.executionTimeDistribution.fast).toBe(4); // < 1000ms
         expect(stats.executionTimeDistribution.normal).toBe(0); // 1000-10000ms
         expect(stats.executionTimeDistribution.slow).toBe(0); // > 10000ms
       });

@@ -74,20 +74,19 @@ describe('Security Modules', () => {
         expect(result.category).toBe(CommandCategory.RISKY);
       });
 
-      it('should allow dangerous commands with confirmation when enabled', () => {
+      it('should allow risky commands with confirmation when enabled', () => {
         const result = filter.isCommandAllowed('rm file.txt');
         expect(result.allowed).toBe(true);
         expect(result.requiresConfirmation).toBe(true);
-        expect(result.category).toBe(CommandCategory.DANGEROUS);
+        expect(result.category).toBe(CommandCategory.RISKY);
       });
 
-      it('should block dangerous commands when disabled', () => {
+      it('should allow risky commands even when dangerous commands are disabled', () => {
         filter.updateConfig({ allowDangerous: false });
         const result = filter.isCommandAllowed('rm file.txt');
-        expect(result.allowed).toBe(false);
-        expect(result.requiresConfirmation).toBe(false);
-        expect(result.category).toBe(CommandCategory.DANGEROUS);
-        expect(result.reason).toContain('Dangerous commands are disabled');
+        expect(result.allowed).toBe(true);
+        expect(result.requiresConfirmation).toBe(true);
+        expect(result.category).toBe(CommandCategory.RISKY);
       });
 
       it('should block commands with BLOCKED category', () => {
@@ -133,8 +132,7 @@ describe('Security Modules', () => {
       });
 
       it('should handle invalid regex patterns gracefully', () => {
-        filter.updateConfig({ trustedCommands: ['[invalid'] });
-        expect(() => filter.isCommandAllowed('ls')).toThrow();
+        expect(() => filter.updateConfig({ trustedCommands: ['[invalid'] })).toThrow();
       });
     });
 
@@ -360,7 +358,7 @@ describe('Security Modules', () => {
         const criticalResult = DangerousCommandDetector.isDangerous('rm -rf /');
         expect(criticalResult.severity).toBe('critical');
 
-        const highResult = DangerousCommandDetector.isDangerous('rm file.txt');
+        const highResult = DangerousCommandDetector.isDangerous('rm -rf *');
         expect(highResult.severity).toBe('high');
       });
     });

@@ -66,9 +66,10 @@ export class ShellExecutionLogger {
   /**
    * Log a security event with enhanced context
    */
-  logSecurityEvent(event: Omit<ShellSecurityEvent, 'timestamp'>): void {
+  logSecurityEvent(event: Omit<ShellSecurityEvent, 'timestamp' | 'id'>): void {
     const securityEvent: ShellSecurityEvent = {
       ...event,
+      id: randomUUID(),
       timestamp: new Date(),
     };
 
@@ -293,7 +294,7 @@ export class ShellExecutionLogger {
       successfulExecutions,
       failedExecutions,
       successRate: Math.round(successRate * 100) / 100,
-      averageExecutionTime: Math.round(averageExecutionTime),
+      averageExecutionTime: averageExecutionTime,
       topCommands,
       topErrors,
       categoryDistribution,
@@ -635,16 +636,15 @@ export class ShellExecutionLogger {
   logCommandBlocked(
     command: string,
     workingDirectory: string,
-    reason: string,
-    riskScore?: number
+    reason: string
   ): void {
     this.logSecurityEvent({
       eventType: 'COMMAND_BLOCKED',
       command,
       workingDirectory,
+      description: reason,
       reason,
       sessionId: this.sessionId,
-      severity: 'HIGH',
       category: CommandCategory.BLOCKED,
     });
   }
@@ -654,12 +654,12 @@ export class ShellExecutionLogger {
    */
   logCommandAllowed(command: string, workingDirectory: string): void {
     this.logSecurityEvent({
-      eventType: 'COMMAND_ALLOWED',
+      eventType: 'TRUSTED_BYPASS',
       command,
       workingDirectory,
+      description: 'Command allowed by security policy',
       reason: 'Command allowed by security policy',
       sessionId: this.sessionId,
-      severity: 'LOW',
       category: CommandCategory.SAFE,
     });
   }
@@ -676,9 +676,9 @@ export class ShellExecutionLogger {
       eventType: 'PATH_TRAVERSAL',
       command,
       workingDirectory,
+      description: `Path traversal attempt detected: ${path}`,
       reason: `Path traversal attempt detected: ${path}`,
       sessionId: this.sessionId,
-      severity: 'CRITICAL',
       category: CommandCategory.BLOCKED,
     });
   }
