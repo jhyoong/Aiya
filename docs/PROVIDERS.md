@@ -303,9 +303,10 @@ Providers that support function calling can handle tool calls:
 **Tool Call Flow**:
 1. User message includes tool request
 2. Provider processes and returns tool calls
-3. Tool executor runs the requested tools
-4. Tool results are sent back to provider
-5. Provider generates final response
+3. Tool executor runs the requested tools (file operations, shell commands)
+4. Security approval required for dangerous shell commands
+5. Tool results are sent back to provider
+6. Provider generates final response
 
 **Tool Call Conversion**:
 - Different providers handle tool calls differently

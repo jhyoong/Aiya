@@ -67,6 +67,9 @@ export interface AiyaConfig {
       cwd?: string;
     }>;
   };
+  tools?: {
+    requireConfirmation?: boolean;
+  };
   max_tokens?: number;
 }
 
@@ -123,6 +126,9 @@ const DEFAULT_CONFIG: AiyaConfig = {
   },
   mcp: {
     servers: [],
+  },
+  tools: {
+    requireConfirmation: true,
   },
   max_tokens: 4096,
 };

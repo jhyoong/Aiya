@@ -105,6 +105,8 @@ src/core/mcp/
 ├── base.ts                    # MCP client base class and interfaces
 ├── filesystem.ts              # Main filesystem MCP client with 5 core tools
 ├── filesystem-state.ts        # State tracking and rollback system
+├── shell.ts                   # Shell command execution MCP client
+├── shell-constants.ts         # Shell command approval configuration
 ├── fuzzy-matcher.ts           # Fuzzy search implementation
 ├── ast-searcher.ts            # AST-based code search
 ├── IMPLEMENTATION_PLAN.md     # MCP implementation planning
@@ -115,6 +117,8 @@ src/core/mcp/
 **Key Files**:
 
 - **`filesystem.ts`**: Primary MCP client with ReadFile, WriteFile, EditFile, SearchFiles, ListDirectory tools
+- **`shell.ts`**: Shell command execution MCP client with RunCommand tool and security integration
+- **`shell-constants.ts`**: Configuration for shell command approval requirements and dangerous command lists
 - **`fuzzy-matcher.ts`**: Fuse.js-based fuzzy matching with confidence scoring
 - **`filesystem-state.ts`**: Change tracking and rollback capabilities for file operations
 
@@ -148,7 +152,9 @@ src/core/
 │   └── logger.ts        # Token usage logging
 └── tools/               # Tool execution
     ├── executor.ts      # Tool execution engine
-    └── mcp-tools.ts     # MCP tool service integration
+    ├── mcp-tools.ts     # MCP tool service integration
+    ├── shell-logger.ts  # Shell command execution logging
+    └── memory.ts        # Tool memory and preference management
 ```
 
 ### UI Layer (`src/ui/`)
@@ -169,6 +175,7 @@ src/ui/
     ├── StatusBar.tsx       # Advanced status bar
     ├── StartupLoader.tsx   # Application startup loader
     ├── ToolExecution.tsx   # Tool execution visualization
+    ├── ShellCommandConfirmationDialog.tsx # Shell command approval UI
     └── setup/              # Setup wizard components
         ├── index.ts        # Setup component exports
         ├── SetupWizard.tsx # Main setup wizard
@@ -183,6 +190,7 @@ src/ui/
 - **`AiyaApp.tsx`**: Root component managing application modes and routing
 - **`ChatInterface.tsx`**: Main chat UI with streaming support and memory management
 - **`UnifiedInput.tsx`**: Sophisticated input component with multi-line support and suggestions
+- **`ShellCommandConfirmationDialog.tsx`**: Security dialog for approving dangerous shell commands
 
 #### Core UI Utilities (`src/ui/core/`)
 
@@ -349,12 +357,15 @@ memory/
 
 ### MCP Tool System
 - **`src/core/mcp/filesystem.ts`**: Core file operations with security validation
+- **`src/core/mcp/shell.ts`**: Shell command execution with approval workflow and logging
+- **`src/core/mcp/shell-constants.ts`**: Shell command security configuration and dangerous command definitions
 - **`src/core/mcp/fuzzy-matcher.ts`**: Advanced fuzzy search with confidence scoring
 - **`src/core/security/workspace.ts`**: Workspace boundary enforcement
 
 ### UI System
 - **`src/ui/AiyaApp.tsx`**: Application routing and global state management
 - **`src/ui/components/ChatInterface.tsx`**: Chat functionality with streaming
+- **`src/ui/components/ShellCommandConfirmationDialog.tsx`**: Security approval dialog for shell commands
 - **`src/ui/core/TextBuffer.ts`**: Advanced text editing with visual layout
 - **`src/ui/hooks/useKeypress.ts`**: Terminal input handling
 
@@ -385,10 +396,11 @@ memory/
 4. Add tests in `tests/unit/providers/`
 
 **Adding a New MCP Tool**:
-1. Add tool schema to `src/core/mcp/filesystem.ts`
+1. Add tool schema to appropriate MCP client (`src/core/mcp/filesystem.ts` or `src/core/mcp/shell.ts`)
 2. Implement tool logic in the same file
-3. Add security validation
-4. Add tests in `tests/unit/mcp/`
+3. Add security validation and approval workflow if needed
+4. Add logging integration for audit trails
+5. Add tests in `tests/unit/mcp/`
 
 **Adding a UI Component**:
 1. Create component in `src/ui/components/`

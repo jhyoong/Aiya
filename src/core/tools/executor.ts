@@ -1,6 +1,7 @@
-import { ToolResult, Message } from '../providers/base.js';
+import { ToolResult, Message, ToolCall } from '../providers/base.js';
 import { MCPToolService } from './mcp-tools.js';
-import chalk from 'chalk';
+import { ToolMemoryService, ToolPreference } from './memory.js';
+import { ToolLogger } from './logger.js';
 
 /**
  * Tool execution coordinator for handling LLM tool calls
@@ -8,10 +9,22 @@ import chalk from 'chalk';
 export class ToolExecutor {
   private mcpService: MCPToolService;
   private verbose: boolean;
+  private confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined;
+  private memoryService: ToolMemoryService;
+  private toolLogger: ToolLogger;
 
-  constructor(mcpService: MCPToolService, verbose: boolean = false) {
+  constructor(
+    mcpService: MCPToolService, 
+    verbose: boolean = false,
+    confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined,
+    memoryService?: ToolMemoryService,
+    toolLogger?: ToolLogger
+  ) {
     this.mcpService = mcpService;
     this.verbose = verbose;
+    this.confirmationCallback = confirmationCallback;
+    this.memoryService = memoryService || new ToolMemoryService();
+    this.toolLogger = toolLogger || new ToolLogger();
   }
 
   /**
@@ -43,28 +56,90 @@ export class ToolExecutor {
     }
 
     if (this.verbose) {
-      console.log(chalk.yellow(` Detected ${toolCalls.length} tool call(s)`));
+      this.toolLogger.logToolDetection(toolCalls.length);
+    }
+
+    // Check memory for stored preferences first
+    const toolsNeedingConfirmation: ToolCall[] = [];
+    let shouldExecute = true;
+
+    for (const toolCall of toolCalls) {
+      // Special handling for shell tools - they should ALWAYS go through confirmation callback
+      // to enable command-specific approval (shell:rm, shell:curl, etc.)
+      if (toolCall.name === 'shell_RunCommand') {
+        toolsNeedingConfirmation.push(toolCall);
+        continue;
+      }
+      
+      const storedPreference = this.memoryService.getPreference(toolCall.name);
+      
+      if (storedPreference === 'reject') {
+        // Auto-reject due to stored preference
+        if (this.verbose) {
+          this.toolLogger.logAutoDecision(toolCall.name, 'reject');
+        }
+        shouldExecute = false;
+        break;
+      } else if (storedPreference === 'allow') {
+        // Auto-allow due to stored preference
+        if (this.verbose) {
+          this.toolLogger.logAutoDecision(toolCall.name, 'allow');
+        }
+      } else {
+        // No stored preference, needs confirmation
+        toolsNeedingConfirmation.push(toolCall);
+      }
+    }
+
+    // If any tool was auto-rejected, cancel execution
+    if (!shouldExecute) {
+      return {
+        updatedMessage: message,
+        toolResults: [],
+        hasToolCalls: false,
+      };
+    }
+
+    // Request confirmation for tools without stored preferences
+    if (toolsNeedingConfirmation.length > 0 && this.confirmationCallback) {
+      const confirmed = await this.confirmationCallback(toolsNeedingConfirmation);
+      if (!confirmed) {
+        // User cancelled - return message without tool execution
+        if (this.verbose) {
+          this.toolLogger.logUserCancellation();
+        }
+        return {
+          updatedMessage: message,
+          toolResults: [],
+          hasToolCalls: false,
+        };
+      }
     }
 
     // Execute all tool calls
     const toolResults: ToolResult[] = [];
     for (const toolCall of toolCalls) {
       if (this.verbose) {
-        console.log(
-          chalk.blue(
-            `  → Executing: ${toolCall.name}(${JSON.stringify(toolCall.arguments)})`
-          )
-        );
+        this.toolLogger.logToolExecutionStart(toolCall.name, toolCall.arguments);
       }
 
+      const startTime = Date.now();
       const result = await this.mcpService.executeTool(toolCall);
+      const duration = Date.now() - startTime;
+      
+      // Log tool execution
+      this.toolLogger.logToolExecution(
+        toolCall.name,
+        toolCall.arguments,
+        result.isError ? undefined : result.result,
+        result.isError ? result.result : undefined,
+        duration
+      );
+      
       toolResults.push(result);
 
       if (this.verbose) {
-        const status = result.isError ? chalk.red('✗') : chalk.green('✓');
-        console.log(
-          `  ${status} ${toolCall.name}: ${result.result.substring(0, 100)}${result.result.length > 100 ? '...' : ''}`
-        );
+        this.toolLogger.logToolExecutionResult(toolCall.name, result.result, result.isError || false);
       }
     }
 
@@ -161,5 +236,29 @@ export class ToolExecutor {
     } else {
       return `⚠️  ${successful} successful, ${failed} failed tool call(s)`;
     }
+  }
+
+  /**
+   * Store tool preference in memory
+   */
+  storeToolPreference(toolName: string, preference: ToolPreference): void {
+    this.memoryService.setPreference(toolName, preference);
+    if (this.verbose) {
+      this.toolLogger.logPreferenceStorage(toolName, preference);
+    }
+  }
+
+  /**
+   * Get memory service instance (for external access)
+   */
+  getMemoryService(): ToolMemoryService {
+    return this.memoryService;
+  }
+
+  /**
+   * Get tool logger instance (for external access)
+   */
+  getToolLogger(): ToolLogger {
+    return this.toolLogger;
   }
 }

@@ -26,7 +26,8 @@ AiyaApp (Root)
 ├── ChatInterface (Main chat UI)
 │   ├── UnifiedInput (Input handling)
 │   ├── SimpleStatusBar (Status display)
-│   └── ToolExecution (Tool execution UI)
+│   ├── ToolExecution (Tool execution UI)
+│   └── ShellCommandConfirmationDialog (Shell command approval)
 ├── SearchResults (Search result display)
 ├── SetupWizard (Initial setup)
 │   ├── WelcomeScreen
@@ -75,6 +76,7 @@ The primary interface for AI chat interactions:
 - **Streaming Support**: Real-time message streaming with chunked processing
 - **Provider Switching**: Runtime provider switching capabilities
 - **Memory Management**: Bounded arrays and content limiting
+- **Shell Command Integration**: Approval workflow for dangerous shell commands
 
 **Message State Management**:
 ```typescript
@@ -124,6 +126,40 @@ interface InputHandling {
 - **Command Pattern**: Input commands with validation
 - **Strategy Pattern**: Different input handling strategies
 - **Observer Pattern**: Real-time input feedback
+
+### ShellCommandConfirmationDialog - Command Approval UI
+**Location**: `src/ui/components/ShellCommandConfirmationDialog.tsx`
+
+Security-focused dialog for approving potentially dangerous shell commands:
+
+**Key Features**:
+- **Command Analysis**: Visual display of command and command type
+- **Risk Assessment**: Color-coded danger levels (red for dangerous, yellow for caution)
+- **User Choice Options**: Allow once, allow always, or reject
+- **Visual Feedback**: Clear visual indicators for command safety level
+- **Keyboard Navigation**: Full keyboard accessibility with arrow key navigation
+
+**Approval Interface**:
+```typescript
+interface ShellCommandConfirmationDialogProps {
+  command: string;           // Full command to execute
+  commandType: string;       // Base command name (e.g., 'rm', 'sudo')
+  onChoice: (choice: ShellConfirmationChoice) => void;
+}
+
+type ShellConfirmationChoice = 'allow-once' | 'reject' | 'allow-always';
+```
+
+**Security Features**:
+- **Dangerous Command Detection**: Highlights high-risk commands (rm, sudo, curl, etc.)
+- **Visual Risk Indicators**: Red borders and warning icons for dangerous commands
+- **Clear Command Display**: Shows both command type and full command text
+- **User Education**: Warning messages about potential system impact
+
+**Design Patterns**:
+- **Modal Pattern**: Blocking dialog that requires user decision
+- **Security Gate Pattern**: Prevents execution without explicit approval
+- **Progressive Disclosure**: Shows appropriate level of detail based on risk
 
 ### TextBuffer - Advanced Text Editing
 **Location**: `src/ui/core/TextBuffer.ts`

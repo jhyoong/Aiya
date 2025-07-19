@@ -1,12 +1,18 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { ShellMCPClient } from '../../../src/core/mcp/shell.js';
 import { MCPToolError } from '../../../src/core/mcp/base.js';
+import { ToolMemoryService } from '../../../src/core/tools/memory.js';
+import { ShellLogger } from '../../../src/core/tools/shell-logger.js';
 
 describe('ShellMCPClient', () => {
   let shellClient: ShellMCPClient;
+  let memoryService: ToolMemoryService;
+  let shellLogger: ShellLogger;
 
   beforeEach(() => {
-    shellClient = new ShellMCPClient();
+    memoryService = new ToolMemoryService();
+    shellLogger = new ShellLogger();
+    shellClient = new ShellMCPClient(memoryService, shellLogger);
   });
 
   describe('constructor and basic properties', () => {
@@ -328,6 +334,71 @@ describe('ShellMCPClient', () => {
 
       expect(result.isError).toBe(false);
       expect(result.content[0].text).toContain(process.cwd());
+    });
+  });
+
+  describe('command execution and logging', () => {
+    it('should execute all commands without approval checks', async () => {
+      const result = await shellClient.callTool('RunCommand', {
+        command: 'echo "any command"',
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toContain('any command');
+    });
+
+    it('should execute potentially dangerous commands (approval handled at higher level)', async () => {
+      // The shell client no longer blocks commands - approval is handled in chat.ts
+      const result = await shellClient.callTool('RunCommand', {
+        command: 'rm --help',
+      });
+
+      expect(result.isError).toBe(false);
+      expect(result.content[0].text).toMatch(/(Usage|help|option)/i);
+    });
+
+    it('should provide memory service access', () => {
+      const memoryServiceInstance = shellClient.getMemoryService();
+      expect(memoryServiceInstance).toBe(memoryService);
+    });
+
+    it('should store command preferences correctly', () => {
+      shellClient.storeCommandPreference('git push origin main', 'allow');
+      
+      expect(memoryService.getPreference('shell:git')).toBe('allow');
+    });
+
+    it('should log successful command execution', async () => {
+      const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
+      
+      await shellClient.callTool('RunCommand', {
+        command: 'echo "test logging"',
+      });
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'echo "test logging"',
+        0, // exit code 0 for success
+        expect.stringContaining('test logging'),
+        expect.any(String),
+        expect.any(Number) // duration
+      );
+    });
+
+    it('should log failed command execution', async () => {
+      const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
+      
+      await shellClient.callTool('RunCommand', {
+        command: 'false', // command that always fails
+      });
+
+      expect(logSpy).toHaveBeenCalledWith(
+        'false',
+        expect.any(Number), // non-zero exit code
+        expect.any(String),
+        expect.any(String),
+        expect.any(Number), // duration
+        expect.any(String) // error message
+      );
     });
   });
 });
