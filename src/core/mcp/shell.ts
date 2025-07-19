@@ -23,10 +23,7 @@ export class ShellMCPClient extends MCPClient {
   private memoryService: ToolMemoryService;
   private shellLogger: ShellLogger;
 
-  constructor(
-    memoryService?: ToolMemoryService,
-    shellLogger?: ShellLogger
-  ) {
+  constructor(memoryService?: ToolMemoryService, shellLogger?: ShellLogger) {
     super('shell');
     this.memoryService = memoryService || new ToolMemoryService();
     this.shellLogger = shellLogger || new ShellLogger();
@@ -123,7 +120,7 @@ export class ShellMCPClient extends MCPClient {
       });
 
       const duration = Date.now() - startTime;
-      
+
       // Log successful command execution
       this.shellLogger.logShellCommand(
         command,
@@ -157,7 +154,7 @@ export class ShellMCPClient extends MCPClient {
       };
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      
+
       // Log failed command execution
       this.shellLogger.logShellCommand(
         command,

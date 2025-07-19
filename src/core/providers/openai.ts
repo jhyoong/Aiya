@@ -171,6 +171,8 @@ export class OpenAIProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: capabilities.supportsThinking,
+          maxTokens: capabilities.maxTokens,
+          supportsStreaming: true,
         },
       };
     } catch (error) {

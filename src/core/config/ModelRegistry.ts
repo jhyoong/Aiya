@@ -293,22 +293,19 @@ export class ModelRegistry {
   }
 
   private static getDisplayName(providerType: keyof ProviderModels): string {
-    const displayNames = {
-      ollama: 'Ollama - Local AI models',
-      openai: 'OpenAI - GPT models',
-      gemini: 'Google Gemini - Gemini models',
-    };
-    return displayNames[providerType] || providerType;
+    // Import moved to avoid circular dependency
+    const { PROVIDER_DISPLAY_NAMES } = require('./constants.js');
+    return PROVIDER_DISPLAY_NAMES[providerType] || providerType;
   }
 
   private static getCapabilitiesDescription(
     providerType: keyof ProviderModels
   ): string {
-    const capabilities = {
-      ollama: 'Free, runs locally, good for development',
-      openai: 'Paid API, state-of-the-art models, function calling',
-      gemini: 'Paid API, large context windows, vision support, thinking mode',
-    };
-    return capabilities[providerType] || 'Provider-specific capabilities';
+    // Import moved to avoid circular dependency
+    const { PROVIDER_CAPABILITIES_DESCRIPTIONS } = require('./constants.js');
+    return (
+      PROVIDER_CAPABILITIES_DESCRIPTIONS[providerType] ||
+      'Provider-specific capabilities'
+    );
   }
 }

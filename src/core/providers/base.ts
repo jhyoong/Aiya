@@ -1,58 +1,16 @@
-import { UsageMetadata, ToolArguments } from '../../types/ProviderTypes.js';
+import {
+  Message,
+  ModelInfo,
+  ProviderResponse,
+  StreamResponse,
+  ToolCall,
+  ToolResult,
+  BaseProviderConfig,
+  ProviderConfig as TypedProviderConfig,
+} from '../../types/ProviderTypes.js';
 
-export interface ToolCall {
-  id: string;
-  name: string;
-  arguments: ToolArguments;
-}
-
-export interface ToolResult {
-  toolCallId: string;
-  result: string;
-  isError?: boolean;
-}
-
-export interface Message {
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  content: string;
-  toolCalls?: ToolCall[];
-  toolCallId?: string; // For tool result messages
-}
-
-export interface Response {
-  content: string;
-  tokensUsed?: number;
-  finishReason?: 'stop' | 'length' | 'tool_calls';
-  toolCalls?: ToolCall[];
-}
-
-export interface StreamResponse {
-  content: string;
-  done: boolean;
-  tokensUsed?: number;
-  toolCalls?: ToolCall[];
-  usage?: UsageMetadata; // Structured usage metadata
-  usageMetadata?: UsageMetadata; // Alternative usage metadata field
-}
-
-export interface ModelInfo {
-  name: string;
-  contextLength: number;
-  supportedFeatures: string[];
-  capabilities?: {
-    supportsVision: boolean;
-    supportsFunctionCalling: boolean;
-    supportsThinking: boolean;
-    costPerToken?: { input: number; output: number };
-  };
-}
-
-export interface ProviderConfig {
-  type: string;
-  model: string;
-  baseUrl: string;
-  apiKey?: string;
-  maxTokens?: number;
+// Extended ProviderConfig for backward compatibility with existing provider implementations
+export interface ProviderConfig extends BaseProviderConfig {
   // Provider-specific configurations with proper typing
   azure?: {
     deploymentName?: string;
@@ -87,6 +45,17 @@ export interface ProviderConfig {
     modelId?: string;
   };
 }
+
+// Re-export types for backward compatibility
+export type Response = ProviderResponse;
+export {
+  Message,
+  ModelInfo,
+  StreamResponse,
+  ToolCall,
+  ToolResult,
+  TypedProviderConfig,
+};
 
 export abstract class LLMProvider {
   protected config: ProviderConfig;

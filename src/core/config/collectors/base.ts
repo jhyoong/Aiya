@@ -61,30 +61,103 @@ export abstract class BaseProviderCollector {
    * Get provider display name
    */
   getDisplayName(): string {
-    const displayNames = {
-      ollama: 'Ollama - Local AI models',
-      openai: 'OpenAI - GPT models',
-      gemini: 'Google Gemini - Gemini models',
-      anthropic: 'Anthropic - Claude models',
-      azure: 'Azure OpenAI - Enterprise GPT',
-      bedrock: 'AWS Bedrock - Various models',
-    };
-    return displayNames[this.providerType] || this.providerType;
+    // Import moved to avoid circular dependency
+    const { PROVIDER_DISPLAY_NAMES } = require('../constants.js');
+    return PROVIDER_DISPLAY_NAMES[this.providerType] || this.providerType;
   }
 
   /**
    * Get provider capabilities description
    */
   getCapabilitiesDescription(): string {
-    const capabilities = {
-      ollama: 'Free, runs locally, good for development',
-      openai: 'Paid API, state-of-the-art models, function calling',
-      gemini: 'Paid API, large context windows, vision support',
-      anthropic: 'Paid API, 200K context, thinking mode',
-      azure: 'Enterprise deployment, custom models',
-      bedrock: 'AWS managed, multiple model providers',
+    // Import moved to avoid circular dependency
+    const { PROVIDER_CAPABILITIES_DESCRIPTIONS } = require('../constants.js');
+    return (
+      PROVIDER_CAPABILITIES_DESCRIPTIONS[this.providerType] ||
+      'Provider-specific capabilities'
+    );
+  }
+
+  /**
+   * Common validation pattern for collecting config with API key from environment
+   */
+  protected collectConfigWithApiKey(
+    providerType: string,
+    envVarName: string
+  ): ExtendedProviderConfig {
+    const apiKey =
+      this.options.existingConfig?.apiKey || process.env[envVarName];
+    const existingConfig = {
+      ...this.options.existingConfig,
+      ...(apiKey && { apiKey }),
     };
-    return capabilities[this.providerType] || 'Provider-specific capabilities';
+
+    const { CapabilityManager } = require('../CapabilityManager.js');
+    return CapabilityManager.getDefaultConfig(providerType, existingConfig);
+  }
+
+  /**
+   * Common validation pattern for basic config fields
+   */
+  protected validateBasicConfig(config: ExtendedProviderConfig): boolean {
+    // Validate required model field
+    if (!config.model || config.model.trim().length === 0) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Common test connection pattern with validation
+   */
+  protected async testConnectionWithValidation(
+    config: ExtendedProviderConfig,
+    testMethod: (config: ExtendedProviderConfig) => Promise<ConnectionTestResult>,
+    errorSuggestions: string[] = ['Check configuration']
+  ): Promise<ConnectionTestResult> {
+    if (!this.options.skipValidation) {
+      const isValid = await this.validateConfig(config);
+      if (!isValid) {
+        return {
+          success: false,
+          error: 'Invalid configuration',
+          suggestions: errorSuggestions,
+        };
+      }
+    }
+
+    return testMethod(config);
+  }
+
+  /**
+   * Common pattern for getting available models
+   */
+  protected async getModelsFromCapabilityManager(
+    providerType: string,
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]> {
+    const { CapabilityManager } = require('../CapabilityManager.js');
+    return await CapabilityManager.getAvailableModelsWithFetching(
+      providerType,
+      config
+    );
+  }
+
+  /**
+   * Common pattern for getting default config with API key
+   */
+  protected getDefaultConfigWithApiKey(
+    providerType: string,
+    envVarName: string
+  ): Partial<ExtendedProviderConfig> {
+    const apiKey = process.env[envVarName];
+    const { CapabilityManager } = require('../CapabilityManager.js');
+    const defaultConfig = CapabilityManager.getDefaultConfig(providerType);
+
+    return {
+      ...defaultConfig,
+      ...(apiKey && { apiKey }),
+    };
   }
 
   /**

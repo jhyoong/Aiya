@@ -19,8 +19,7 @@ export class OllamaCollector extends BaseProviderCollector {
   }
 
   async validateConfig(config: ExtendedProviderConfig): Promise<boolean> {
-    // Validate required fields
-    if (!config.model || config.model.trim().length === 0) {
+    if (!this.validateBasicConfig(config)) {
       return false;
     }
 
@@ -34,27 +33,17 @@ export class OllamaCollector extends BaseProviderCollector {
   async testConnection(
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
-    if (!this.options.skipValidation) {
-      const isValid = await this.validateConfig(config);
-      if (!isValid) {
-        return {
-          success: false,
-          error: 'Invalid configuration',
-          suggestions: ['Check model name and base URL'],
-        };
-      }
-    }
-
-    return this.connectionTester.testOllama(config);
+    return this.testConnectionWithValidation(
+      config,
+      this.connectionTester.testOllama.bind(this.connectionTester),
+      ['Check model name and base URL']
+    );
   }
 
   async getAvailableModels(
     config: Partial<ExtendedProviderConfig>
   ): Promise<string[]> {
-    return await CapabilityManager.getAvailableModelsWithFetching(
-      'ollama',
-      config
-    );
+    return this.getModelsFromCapabilityManager('ollama', config);
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {

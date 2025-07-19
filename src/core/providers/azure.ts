@@ -196,6 +196,8 @@ export class AzureOpenAIProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: false, // Azure OpenAI doesn't have thinking tags
+          maxTokens: capabilities.contextLength,
+          supportsStreaming: true,
           ...(capabilities.costPerToken && {
             costPerToken: capabilities.costPerToken,
           }),

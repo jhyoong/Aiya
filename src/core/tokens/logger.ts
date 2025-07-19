@@ -1,6 +1,4 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { randomUUID } from 'crypto';
+import { BaseLogger } from '../logging/BaseLogger.js';
 
 export interface TokenLogEntry {
   timestamp: string;
@@ -12,37 +10,18 @@ export interface TokenLogEntry {
   estimated: boolean;
 }
 
-export class TokenLogger {
-  private logFile: string;
-  private sessionId: string;
+export class TokenLogger extends BaseLogger {
   private provider: string;
   private model: string;
-  private isNewSession: boolean;
 
   constructor(provider: string, model: string, sessionId?: string) {
-    this.sessionId = sessionId || randomUUID();
+    super('tokens.log', sessionId);
     this.provider = provider;
     this.model = model;
-    this.isNewSession = !sessionId; // Track if this is a new session or continuing existing one
-
-    // Create logs directory in ~/.aiya/logs/
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    const aiyaDir = path.join(homeDir, '.aiya');
-    const logsDir = path.join(aiyaDir, 'logs');
-
-    // Ensure directories exist
-    if (!fs.existsSync(aiyaDir)) {
-      fs.mkdirSync(aiyaDir, { recursive: true });
-    }
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    this.logFile = path.join(logsDir, 'tokens.log');
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  protected getLoggerType(): string {
+    return 'token';
   }
 
   logTokenUsage(
@@ -61,12 +40,7 @@ export class TokenLogger {
     };
 
     const logLine = this.formatLogEntry(entry);
-
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write token log:', error);
-    }
+    this.writeLogEntry(logLine);
   }
 
   private formatLogEntry(entry: TokenLogEntry): string {
@@ -74,22 +48,16 @@ export class TokenLogger {
     return `[${entry.timestamp}] [${entry.sessionId}] ${entry.provider}:${entry.model} sent: ${entry.sent}, received: ${entry.received}${estimatedTag}`;
   }
 
-  logSessionStart(): void {
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_START ${this.provider}:${this.model}`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write session start log:', error);
-    }
+  override logSessionStart(): void {
+    const providerInfo = `${this.provider}:${this.model}`;
+    const logLine = this.formatSessionEvent('SESSION_START', providerInfo);
+    this.writeLogEntry(logLine);
   }
 
-  logSessionEnd(): void {
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_END ${this.provider}:${this.model}`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write session end log:', error);
-    }
+  override logSessionEnd(): void {
+    const providerInfo = `${this.provider}:${this.model}`;
+    const logLine = this.formatSessionEvent('SESSION_END', providerInfo);
+    this.writeLogEntry(logLine);
   }
 
   /**
@@ -98,13 +66,10 @@ export class TokenLogger {
   logSessionChange(newProvider: string, newModel: string): void {
     const oldProvider = `${this.provider}:${this.model}`;
     const newProviderModel = `${newProvider}:${newModel}`;
+    const changeInfo = `${oldProvider} -> ${newProviderModel}`;
 
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_CHANGE ${oldProvider} -> ${newProviderModel}`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write session change log:', error);
-    }
+    const logLine = this.formatSessionEvent('SESSION_CHANGE', changeInfo);
+    this.writeLogEntry(logLine);
 
     // Update the current provider and model
     this.provider = newProvider;
@@ -136,7 +101,7 @@ export class TokenLogger {
   /**
    * Check if this is a new session
    */
-  isNewSessionStart(): boolean {
+  override isNewSessionStart(): boolean {
     return this.isNewSession;
   }
 

@@ -222,6 +222,8 @@ export class BedrockProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: capabilities.supportsThinking,
+          maxTokens: capabilities.contextLength,
+          supportsStreaming: true,
           ...(capabilities.costPerToken && {
             costPerToken: capabilities.costPerToken,
           }),

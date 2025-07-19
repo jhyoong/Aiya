@@ -114,6 +114,13 @@ export class OllamaProvider extends LLMProvider {
         name: this.model,
         contextLength: this.extractContextLength(modelInfo),
         supportedFeatures: ['chat', 'streaming'],
+        capabilities: {
+          supportsVision: false, // Ollama generally doesn't support vision
+          supportsFunctionCalling: false, // Ollama doesn't support function calling
+          supportsThinking: false, // Ollama doesn't support thinking tokens
+          maxTokens: this.extractContextLength(modelInfo),
+          supportsStreaming: true,
+        },
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('not found')) {

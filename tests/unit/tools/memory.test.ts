@@ -1,5 +1,8 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { ToolMemoryService, ToolPreference } from '../../../src/core/tools/memory.js';
+import {
+  ToolMemoryService,
+  ToolPreference,
+} from '../../../src/core/tools/memory.js';
 
 describe('ToolMemoryService', () => {
   let memoryService: ToolMemoryService;
@@ -17,7 +20,7 @@ describe('ToolMemoryService', () => {
 
     test('should store and retrieve tool preferences', () => {
       memoryService.setPreference('read-file', 'allow');
-      
+
       expect(memoryService.hasPreference('read-file')).toBe(true);
       expect(memoryService.getPreference('read-file')).toBe('allow');
     });
@@ -34,7 +37,7 @@ describe('ToolMemoryService', () => {
 
     test('should return null for unknown tools', () => {
       memoryService.setPreference('known-tool', 'allow');
-      
+
       expect(memoryService.getPreference('unknown-tool')).toBeNull();
       expect(memoryService.hasPreference('unknown-tool')).toBe(false);
     });
@@ -93,7 +96,7 @@ describe('ToolMemoryService', () => {
       expect(allPreferences).toEqual({
         'read-file': 'allow',
         'write-file': 'reject',
-        'run-command': 'allow'
+        'run-command': 'allow',
       });
     });
 
@@ -103,13 +106,13 @@ describe('ToolMemoryService', () => {
 
     test('should return a copy of preferences (not reference)', () => {
       memoryService.setPreference('test-tool', 'allow');
-      
+
       const preferences1 = memoryService.getAllPreferences();
       const preferences2 = memoryService.getAllPreferences();
-      
+
       // Modify one copy
       preferences1['new-tool'] = 'reject';
-      
+
       // Original should be unchanged
       expect(preferences2).not.toHaveProperty('new-tool');
       expect(memoryService.hasPreference('new-tool')).toBe(false);
@@ -124,7 +127,7 @@ describe('ToolMemoryService', () => {
         'tool.with.dots',
         'tool with spaces',
         'UPPERCASE_TOOL',
-        'Tool-With-Mixed_Case.dots'
+        'Tool-With-Mixed_Case.dots',
       ];
 
       toolNames.forEach(toolName => {
@@ -161,12 +164,12 @@ describe('ToolMemoryService', () => {
       expect(memoryService.hasPreference('tool1')).toBe(true);
       expect(memoryService.hasPreference('tool3')).toBe(false);
       memoryService.setPreference('tool3', 'allow');
-      
+
       // Verify all preferences are still intact
       expect(memoryService.getPreference('tool1')).toBe('allow');
       expect(memoryService.getPreference('tool2')).toBe('reject');
       expect(memoryService.getPreference('tool3')).toBe('allow');
-      
+
       const allPrefs = memoryService.getAllPreferences();
       expect(Object.keys(allPrefs)).toHaveLength(3);
     });
@@ -176,7 +179,7 @@ describe('ToolMemoryService', () => {
       for (let i = 0; i < 100; i++) {
         const toolName = `tool-${i}`;
         const preference: ToolPreference = i % 2 === 0 ? 'allow' : 'reject';
-        
+
         memoryService.setPreference(toolName, preference);
         expect(memoryService.getPreference(toolName)).toBe(preference);
       }

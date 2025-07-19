@@ -149,7 +149,7 @@ export class GeminiProvider extends LLMProvider {
         content: '',
         done: true,
         tokensUsed: totalTokens,
-        usageMetadata: usageMetadata, // Include full usage metadata
+        usage: usageMetadata, // Include full usage metadata
       };
     } catch (error) {
       this.handleError(error, 'stream');
@@ -182,6 +182,8 @@ export class GeminiProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: capabilities.supportsThinking,
+          maxTokens: capabilities.maxTokens,
+          supportsStreaming: true,
         },
       };
     } catch (error) {

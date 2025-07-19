@@ -97,10 +97,11 @@ export class ShellLogger extends ToolLogger {
   }
 
   private formatShellLogEntry(entry: ShellLogEntry): string {
-    const exitCodeTag = entry.exitCode !== undefined ? ` exit:${entry.exitCode}` : '';
+    const exitCodeTag =
+      entry.exitCode !== undefined ? ` exit:${entry.exitCode}` : '';
     const durationTag = entry.duration ? ` (${entry.duration}ms)` : '';
     const errorTag = entry.error ? ` ERROR: ${entry.error}` : '';
-    
+
     let outputInfo = '';
     if (entry.stdout) {
       outputInfo += ` stdout:[${entry.stdout.length} chars]`;
@@ -114,7 +115,7 @@ export class ShellLogger extends ToolLogger {
 
   private truncateOutput(output?: string): string | undefined {
     if (!output) return output;
-    
+
     // Truncate very long output to avoid massive log files
     if (output.length > 1000) {
       return output.substring(0, 1000) + '...[truncated]';
@@ -126,16 +127,16 @@ export class ShellLogger extends ToolLogger {
     // Extract the base command from the shell command
     const parts = command.trim().split(/\s+/);
     if (parts.length === 0) return 'unknown';
-    
+
     const baseCommand = parts[0];
     if (!baseCommand) return 'unknown';
-    
+
     // Handle common command patterns
     if (baseCommand.includes('/')) {
       // Full path command, extract just the command name
       return path.basename(baseCommand);
     }
-    
+
     return baseCommand;
   }
 }

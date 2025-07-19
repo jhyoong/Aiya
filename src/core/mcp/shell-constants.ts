@@ -9,7 +9,7 @@
 export const COMMANDS_REQUIRING_APPROVAL = [
   // File system operations (destructive)
   'rm',
-  'rmdir', 
+  'rmdir',
   'mv',
   'cp',
   'chmod',

@@ -220,6 +220,8 @@ export class AnthropicProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: true, // Claude supports thinking tags
+          maxTokens: capabilities.contextLength,
+          supportsStreaming: true,
           ...(capabilities.costPerToken && {
             costPerToken: capabilities.costPerToken,
           }),

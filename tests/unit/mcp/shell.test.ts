@@ -364,13 +364,13 @@ describe('ShellMCPClient', () => {
 
     it('should store command preferences correctly', () => {
       shellClient.storeCommandPreference('git push origin main', 'allow');
-      
+
       expect(memoryService.getPreference('shell:git')).toBe('allow');
     });
 
     it('should log successful command execution', async () => {
       const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
-      
+
       await shellClient.callTool('RunCommand', {
         command: 'echo "test logging"',
       });
@@ -386,7 +386,7 @@ describe('ShellMCPClient', () => {
 
     it('should log failed command execution', async () => {
       const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
-      
+
       await shellClient.callTool('RunCommand', {
         command: 'false', // command that always fails
       });

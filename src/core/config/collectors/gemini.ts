@@ -12,19 +12,12 @@ export class GeminiCollector extends BaseProviderCollector {
   }
 
   async collectConfig(): Promise<ExtendedProviderConfig> {
-    const apiKey =
-      this.options.existingConfig?.apiKey || process.env.GEMINI_API_KEY;
-    const existingConfig = {
-      ...this.options.existingConfig,
-      ...(apiKey && { apiKey }),
-    };
-
-    const config = CapabilityManager.getDefaultConfig('gemini', existingConfig);
+    const config = this.collectConfigWithApiKey('gemini', 'GEMINI_API_KEY');
 
     // Add Gemini-specific configurations
     if (!config.gemini) {
       config.gemini = {
-        location: existingConfig?.gemini?.location || 'us-central1',
+        location: this.options.existingConfig?.gemini?.location || 'us-central1',
         maxTokens: 8192,
         thinkingBudget: 20000,
         includeThoughts: true,
@@ -35,8 +28,7 @@ export class GeminiCollector extends BaseProviderCollector {
   }
 
   async validateConfig(config: ExtendedProviderConfig): Promise<boolean> {
-    // Validate required fields
-    if (!config.model || config.model.trim().length === 0) {
+    if (!this.validateBasicConfig(config)) {
       return false;
     }
 
@@ -51,36 +43,24 @@ export class GeminiCollector extends BaseProviderCollector {
   async testConnection(
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
-    if (!this.options.skipValidation) {
-      const isValid = await this.validateConfig(config);
-      if (!isValid) {
-        return {
-          success: false,
-          error: 'Invalid configuration',
-          suggestions: ['Check model name and API key'],
-        };
-      }
-    }
-
-    return this.connectionTester.testGemini(config);
+    return this.testConnectionWithValidation(
+      config,
+      this.connectionTester.testGemini.bind(this.connectionTester),
+      ['Check model name and API key']
+    );
   }
 
   async getAvailableModels(
     config: Partial<ExtendedProviderConfig>
   ): Promise<string[]> {
-    return await CapabilityManager.getAvailableModelsWithFetching(
-      'gemini',
-      config
-    );
+    return this.getModelsFromCapabilityManager('gemini', config);
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    const defaultConfig = CapabilityManager.getDefaultConfig('gemini');
+    const defaultConfig = this.getDefaultConfigWithApiKey('gemini', 'GEMINI_API_KEY');
 
     return {
       ...defaultConfig,
-      ...(apiKey && { apiKey }),
       gemini: {
         location: 'us-central1',
         maxTokens: 8192,

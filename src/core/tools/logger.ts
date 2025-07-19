@@ -1,6 +1,4 @@
-import * as fs from 'fs';
-import * as path from 'path';
-import { randomUUID } from 'crypto';
+import { BaseLogger } from '../logging/BaseLogger.js';
 
 export interface ToolLogEntry {
   timestamp: string;
@@ -12,33 +10,13 @@ export interface ToolLogEntry {
   duration?: number | undefined;
 }
 
-export class ToolLogger {
-  private logFile: string;
-  private sessionId: string;
-  private isNewSession: boolean;
-
+export class ToolLogger extends BaseLogger {
   constructor(sessionId?: string) {
-    this.sessionId = sessionId || randomUUID();
-    this.isNewSession = !sessionId;
-
-    // Create logs directory in ~/.aiya/logs/
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-    const aiyaDir = path.join(homeDir, '.aiya');
-    const logsDir = path.join(aiyaDir, 'logs');
-
-    // Ensure directories exist
-    if (!fs.existsSync(aiyaDir)) {
-      fs.mkdirSync(aiyaDir, { recursive: true });
-    }
-    if (!fs.existsSync(logsDir)) {
-      fs.mkdirSync(logsDir, { recursive: true });
-    }
-
-    this.logFile = path.join(logsDir, 'tools.log');
+    super('tools.log', sessionId);
   }
 
-  getSessionId(): string {
-    return this.sessionId;
+  protected getLoggerType(): string {
+    return 'tool';
   }
 
   logToolExecution(
@@ -59,12 +37,7 @@ export class ToolLogger {
     };
 
     const logLine = this.formatLogEntry(entry);
-
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (writeError) {
-      console.error('Failed to write tool log:', writeError);
-    }
+    this.writeLogEntry(logLine);
   }
 
   private formatLogEntry(entry: ToolLogEntry): string {
@@ -87,32 +60,10 @@ export class ToolLogger {
     }
   }
 
-  logSessionStart(): void {
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_START`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write session start log:', error);
-    }
-  }
-
-  logSessionEnd(): void {
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] SESSION_END`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write session end log:', error);
-    }
-  }
-
   logVerboseEvent(event: string, details?: string): void {
     const detailsStr = details ? ` ${details}` : '';
-    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] VERBOSE: ${event}${detailsStr}`;
-    try {
-      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
-    } catch (error) {
-      console.error('Failed to write verbose log:', error);
-    }
+    const logLine = this.formatSessionEvent(`VERBOSE: ${event}`, detailsStr);
+    this.writeLogEntry(logLine);
   }
 
   logToolDetection(count: number): void {
@@ -120,30 +71,46 @@ export class ToolLogger {
   }
 
   logAutoDecision(toolName: string, decision: 'allow' | 'reject'): void {
-    this.logVerboseEvent('AUTO_DECISION', `Tool '${toolName}' auto-${decision}ed due to stored preference`);
+    this.logVerboseEvent(
+      'AUTO_DECISION',
+      `Tool '${toolName}' auto-${decision}ed due to stored preference`
+    );
   }
 
   logUserCancellation(): void {
-    this.logVerboseEvent('USER_CANCELLATION', 'Tool execution cancelled by user');
+    this.logVerboseEvent(
+      'USER_CANCELLATION',
+      'Tool execution cancelled by user'
+    );
   }
 
   logToolExecutionStart(toolName: string, args: any): void {
     const argsStr = this.sanitizeArgs(args);
-    this.logVerboseEvent('TOOL_EXECUTION_START', `Executing: ${toolName}(${argsStr})`);
+    this.logVerboseEvent(
+      'TOOL_EXECUTION_START',
+      `Executing: ${toolName}(${argsStr})`
+    );
   }
 
-  logToolExecutionResult(toolName: string, result: string, isError: boolean): void {
+  logToolExecutionResult(
+    toolName: string,
+    result: string,
+    isError: boolean
+  ): void {
     const status = isError ? 'ERROR' : 'SUCCESS';
-    const truncatedResult = result.length > 100 ? result.substring(0, 100) + '...' : result;
-    this.logVerboseEvent('TOOL_EXECUTION_RESULT', `${toolName}: ${status} - ${truncatedResult}`);
+    const truncatedResult =
+      result.length > 100 ? result.substring(0, 100) + '...' : result;
+    this.logVerboseEvent(
+      'TOOL_EXECUTION_RESULT',
+      `${toolName}: ${status} - ${truncatedResult}`
+    );
   }
 
   logPreferenceStorage(toolName: string, preference: string): void {
-    this.logVerboseEvent('PREFERENCE_STORAGE', `Stored preference for '${toolName}': ${preference}`);
-  }
-
-  isNewSessionStart(): boolean {
-    return this.isNewSession;
+    this.logVerboseEvent(
+      'PREFERENCE_STORAGE',
+      `Stored preference for '${toolName}': ${preference}`
+    );
   }
 
   static continueSession(existingLogger: ToolLogger): ToolLogger {
