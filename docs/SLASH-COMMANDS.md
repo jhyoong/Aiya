@@ -228,11 +228,13 @@ Commands have access to:
 - Configuration settings
 
 ### MCP Tool Integration
-File operations use MCP (Model Context Protocol) tools:
+File operations and command execution use MCP (Model Context Protocol) tools:
 - **ReadFile**: Secure file reading with metadata
 - **SearchFiles**: Advanced search with multiple algorithms
 - **ListDirectory**: Directory listing with filtering
+- **RunCommand**: Shell command execution with approval workflow
 - **Security validation**: All operations through security layer
+- **Command approval**: Dangerous shell commands require user approval
 
 ### Provider Integration
 Commands work with all configured providers:

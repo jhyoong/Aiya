@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Model Context Protocol (MCP) tool system in Aiya provides a structured way for AI models to interact with the file system and other external resources. It implements a comprehensive set of file operations with security, validation, and advanced functionality.
+The Model Context Protocol (MCP) tool system in Aiya provides a structured way for AI models to interact with the file system, shell commands, and other external resources. It implements a comprehensive set of file operations and shell command execution with security, validation, and advanced functionality.
 
 ## Core Architecture
 
@@ -97,6 +97,10 @@ class FileSystemError extends Error {
   )
 }
 ```
+
+### MCP Client Implementations
+
+Aiya includes two primary MCP client implementations for different types of operations:
 
 ### Filesystem MCP Client
 
@@ -323,6 +327,124 @@ The primary MCP client implementation providing comprehensive file system operat
 - `__pycache__`, `.pytest_cache`
 - Custom exclude patterns
 
+### Shell MCP Client
+
+#### ShellMCPClient
+**Location**: `src/core/mcp/shell.ts`
+
+The shell MCP client implementation provides command execution capabilities:
+
+**Core Dependencies**:
+- `ToolMemoryService` - Command preference memory
+- `ShellLogger` - Comprehensive logging system
+- `shell-constants` - Command approval configuration
+
+**Architecture Pattern**: The client follows a **Single Tool** pattern with one primary tool for shell command execution, integrated with approval workflows and comprehensive logging.
+
+#### RunCommand Tool
+
+**Purpose**: Execute shell commands with security approval and comprehensive logging
+
+**Parameters**:
+```typescript
+{
+  command: string;
+  timeout?: number; // Default: 30000ms
+}
+```
+
+**Features**:
+- **Command Execution**: Uses Node.js `child_process.exec` for command execution
+- **Timeout Management**: Configurable timeout with default 30-second limit
+- **Output Handling**: Captures both stdout and stderr with proper formatting
+- **Error Handling**: Comprehensive error handling with exit codes
+- **Logging Integration**: Full command execution logging via `ShellLogger`
+- **Memory Service**: Command preference tracking for approval workflows
+
+**Response Structure**:
+```typescript
+{
+  content: Array<{
+    type: 'text';
+    text: string; // Combined stdout/stderr or error message
+  }>;
+  isError: boolean;
+}
+```
+
+**Security Integration**:
+The shell client integrates with the approval system defined in `shell-constants.ts`:
+
+**Commands Requiring Approval**:
+- **File Operations**: `rm`, `rmdir`, `mv`, `cp`, `chmod`, `chown`, `dd`
+- **System Administration**: `sudo`, `su`, `passwd`, `usermod`, `groupmod`, `mount`, `umount`
+- **Network Operations**: `curl`, `wget`, `ssh`, `scp`, `rsync`
+- **Package Management**: `apt`, `yum`, `npm`, `yarn`, `pip`, `brew`
+- **Process Management**: `kill`, `killall`, `pkill`
+- **Git Operations**: `git` (potentially destructive operations)
+- **System Control**: `systemctl`, `service`, `crontab`
+- **Archive Operations**: `tar`, `zip`, `unzip`
+
+**Approval Flow**:
+1. **Command Analysis**: Extract command name from input
+2. **Approval Check**: Check if command requires user approval
+3. **User Confirmation**: Present approval dialog for dangerous commands
+4. **Memory Storage**: Store user preferences (once, always, reject)
+5. **Execution**: Execute approved commands with full logging
+
+**Error Handling**:
+- **Timeout Errors**: Handle command timeouts with specific error messages
+- **Execution Errors**: Capture exit codes, stdout, and stderr
+- **Permission Errors**: Handle access denied scenarios
+- **Command Not Found**: Handle missing command errors
+
+**Logging Capabilities**:
+The shell client provides comprehensive logging through `ShellLogger`:
+
+**Command Execution Logs**:
+```typescript
+interface ShellLogEntry {
+  timestamp: string;
+  sessionId: string;
+  command: string;
+  exitCode?: number;
+  stdout?: string; // Truncated to 1000 chars
+  stderr?: string; // Truncated to 1000 chars
+  duration?: number; // Execution time in ms
+  error?: string; // Error message if any
+}
+```
+
+**Approval Logs**:
+```typescript
+interface ShellApprovalLogEntry {
+  timestamp: string;
+  sessionId: string;
+  command: string;
+  commandType: string;
+  approved: boolean;
+  choice: string; // 'once', 'always', 'reject'
+}
+```
+
+**Log File Location**: `~/.aiya/logs/shell.log`
+
+**Memory Service Integration**:
+The shell client integrates with the memory service for command preferences:
+
+```typescript
+// Store command preference
+storeCommandPreference(command: string, preference: ToolPreference): void
+
+// Get memory service for external access
+getMemoryService(): ToolMemoryService
+```
+
+**Command Preference Types**:
+- `once` - Approve this execution only
+- `always` - Always approve this command type
+- `reject` - Always reject this command type
+
 ### Supporting Components
 
 #### FileSystemState
@@ -483,14 +605,19 @@ class MCPToolService {
 6. **State Tracking**: Changes tracked for rollback
 
 #### Provider Integration
-Tools are available to all AI providers through the standardized interface:
+Both filesystem and shell tools are available to all AI providers through the standardized interface:
+
+**Tool Registration**:
+- Filesystem tools: `filesystem_ReadFile`, `filesystem_WriteFile`, `filesystem_EditFile`, `filesystem_SearchFiles`, `filesystem_ListDirectory`
+- Shell tools: `shell_RunCommand`
 
 **Tool Call Flow**:
 1. **Provider Request**: AI provider requests tool execution
-2. **Tool Service**: Routes to appropriate MCP client
-3. **Execution**: Tool executed with full validation
-4. **Response**: Results returned to provider
-5. **Error Handling**: Errors handled and reported
+2. **Tool Service**: Routes to appropriate MCP client (filesystem or shell)
+3. **Security Check**: Validation and approval for sensitive operations
+4. **Execution**: Tool executed with full validation and logging
+5. **Response**: Results returned to provider
+6. **Error Handling**: Errors handled and reported
 
 ### Error Handling Strategy
 
@@ -536,9 +663,11 @@ interface ErrorContext {
 
 #### Adding New MCP Clients
 1. **Extend MCPClient**: Implement abstract methods
-2. **Register with Tool Service**: Add to tool service
-3. **Add Configuration**: Extend configuration system
-4. **Add Error Handling**: Implement error handling
+2. **Register with Tool Service**: Add to tool service in chat command initialization
+3. **Add Configuration**: Extend configuration system if needed
+4. **Add Error Handling**: Implement comprehensive error handling
+5. **Add Security Integration**: Implement approval workflows for sensitive operations
+6. **Add Logging**: Integrate with logging system for audit trails
 
 ### Best Practices
 

@@ -55,6 +55,9 @@ src/
 │   ├── config/           # Configuration management
 │   ├── providers/        # AI provider implementations
 │   ├── mcp/             # Model Context Protocol tools
+│   │   ├── filesystem.ts # File system operations client
+│   │   ├── shell.ts     # Shell command execution client
+│   │   └── base.ts      # Base MCP client interface
 │   ├── security/        # Security and validation
 │   ├── operations/      # File operations
 │   ├── tokens/          # Token counting and logging
@@ -128,6 +131,15 @@ src/
   - Support advanced search capabilities (fuzzy, AST, regex)
   - Provide atomic operations and rollback capabilities
 - **Pattern**: Strategy Pattern + Command Pattern + Facade Pattern
+
+#### ShellMCPClient - Shell Command Execution
+- **Purpose**: Execute shell commands through the MCP framework
+- **Responsibilities**:
+  - Implement RunCommand tool for shell command execution
+  - Handle command timeout and error management
+  - Integrate with approval system for dangerous commands
+  - Provide comprehensive logging and memory tracking
+- **Pattern**: Command Pattern + Observer Pattern
 
 #### WorkspaceSecurity - Security Layer
 - **Purpose**: Ensure secure file operations within workspace boundaries
@@ -250,10 +262,11 @@ Approved Operation
 4. Update UI components if needed
 
 ### Adding New Tools
-1. Add tool schema to `FilesystemMCPClient.listTools()`
-2. Implement tool logic in `callTool()`
-3. Add security validation
-4. Include rollback capabilities
+1. Add tool schema to MCP client's `listTools()` method
+2. Implement tool logic in client's `callTool()` method
+3. Add security validation where appropriate
+4. Include rollback capabilities for stateful operations
+5. Register client with `MCPToolService` for integration
 
 ## Performance Considerations
 
