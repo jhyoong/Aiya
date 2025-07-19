@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-07-19
+
+### Added
+- **Shell MCP Tool**: New shell command execution capability
+  - Execute bash commands directly from AI conversations
+  - Secure command execution with timeout protection
+  - Proper stdout/stderr capture and error handling
+  - Integrated with existing MCP tool architecture
+- Enhanced AI assistant capabilities with shell command support
+
+### Technical Details
+- Added `ShellMCPClient` extending the MCP framework
+- Integrated shell tool with `MCPToolService`
+- Command execution via Node.js `child_process.exec`
+- Tool available as `shell_RunCommand` to AI providers
+
 ## [1.3.0] - 2025-07-14
 
 ### Added
