@@ -180,6 +180,18 @@ export class MCPToolService {
       'You have access to the following tools. When you need to use a tool, respond with a tool call in this exact format:\n\n';
     message +=
       '```json\n{\n  "tool_calls": [\n    {\n      "id": "call_123",\n      "name": "tool_name",\n      "arguments": {"param": "value"}\n    }\n  ]\n}\n```\n\n';
+
+    // Add working directory context for shell tools
+    const shellTools = tools.filter(tool => tool.name.includes('shell'));
+    if (shellTools.length > 0) {
+      const currentWorkingDirectory = process.cwd();
+      message += `**Working Directory Context:**\n`;
+      message += `- Current working directory: ${currentWorkingDirectory}\n`;
+      message += `- Shell commands execute in the workspace directory by default\n`;
+      message += `- Use the 'cwd' parameter to specify a different directory within the workspace\n`;
+      message += `- All paths are relative to the workspace root for security\n\n`;
+    }
+
     message += 'Available tools:\n\n';
 
     for (const tool of tools) {

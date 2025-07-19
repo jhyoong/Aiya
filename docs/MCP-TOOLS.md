@@ -336,27 +336,18 @@ The MCP system provides two main client implementations:
 
 ### 6. ExecuteCommand Tool
 
-**Location**: `src/core/mcp/shell.ts`
+**Location**: `src/core/mcp/shell/` (modular architecture)
 
 **Purpose**: Execute shell commands safely within workspace boundaries with comprehensive security measures
 
-**Parameters**:
-```typescript
-{
-  command: string;
-  cwd?: string;
-  timeout?: number;
-}
-```
+**Documentation**: For detailed information about the Shell Tool including architecture, security features, configuration, and usage examples, see the dedicated [Shell Tool Documentation](./SHELL-TOOL.md).
 
-**Features**:
-- **Safe Command Execution**: Execute commands within workspace directory only
-- **Security Validation**: Block dangerous commands and patterns
-- **User Confirmation**: Interactive prompts for risky operations
-- **Structured Output**: Return stdout, stderr, exit code, and execution time
-- **Timeout Protection**: Configurable timeout with automatic termination
-- **Working Directory Control**: Restrict operations to workspace boundaries
-- **Comprehensive Logging**: Full audit trail of all command executions
+**Key Features**:
+- **Pattern-Based Security**: Simple command categorization (SAFE/RISKY/DANGEROUS/BLOCKED)
+- **User Confirmation System**: Interactive prompts for risky operations with session memory
+- **Workspace Boundary Enforcement**: All operations restricted to project workspace
+- **Comprehensive Monitoring**: Full audit trail and performance monitoring
+- **Modular Architecture**: Clean separation of security, monitoring, and error handling
 
 **Response Structure**:
 ```typescript
@@ -369,101 +360,15 @@ The MCP system provides two main client implementations:
 }
 ```
 
-**Security Measures**:
-
-**1. Dangerous Command Detection**:
-- System destruction: `rm -rf /`, `format`, `dd if=/dev/zero`
-- Network access: `curl`, `wget`, `ssh`
-- Privilege escalation: `sudo`, `su`
-- Fork bombs: `:(){:|:&};:`
-- Process manipulation: `kill -9`, `killall`
-
-**2. Command Sanitization**:
-- Input validation and sanitization
-- Prevention of command injection
-- Shell expansion attack prevention
-- Special character filtering
-
-**3. Workspace Boundary Enforcement**:
-- All operations restricted to project workspace
-- Working directory validation
-- Path traversal prevention
-- Symbolic link protection
-
-**4. User Confirmation System**:
-- **Command Categorization**: Pattern-based categorization system
-- **Interactive Prompts**: Allow/Deny/Trust/Block options
-- **Session Memory**: Cache decisions with 30-minute TTL
-- **Trusted Commands**: Bypass confirmation for safe patterns
-- **Always Block**: Critical commands blocked regardless of confirmation
-
-**Command Categories**:
-- **SAFE**: Execute without confirmation (ls, pwd, echo, git status)
-- **RISKY**: Require confirmation (npm install, mkdir, chmod)
-- **DANGEROUS**: Require confirmation with warning (rm, sudo commands)
-- **BLOCKED**: Never allow (rm -rf /, format, fork bombs)
-
-**Configuration Options**:
+**Quick Configuration Example**:
 ```typescript
 interface ShellToolConfig {
-  requireConfirmationForRisky: boolean;     // Require confirmation for risky commands
-  requireConfirmationForDangerous: boolean; // Require confirmation for dangerous commands
-  allowDangerous: boolean;                  // Allow dangerous commands (if false, blocks them)
-  confirmationTimeout: number;              // Timeout for user prompts (ms)
-  sessionMemory: boolean;                   // Remember confirmation decisions
-  trustedCommands: string[];                // Commands that bypass confirmation
-  alwaysBlockPatterns: string[];            // Commands always blocked
-  maxExecutionTime: number;                 // Maximum command execution time
+  requireConfirmationForRisky: boolean;     // Default: true
+  requireConfirmationForDangerous: boolean; // Default: true
+  allowDangerous: boolean;                  // Default: false
+  maxExecutionTime: number;                 // Default: 30 seconds
+  sessionMemory: boolean;                   // Default: true
 }
-```
-
-**Category Decision Logic**:
-Commands are categorized by pattern matching:
-1. **Blocked patterns** checked first (auto-block)
-2. **Dangerous patterns** checked second (require confirmation)
-3. **Safe patterns** checked third (allow without confirmation)
-4. **Default to risky** for unknown commands (require confirmation)
-
-**Execution Logging**:
-```typescript
-interface ShellExecutionLog {
-  timestamp: Date;
-  command: string;
-  cwd: string;
-  exitCode: number;
-  executionTime: number;
-  success: boolean;
-  riskScore: number;
-  securityEvents: string[];
-  sessionId: string;
-  userId?: string;
-}
-```
-
-**Error Handling**:
-- **ShellExecutionError**: Base execution errors with context
-- **ShellSecurityError**: Security violation errors
-- **ShellTimeoutError**: Command timeout errors  
-- **ShellPermissionError**: Permission-related errors
-- 11 total error categories with intelligent suggestions
-
-**Usage Examples (of how the LLM would call the tool)**:
-```bash
-# Development commands (typically auto-approved)
-npm test
-npm run build
-git status
-ls -la
-
-# Medium risk commands (may require confirmation)
-npm install
-git push origin main
-mkdir new-directory
-
-# High risk commands (require confirmation or blocked)
-rm -rf node_modules
-chmod 777 file.txt
-sudo apt install package
 ```
 
 ---

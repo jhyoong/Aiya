@@ -107,7 +107,15 @@ src/core/mcp/
 ├── filesystem-state.ts        # State tracking and rollback system
 ├── fuzzy-matcher.ts           # Fuzzy search implementation
 ├── ast-searcher.ts            # AST-based code search
-├── shell.ts                   # Shell MCP client for command execution
+├── shell/                     # Modular shell MCP client for command execution
+│   ├── constants.ts           # All configuration constants
+│   ├── types.ts              # TypeScript interfaces and types
+│   ├── index.ts              # Barrel exports
+│   ├── shell-mcp-client.ts   # Main client implementation
+│   ├── command-categorization.ts # Pattern-based command categorization
+│   ├── security/             # Security modules (4 components)
+│   ├── monitoring/           # Monitoring modules (2 components)
+│   └── errors/               # Error modules (3 components)
 ├── IMPLEMENTATION_PLAN.md     # MCP implementation planning
 ├── PHASE_2_PLAN.md           # Phase 2 development plan
 └── TOOL_REVAMP.md            # Tool system revamp documentation
@@ -116,7 +124,7 @@ src/core/mcp/
 **Key Files**:
 
 - **`filesystem.ts`**: Primary MCP client with ReadFile, WriteFile, EditFile, SearchFiles, ListDirectory tools
-- **`shell.ts`**: Shell MCP client with ExecuteCommand tool for secure command execution
+- **`shell/`**: Modular shell MCP client with ExecuteCommand tool featuring pattern-based security categorization
 - **`fuzzy-matcher.ts`**: Fuse.js-based fuzzy matching with confidence scoring
 - **`filesystem-state.ts`**: Change tracking and rollback capabilities for file operations
 
@@ -351,7 +359,7 @@ memory/
 
 ### MCP Tool System
 - **`src/core/mcp/filesystem.ts`**: Core file operations with security validation
-- **`src/core/mcp/shell.ts`**: Secure shell command execution with user confirmation
+- **`src/core/mcp/shell/`**: Secure shell command execution with pattern-based categorization and user confirmation
 - **`src/core/mcp/fuzzy-matcher.ts`**: Advanced fuzzy search with confidence scoring
 - **`src/core/security/workspace.ts`**: Workspace boundary enforcement
 
@@ -372,7 +380,7 @@ memory/
 
 **Provider Operations**: Look in `src/core/providers/`
 **File Operations**: Check `src/core/mcp/filesystem.ts`
-**Shell Command Execution**: Check `src/core/mcp/shell.ts`
+**Shell Command Execution**: Check `src/core/mcp/shell/` (modular architecture)
 **Configuration**: Examine `src/core/config/manager.ts`
 **UI Components**: Browse `src/ui/components/`
 **Text Editing**: See `src/ui/core/TextBuffer.ts`

@@ -89,8 +89,8 @@ interface ShellExecutionLog {
 import { CommandRiskAssessment, CommandRiskCategory } from '../../../src/core/mcp/shell.js';
 
 // NEW (Add these imports)
-import { CommandCategorization, CommandCategory } from '../../../src/core/mcp/shell/command-categorization.js';
-import { categorizeCommand } from '../../../src/core/mcp/shell/command-categorization.js';
+import { CommandCategorization, CommandCategory } from '../../../src/core/mcp/shell/index.js';
+import { categorizeCommand } from '../../../src/core/mcp/shell/index.js';
 ```
 
 **Mock Object Updates:**
@@ -141,7 +141,8 @@ const options: ConfirmationPromptOptions = {
 **Required Changes:**
 ```typescript
 // OLD (Remove)
-import { CommandRiskAssessor } from '../../src/core/mcp/shell.js';
+// CommandRiskAssessor has been replaced with categorizeCommand function
+// import { categorizeCommand } from '../../src/core/mcp/shell/index.js';
 let riskAssessor: CommandRiskAssessor;
 riskAssessor = new CommandRiskAssessor(defaultConfig);
 

@@ -280,7 +280,7 @@ npm run format:check      # Check code formatting
 
 ## Changelog
 
-- **Version 1.4.0** - Added comprehensive Shell MCP tool for secure command execution. Features include dangerous command detection, user confirmation prompts, risk assessment, execution logging, and workspace boundary enforcement. Enables full development workflows with AI assistance.
+- **Version 1.4.0** - Added comprehensive Shell MCP tool for secure command execution. Features include dangerous command detection, user confirmation prompts, pattern-based command categorization, execution logging, and workspace boundary enforcement. Enables full development workflows with AI assistance.
 - **Version 1.3.0** - Reworked MCP tools system with improved file operations and better error handling. Also added more documentation.
 - **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), vitest setup, and improved setup wizard.
 - **Version 1.1.1** - Enhanced terminal UI with modern terminal behaviors and improved user experience.

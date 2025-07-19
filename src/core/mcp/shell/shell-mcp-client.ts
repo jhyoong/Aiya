@@ -98,10 +98,12 @@ export class ShellMCPClient extends MCPClient {
   }
 
   async listTools(): Promise<Tool[]> {
+    const workspaceRoot = this.security.getWorkspaceRoot();
+    
     return [
       {
         name: 'ExecuteCommand',
-        description: 'Execute shell commands with security filtering and confirmation',
+        description: `Execute shell commands safely within workspace boundaries. Commands run in the workspace directory (${workspaceRoot}) unless otherwise specified with the 'cwd' parameter.`,
         inputSchema: {
           type: 'object',
           properties: {
@@ -111,7 +113,7 @@ export class ShellMCPClient extends MCPClient {
             },
             cwd: {
               type: 'string',
-              description: 'Working directory (optional)',
+              description: `Working directory relative to workspace root (optional). Defaults to workspace root (${workspaceRoot}). Use "." for current directory, or specify a relative path within the workspace. Example: "src/components" to run commands in that subdirectory.`,
             },
             timeout: {
               type: 'number',

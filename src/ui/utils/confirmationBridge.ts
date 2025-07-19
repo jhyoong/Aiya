@@ -44,8 +44,20 @@ export class UIConfirmationBridge implements ConfirmationBridge {
   async showConfirmation(
     options: ConfirmationPromptOptions
   ): Promise<ConfirmationResponse> {
+    const debugEnabled = process.env.AIYA_DEBUG_CONFIRMATION === 'true' || process.env.AIYA_VERBOSE === 'true';
+    
+    if (debugEnabled) {
+      console.log(`[CONFIRMATION] Showing prompt for command: ${options.command}`);
+      console.log(`[CONFIRMATION] Working directory: ${options.workingDirectory}`);
+      console.log(`[CONFIRMATION] Category: ${options.categorization.category}`);
+      console.log(`[CONFIRMATION] Timeout: ${options.timeout}ms`);
+    }
+
     // If there's already an active prompt, reject it
     if (this.activePromise) {
+      if (debugEnabled) {
+        console.log('[CONFIRMATION] Hiding existing prompt to show new one');
+      }
       this.hideConfirmation();
     }
 
@@ -56,11 +68,25 @@ export class UIConfirmationBridge implements ConfirmationBridge {
 
     // Set current prompt and notify UI
     this.currentPrompt = options;
-    this.promptUpdateCallback?.(options);
+    
+    if (debugEnabled) {
+      console.log(`[CONFIRMATION] Calling UI callback: ${this.promptUpdateCallback ? 'available' : 'missing'}`);
+    }
+    
+    try {
+      this.promptUpdateCallback?.(options);
+    } catch (error) {
+      if (debugEnabled) {
+        console.error('[CONFIRMATION] Error calling UI callback:', error);
+      }
+    }
 
     // Set up timeout fallback
     const timeoutId = setTimeout(() => {
       if (this.activePromise) {
+        if (debugEnabled) {
+          console.log(`[CONFIRMATION] Timeout reached after ${options.timeout}ms - denying by default`);
+        }
         this.handleResponse({
           action: 'deny',
           rememberDecision: false,
@@ -72,9 +98,19 @@ export class UIConfirmationBridge implements ConfirmationBridge {
     try {
       const response = await this.activePromise;
       clearTimeout(timeoutId);
+      
+      if (debugEnabled) {
+        console.log(`[CONFIRMATION] Received response: ${response.action} (timedOut: ${response.timedOut})`);
+      }
+      
       return response;
     } catch (error) {
       clearTimeout(timeoutId);
+      
+      if (debugEnabled) {
+        console.error('[CONFIRMATION] Error during confirmation:', error);
+      }
+      
       throw error;
     }
   }
@@ -104,9 +140,18 @@ export class UIConfirmationBridge implements ConfirmationBridge {
    * Handle user response from the UI
    */
   handleResponse(response: ConfirmationResponse): void {
+    const debugEnabled = process.env.AIYA_DEBUG_CONFIRMATION === 'true' || process.env.AIYA_VERBOSE === 'true';
+    
+    if (debugEnabled) {
+      console.log(`[CONFIRMATION] Handling response: ${response.action} (remember: ${response.rememberDecision}, timedOut: ${response.timedOut})`);
+    }
+    
     if (this.resolveFunction) {
       this.resolveFunction(response);
+    } else if (debugEnabled) {
+      console.log('[CONFIRMATION] Warning: No resolve function available to handle response');
     }
+    
     this.cleanup();
   }
 
