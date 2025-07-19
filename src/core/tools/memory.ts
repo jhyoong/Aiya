@@ -35,6 +35,13 @@ export class ToolMemoryService {
   }
 
   /**
+   * Clear specific preference for a tool
+   */
+  clearPreference(toolName: string): void {
+    this.preferences.delete(toolName);
+  }
+
+  /**
    * Get all stored preferences (for debugging)
    */
   getAllPreferences(): Record<string, ToolPreference> {

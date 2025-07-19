@@ -1,6 +1,7 @@
 import { ToolResult, Message, ToolCall } from '../providers/base.js';
 import { MCPToolService } from './mcp-tools.js';
 import { ToolMemoryService, ToolPreference } from './memory.js';
+import { ToolLogger } from './logger.js';
 import chalk from 'chalk';
 
 /**
@@ -11,17 +12,20 @@ export class ToolExecutor {
   private verbose: boolean;
   private confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined;
   private memoryService: ToolMemoryService;
+  private toolLogger: ToolLogger;
 
   constructor(
     mcpService: MCPToolService, 
     verbose: boolean = false,
     confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined,
-    memoryService?: ToolMemoryService
+    memoryService?: ToolMemoryService,
+    toolLogger?: ToolLogger
   ) {
     this.mcpService = mcpService;
     this.verbose = verbose;
     this.confirmationCallback = confirmationCallback;
     this.memoryService = memoryService || new ToolMemoryService();
+    this.toolLogger = toolLogger || new ToolLogger();
   }
 
   /**
@@ -61,6 +65,13 @@ export class ToolExecutor {
     let shouldExecute = true;
 
     for (const toolCall of toolCalls) {
+      // Special handling for shell tools - they should ALWAYS go through confirmation callback
+      // to enable command-specific approval (shell:rm, shell:curl, etc.)
+      if (toolCall.name === 'shell_RunCommand') {
+        toolsNeedingConfirmation.push(toolCall);
+        continue;
+      }
+      
       const storedPreference = this.memoryService.getPreference(toolCall.name);
       
       if (storedPreference === 'reject') {
@@ -117,7 +128,19 @@ export class ToolExecutor {
         );
       }
 
+      const startTime = Date.now();
       const result = await this.mcpService.executeTool(toolCall);
+      const duration = Date.now() - startTime;
+      
+      // Log tool execution
+      this.toolLogger.logToolExecution(
+        toolCall.name,
+        toolCall.arguments,
+        result.isError ? undefined : result.result,
+        result.isError ? result.result : undefined,
+        duration
+      );
+      
       toolResults.push(result);
 
       if (this.verbose) {
@@ -238,5 +261,12 @@ export class ToolExecutor {
    */
   getMemoryService(): ToolMemoryService {
     return this.memoryService;
+  }
+
+  /**
+   * Get tool logger instance (for external access)
+   */
+  getToolLogger(): ToolLogger {
+    return this.toolLogger;
   }
 }
