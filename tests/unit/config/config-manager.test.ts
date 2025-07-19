@@ -257,7 +257,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       expect(savedConfig.provider.type).toBe('ollama');
 
       // Should merge shell config
-      expect(savedConfig.shell.requireConfirmationForRisky).toBe(80); // Updated
+      expect(savedConfig.shell.requireConfirmationForRisky).toBe(true); // Updated
       expect(savedConfig.shell.sessionMemory).toBe(false); // Updated
       expect(savedConfig.shell.requireConfirmation).toBe(true); // Preserved
       expect(savedConfig.shell.maxExecutionTime).toBe(30); // Preserved
@@ -452,7 +452,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
 
       const config = await configManager.load();
 
-      expect(config.shell?.requireConfirmationForRisky).toBe(0);
+      expect(config.shell?.requireConfirmationForRisky).toBe(false);
       expect(config.shell?.confirmationTimeout).toBe(1);
       expect(config.shell?.maxExecutionTime).toBe(1);
     });
