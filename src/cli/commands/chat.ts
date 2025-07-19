@@ -5,6 +5,7 @@ import { ConfigManager } from '../../core/config/manager.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
+import { ShellMCPClient } from '../../core/mcp/shell.js';
 import { Message } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
@@ -234,6 +235,10 @@ export const chatCommand = new Command('chat')
       await mcpClient.connect();
       showLoader('MCP client connected successfully');
 
+      const shellClient = new ShellMCPClient();
+      await shellClient.connect();
+      showLoader('Shell MCP client connected successfully');
+
       // Verify connection
       showLoader('Verifying provider health...');
       if (!(await provider.isHealthy())) {
@@ -243,7 +248,7 @@ export const chatCommand = new Command('chat')
       showLoader('Provider health check passed');
 
       // Initialize MCP tool service
-      const toolService = new MCPToolService([mcpClient]);
+      const toolService = new MCPToolService([mcpClient, shellClient]);
       await toolService.initialize();
       showLoader('MCP tool service initialized');
 

@@ -2,7 +2,7 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-**Version 1.3.0** - Reworked MCP tools system and added some docs.
+**Version 1.4.0** - Added shell command execution capabilities to the MCP tools system.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -184,8 +184,11 @@ Aiya includes a built-in Model Context Protocol (MCP) tool system that enables f
 - **EditFile**: Apply targeted edits using replace/insert/delete operations with fuzzy matching
 - **SearchFiles**: Search files with literal and regex patterns, including context lines
 
+#### Shell Operations
+- **RunCommand**: Execute bash commands with timeout protection and secure output capture
+
 ### Tool Usage
-The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, and batch processing for complex file manipulation tasks.
+The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, batch processing for complex file manipulation tasks, and shell command execution for development workflows.
 
 ## Basic Security
 
