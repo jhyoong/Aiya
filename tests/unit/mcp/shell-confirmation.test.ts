@@ -7,10 +7,7 @@ import {
   SessionDecision,
 } from '../../../src/core/mcp/confirmation.js';
 import {
-  CommandRiskAssessment,
-  CommandRiskCategory,
-} from '../../../src/core/mcp/shell.js';
-import {
+  CommandCategorization,
   CommandCategory,
 } from '../../../src/core/mcp/shell/command-categorization.js';
 
@@ -53,25 +50,18 @@ vi.mock('../../../src/ui/utils/memoryManagement.js', () => ({
 
 describe('ShellConfirmationPrompt', () => {
   let prompt: ShellConfirmationPrompt;
-  let mockRiskAssessment: CommandRiskAssessment;
+  let mockCategorization: CommandCategorization;
   let mockOptions: ConfirmationPromptOptions;
 
   beforeEach(() => {
     prompt = new ShellConfirmationPrompt();
 
-    mockRiskAssessment = {
-      riskScore: 75,
-      category: CommandRiskCategory.HIGH,
-      riskFactors: ['File deletion operation', 'Potential data loss'],
+    mockCategorization = {
+      category: CommandCategory.DANGEROUS,
+      matchedPattern: 'rm -rf',
+      reason: 'File deletion operation',
       requiresConfirmation: true,
-      shouldBlock: false,
-      context: {
-        commandType: 'File Management',
-        potentialImpact: ['Files will be permanently deleted'],
-        mitigationSuggestions: [
-          'Use ls to verify which files will be affected',
-        ],
-      },
+      allowExecution: true,
     };
 
     mockOptions = {
@@ -204,7 +194,8 @@ describe('SessionMemoryManager', () => {
         commandPattern: 'old-command',
         action: 'allow',
         timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-        };
+        category: CommandCategory.SAFE,
+      };
 
       sessionMemory.recordDecision('old-command', oldDecision);
 
@@ -237,7 +228,8 @@ describe('SessionMemoryManager', () => {
           commandPattern: `command-${i}`,
           action: 'allow',
           timestamp: new Date(),
-            };
+          category: CommandCategory.SAFE,
+        };
         sessionMemory.recordDecision(`command-${i}`, decision);
       }
 
@@ -267,24 +259,19 @@ describe('ConfirmationPromptOptions Interface', () => {
   test('should have all required properties', () => {
     const options: ConfirmationPromptOptions = {
       command: 'test command',
-      riskAssessment: {
-        riskScore: 50,
-        category: CommandRiskCategory.MEDIUM,
-        riskFactors: ['test factor'],
+      categorization: {
+        category: CommandCategory.RISKY,
+        matchedPattern: 'test pattern',
+        reason: 'test factor',
         requiresConfirmation: true,
-        shouldBlock: false,
-        context: {
-          commandType: 'test',
-          potentialImpact: ['test impact'],
-          mitigationSuggestions: ['test suggestion'],
-        },
+        allowExecution: true,
       },
       workingDirectory: '/test/dir',
       timeout: 30000,
     };
 
     expect(options).toHaveProperty('command');
-    expect(options).toHaveProperty('riskAssessment');
+    expect(options).toHaveProperty('categorization');
     expect(options).toHaveProperty('workingDirectory');
     expect(options).toHaveProperty('timeout');
   });
@@ -354,63 +341,51 @@ describe('SessionDecision Interface', () => {
   });
 });
 
-describe('Risk Assessment Integration', () => {
-  test('should handle all risk categories', () => {
+describe('Command Categorization Integration', () => {
+  test('should handle all command categories', () => {
     const categories = [
-      CommandRiskCategory.SAFE,
-      CommandRiskCategory.LOW,
-      CommandRiskCategory.MEDIUM,
-      CommandRiskCategory.HIGH,
-      CommandRiskCategory.CRITICAL,
+      CommandCategory.SAFE,
+      CommandCategory.RISKY,
+      CommandCategory.DANGEROUS,
+      CommandCategory.BLOCKED,
     ];
 
     categories.forEach(category => {
-      const assessment: CommandRiskAssessment = {
-        riskScore: 50,
+      const categorization: CommandCategorization = {
         category,
-        riskFactors: ['test factor'],
-        requiresConfirmation: true,
-        shouldBlock: false,
-        context: {
-          commandType: 'test',
-          potentialImpact: ['test impact'],
-          mitigationSuggestions: ['test suggestion'],
-        },
+        matchedPattern: 'test pattern',
+        reason: 'test factor',
+        requiresConfirmation: category !== CommandCategory.SAFE,
+        allowExecution: category !== CommandCategory.BLOCKED,
       };
 
       const options: ConfirmationPromptOptions = {
         command: 'test command',
-        riskAssessment: assessment,
+        categorization,
         workingDirectory: '/test/dir',
         timeout: 30000,
       };
 
-      expect(options.riskAssessment.category).toBe(category);
+      expect(options.categorization.category).toBe(category);
     });
   });
 
-  test('should handle empty risk factors and suggestions', () => {
-    const assessment: CommandRiskAssessment = {
-      category: CommandRiskCategory.SAFE,
-      riskFactors: [],
+  test('should handle safe commands without confirmation', () => {
+    const categorization: CommandCategorization = {
+      category: CommandCategory.SAFE,
+      reason: 'Safe command',
       requiresConfirmation: false,
-      shouldBlock: false,
-      context: {
-        commandType: 'Safe Command',
-        potentialImpact: [],
-        mitigationSuggestions: [],
-      },
+      allowExecution: true,
     };
 
     const options: ConfirmationPromptOptions = {
       command: 'ls',
-      riskAssessment: assessment,
+      categorization,
       workingDirectory: '/test/dir',
       timeout: 30000,
     };
 
-    expect(options.riskAssessment.riskFactors).toEqual([]);
-    expect(options.riskAssessment.context.potentialImpact).toEqual([]);
-    expect(options.riskAssessment.context.mitigationSuggestions).toEqual([]);
+    expect(options.categorization.requiresConfirmation).toBe(false);
+    expect(options.categorization.allowExecution).toBe(true);
   });
 });

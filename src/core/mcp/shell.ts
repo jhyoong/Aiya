@@ -65,7 +65,6 @@ export interface ShellErrorContext {
   timeout?: number;
   exitCode?: number;
   executionTime?: number;
-  riskScore?: number;
   securityEvent?: string;
   timestamp: Date;
   userId?: string;
@@ -730,90 +729,6 @@ export class ShellErrorCategorizer {
     }
   }
 
-  /**
-   * Analyze command risk based on patterns and context
-   */
-  static analyzeCommandRisk(
-    command: string,
-    workingDirectory: string,
-    executionTime: number
-  ): {
-    riskScore: number;
-    riskFactors: string[];
-    category: string;
-  } {
-    let riskScore = 0;
-    const riskFactors: string[] = [];
-
-    // Command-based risk factors
-    if (command.includes('rm')) {
-      riskScore += 30;
-      riskFactors.push('File deletion command');
-    }
-
-    if (command.includes('curl') || command.includes('wget')) {
-      riskScore += 20;
-      riskFactors.push('Network download command');
-    }
-
-    if (command.includes('sudo') || command.includes('su')) {
-      riskScore += 50;
-      riskFactors.push('Privilege escalation command');
-    }
-
-    if (command.includes('chmod') || command.includes('chown')) {
-      riskScore += 25;
-      riskFactors.push('Permission modification command');
-    }
-
-    if (
-      command.includes('|') ||
-      command.includes(';') ||
-      command.includes('&&')
-    ) {
-      riskScore += 15;
-      riskFactors.push('Command chaining or piping');
-    }
-
-    if (command.includes('*') || command.includes('?')) {
-      riskScore += 10;
-      riskFactors.push('Wildcard patterns');
-    }
-
-    if (command.includes('..')) {
-      riskScore += 35;
-      riskFactors.push('Path traversal patterns');
-    }
-
-    // Execution time risk factors
-    if (executionTime > 30000) {
-      riskScore += 15;
-      riskFactors.push('Long execution time');
-    }
-
-    // Working directory risk factors
-    if (
-      workingDirectory.includes('/tmp') ||
-      workingDirectory.includes('temp')
-    ) {
-      riskScore += 10;
-      riskFactors.push('Temporary directory usage');
-    }
-
-    // Determine category
-    let category = 'safe';
-    if (riskScore > 70) {
-      category = 'dangerous';
-    } else if (riskScore > 30) {
-      category = 'moderate';
-    }
-
-    return {
-      riskScore: Math.min(riskScore, 100),
-      riskFactors,
-      category,
-    };
-  }
 
   /**
    * Extract command metadata for enhanced logging
@@ -1213,546 +1128,8 @@ export class DangerousCommandDetector {
 /**
  * Risk Categories for command execution
  */
-export enum CommandRiskCategory {
-  SAFE = 'safe', // 0-25: Basic commands like ls, pwd, echo
-  LOW = 'low', // 26-50: Development commands like npm install, git status
-  MEDIUM = 'medium', // 51-75: Build/test commands like npm run build, pytest
-  HIGH = 'high', // 76-90: System modification like chmod, mkdir, rm (non-recursive)
-  CRITICAL = 'critical', // 91-100: Dangerous operations like rm -rf, sudo, format
-}
 
-/**
- * Command Risk Assessment Result
- */
-export interface CommandRiskAssessment {
-  /** Risk score from 0-100 */
-  riskScore: number;
 
-  /** Risk category based on score */
-  category: CommandRiskCategory;
-
-  /** Specific risk factors identified */
-  riskFactors: string[];
-
-  /** Whether the command requires user confirmation */
-  requiresConfirmation: boolean;
-
-  /** Whether the command should be automatically blocked */
-  shouldBlock: boolean;
-
-  /** Contextual information about the risk */
-  context: {
-    commandType: string;
-    potentialImpact: string[];
-    mitigationSuggestions: string[];
-  };
-}
-
-/**
- * Command Risk Assessor for comprehensive command risk evaluation
- * Builds on existing DangerousCommandDetector with enhanced risk scoring
- */
-export class CommandRiskAssessor {
-  private config: ShellToolConfig;
-
-  constructor(config: ShellToolConfig) {
-    this.config = config;
-  }
-
-  /**
-   * Assess the risk level of a command
-   */
-  assessRisk(
-    command: string,
-    workingDirectory?: string
-  ): CommandRiskAssessment {
-    const riskScore = this.calculateRiskScore(command, workingDirectory);
-    const category = this.getRiskCategory(riskScore);
-    const riskFactors = this.identifyRiskFactors(command);
-    const requiresConfirmation = this.shouldRequireConfirmation(
-      command,
-      riskScore
-    );
-    const shouldBlock = this.shouldBlockCommand(command, riskScore);
-
-    return {
-      riskScore,
-      category,
-      riskFactors,
-      requiresConfirmation,
-      shouldBlock,
-      context: this.generateRiskContext(command, category, riskFactors),
-    };
-  }
-
-  /**
-   * Calculate comprehensive risk score (0-100)
-   */
-  private calculateRiskScore(
-    command: string,
-    workingDirectory?: string
-  ): number {
-    let score = 0;
-    const normalizedCommand = command.toLowerCase().trim();
-
-    // Start with existing dangerous command detection
-    const dangerousCheck = DangerousCommandDetector.isDangerous(command);
-    if (dangerousCheck.dangerous) {
-      score += dangerousCheck.reason?.includes('critical') ? 90 : 70;
-    }
-
-    // Use existing risk calculation as baseline
-    score = Math.max(
-      score,
-      DangerousCommandDetector.calculateRiskScore(command)
-    );
-
-    // Enhanced risk factors
-    score += this.assessCommandComplexity(normalizedCommand);
-    score += this.assessFileSystemImpact(normalizedCommand);
-    score += this.assessNetworkRisk(normalizedCommand);
-    score += this.assessSystemModification(normalizedCommand);
-    score += this.assessPrivilegeEscalation(normalizedCommand);
-    score += this.assessDataAccess(normalizedCommand, workingDirectory);
-
-    return Math.min(score, 100);
-  }
-
-  /**
-   * Assess command complexity risk
-   */
-  private assessCommandComplexity(command: string): number {
-    let score = 0;
-
-    // Command chaining increases risk
-    if (command.includes('&&') || command.includes('||')) score += 10;
-    if (command.includes(';')) score += 15;
-    if (command.includes('|')) score += 5;
-
-    // Complex redirections
-    if (command.includes('>>') || command.includes('>')) score += 8;
-    if (command.includes('<<') || command.includes('<')) score += 5;
-
-    // Background processes
-    if (command.includes(' &')) score += 12;
-
-    // Loops and conditionals
-    if (
-      command.includes('for ') ||
-      command.includes('while ') ||
-      command.includes('if ')
-    )
-      score += 20;
-
-    return score;
-  }
-
-  /**
-   * Assess file system impact risk
-   */
-  private assessFileSystemImpact(command: string): number {
-    let score = 0;
-
-    // File deletion commands
-    if (command.includes('rm ')) score += 25;
-    if (command.includes('rmdir')) score += 20;
-    if (command.includes('unlink')) score += 15;
-
-    // Mass operations
-    if (command.includes('*')) score += 15;
-    if (command.includes('**')) score += 25;
-    if (command.includes('find ') && command.includes('-delete')) score += 30;
-
-    // Permission changes
-    if (command.includes('chmod')) score += 20;
-    if (command.includes('chown')) score += 25;
-
-    // Archive operations
-    if (command.includes('tar ') && command.includes('-x')) score += 10;
-    if (command.includes('unzip')) score += 10;
-
-    return score;
-  }
-
-  /**
-   * Assess network-related risk
-   */
-  private assessNetworkRisk(command: string): number {
-    let score = 0;
-
-    // Network download commands
-    if (command.includes('wget') || command.includes('curl')) score += 15;
-    if (command.includes('git clone')) score += 10;
-
-    // Network services
-    if (command.includes('nc ') || command.includes('netcat')) score += 20;
-    if (command.includes('ssh')) score += 15;
-
-    // Potential data exfiltration
-    if (
-      (command.includes('curl') || command.includes('wget')) &&
-      command.includes('|')
-    )
-      score += 25;
-
-    return score;
-  }
-
-  /**
-   * Assess system modification risk
-   */
-  private assessSystemModification(command: string): number {
-    let score = 0;
-
-    // Package management
-    if (command.includes('npm install') || command.includes('pip install'))
-      score += 15;
-    if (
-      command.includes('apt ') ||
-      command.includes('yum ') ||
-      command.includes('brew ')
-    )
-      score += 20;
-
-    // Service management
-    if (command.includes('systemctl') || command.includes('service'))
-      score += 25;
-
-    // Environment modification
-    if (command.includes('export ') || command.includes('setenv')) score += 10;
-
-    return score;
-  }
-
-  /**
-   * Assess privilege escalation risk
-   */
-  private assessPrivilegeEscalation(command: string): number {
-    let score = 0;
-
-    // Direct privilege escalation
-    if (command.includes('sudo')) score += 30;
-    if (command.includes('su ')) score += 35;
-
-    // Potential privilege escalation vectors
-    if (command.includes('chmod +s') || command.includes('chmod 4'))
-      score += 40;
-
-    return score;
-  }
-
-  /**
-   * Assess data access risk based on paths
-   */
-  private assessDataAccess(
-    command: string,
-    _workingDirectory?: string
-  ): number {
-    let score = 0;
-
-    // System directories
-    if (
-      command.includes('/etc/') ||
-      command.includes('/usr/') ||
-      command.includes('/var/')
-    )
-      score += 20;
-    if (command.includes('/root/') || command.includes('/home/')) score += 15;
-
-    // Configuration files
-    if (
-      command.includes('.config') ||
-      command.includes('.bashrc') ||
-      command.includes('.profile')
-    )
-      score += 15;
-
-    // Sensitive file patterns
-    if (
-      command.includes('passwd') ||
-      command.includes('shadow') ||
-      command.includes('ssh_key')
-    )
-      score += 30;
-
-    // Path traversal
-    if (command.includes('../') || command.includes('..\\')) score += 25;
-
-    return score;
-  }
-
-  /**
-   * Get risk category from score
-   */
-  private getRiskCategory(score: number): CommandRiskCategory {
-    if (score <= 25) return CommandRiskCategory.SAFE;
-    if (score <= 50) return CommandRiskCategory.LOW;
-    if (score <= 75) return CommandRiskCategory.MEDIUM;
-    if (score <= 90) return CommandRiskCategory.HIGH;
-    return CommandRiskCategory.CRITICAL;
-  }
-
-  /**
-   * Identify specific risk factors
-   */
-  private identifyRiskFactors(command: string): string[] {
-    const factors: string[] = [];
-    const normalizedCommand = command.toLowerCase();
-
-    // Dangerous command patterns
-    const dangerousCheck = DangerousCommandDetector.isDangerous(command);
-    if (dangerousCheck.dangerous) {
-      factors.push(`Dangerous command pattern: ${dangerousCheck.reason}`);
-    }
-
-    // File system risks
-    if (normalizedCommand.includes('rm '))
-      factors.push('File deletion operation');
-    if (normalizedCommand.includes('*'))
-      factors.push('Wildcard operation affecting multiple files');
-    if (normalizedCommand.includes('chmod'))
-      factors.push('Permission modification');
-
-    // Network risks
-    if (
-      normalizedCommand.includes('curl') ||
-      normalizedCommand.includes('wget')
-    ) {
-      factors.push('Network download operation');
-    }
-
-    // System risks
-    if (normalizedCommand.includes('sudo'))
-      factors.push('Privilege escalation');
-    if (normalizedCommand.includes('systemctl'))
-      factors.push('System service modification');
-
-    // Complexity risks
-    if (
-      normalizedCommand.includes('&&') ||
-      normalizedCommand.includes('||') ||
-      normalizedCommand.includes(';')
-    ) {
-      factors.push('Command chaining');
-    }
-
-    return factors;
-  }
-
-  /**
-   * Determine if command requires user confirmation
-   */
-  private shouldRequireConfirmation(
-    command: string,
-    riskScore: number
-  ): boolean {
-    // Check if confirmation is globally disabled
-    if (!this.config.requireConfirmation) {
-      return false;
-    }
-
-    // Check if command is in trusted list (bypass confirmation)
-    if (this.isTrustedCommand(command)) {
-      return false;
-    }
-
-    // Check if risk score exceeds threshold
-    return riskScore >= this.config.confirmationThreshold;
-  }
-
-  /**
-   * Determine if command should be automatically blocked
-   */
-  private shouldBlockCommand(command: string, riskScore: number): boolean {
-    // Auto-block critical risk commands if they're not explicitly trusted
-    // Note: alwaysBlockPatterns are now handled in the main execution flow
-    if (riskScore >= 95 && !this.isTrustedCommand(command)) {
-      return true;
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if command is in trusted list
-   */
-  private isTrustedCommand(command: string): boolean {
-    const normalizedCommand = command.toLowerCase().trim();
-
-    for (const trustedPattern of this.config.trustedCommands) {
-      const regex = new RegExp(trustedPattern, 'i');
-      if (regex.test(normalizedCommand)) {
-        return true;
-      }
-    }
-
-    return false;
-  }
-
-  /**
-   * Generate risk context information
-   */
-  private generateRiskContext(
-    command: string,
-    category: CommandRiskCategory,
-    riskFactors: string[]
-  ): {
-    commandType: string;
-    potentialImpact: string[];
-    mitigationSuggestions: string[];
-  } {
-    const context = {
-      commandType: this.classifyCommandType(command),
-      potentialImpact: this.assessPotentialImpact(command, category),
-      mitigationSuggestions: this.generateMitigationSuggestions(
-        command,
-        riskFactors
-      ),
-    };
-
-    return context;
-  }
-
-  /**
-   * Classify the type of command
-   */
-  private classifyCommandType(command: string): string {
-    const normalizedCommand = command.toLowerCase();
-
-    if (
-      normalizedCommand.startsWith('npm ') ||
-      normalizedCommand.startsWith('yarn ')
-    )
-      return 'Package Management';
-    if (normalizedCommand.startsWith('git ')) return 'Version Control';
-    if (normalizedCommand.startsWith('docker ')) return 'Container Management';
-    if (
-      normalizedCommand.includes('rm ') ||
-      normalizedCommand.includes('delete')
-    )
-      return 'File Deletion';
-    if (
-      normalizedCommand.includes('chmod') ||
-      normalizedCommand.includes('chown')
-    )
-      return 'Permission Modification';
-    if (
-      normalizedCommand.includes('curl') ||
-      normalizedCommand.includes('wget')
-    )
-      return 'Network Operation';
-    if (normalizedCommand.includes('sudo') || normalizedCommand.includes('su '))
-      return 'Privilege Escalation';
-    if (
-      normalizedCommand.includes('systemctl') ||
-      normalizedCommand.includes('service')
-    )
-      return 'System Service';
-
-    return 'General Command';
-  }
-
-  /**
-   * Assess potential impact of command execution
-   */
-  private assessPotentialImpact(
-    command: string,
-    category: CommandRiskCategory
-  ): string[] {
-    const impact: string[] = [];
-    const normalizedCommand = command.toLowerCase();
-
-    switch (category) {
-      case CommandRiskCategory.CRITICAL:
-        impact.push('Potential system damage or data loss');
-        impact.push('Possible security compromise');
-        impact.push('May affect system stability');
-        break;
-      case CommandRiskCategory.HIGH:
-        impact.push('Significant file system changes');
-        impact.push('Potential permission modifications');
-        impact.push('May affect application functionality');
-        break;
-      case CommandRiskCategory.MEDIUM:
-        impact.push('Moderate file system changes');
-        impact.push('Package or dependency modifications');
-        break;
-      case CommandRiskCategory.LOW:
-        impact.push('Minor file system changes');
-        impact.push('Read-mostly operations');
-        break;
-      case CommandRiskCategory.SAFE:
-        impact.push('No significant impact expected');
-        break;
-    }
-
-    // Add specific impact based on command type
-    if (normalizedCommand.includes('rm '))
-      impact.push('Files will be permanently deleted');
-    if (normalizedCommand.includes('chmod'))
-      impact.push('File permissions will be modified');
-    if (normalizedCommand.includes('install'))
-      impact.push('New software packages will be installed');
-
-    return impact;
-  }
-
-  /**
-   * Generate mitigation suggestions for risky commands
-   */
-  private generateMitigationSuggestions(
-    command: string,
-    riskFactors: string[]
-  ): string[] {
-    const suggestions: string[] = [];
-    const normalizedCommand = command.toLowerCase();
-
-    // General suggestions based on risk factors
-    if (riskFactors.some(f => f.includes('deletion'))) {
-      suggestions.push('Consider backing up affected files first');
-      suggestions.push('Use ls to verify which files will be affected');
-    }
-
-    if (riskFactors.some(f => f.includes('wildcard'))) {
-      suggestions.push(
-        'Test with ls first to see what files match the pattern'
-      );
-      suggestions.push(
-        'Consider processing files one by one instead of using wildcards'
-      );
-    }
-
-    if (riskFactors.some(f => f.includes('privilege'))) {
-      suggestions.push('Verify that elevated privileges are necessary');
-      suggestions.push('Consider running without sudo first');
-    }
-
-    if (riskFactors.some(f => f.includes('network'))) {
-      suggestions.push('Verify the source is trusted');
-      suggestions.push('Consider downloading to a staging area first');
-    }
-
-    // Command-specific suggestions
-    if (normalizedCommand.includes('rm -rf')) {
-      suggestions.push('Double-check the target directory path');
-      suggestions.push('Consider using rm without -f flag for confirmation');
-    }
-
-    if (normalizedCommand.includes('chmod 777')) {
-      suggestions.push('Consider more restrictive permissions');
-      suggestions.push('Verify if world-writable permissions are necessary');
-    }
-
-    return suggestions;
-  }
-
-  /**
-   * Update risk assessor configuration
-   */
-  updateConfig(config: Partial<ShellToolConfig>): void {
-    this.config = { ...this.config, ...config };
-  }
-}
 
 /**
  * Command Input Sanitization and Validation System
@@ -2195,7 +1572,6 @@ export interface ShellToolConfig {
   maxExecutionTime: number;
   allowComplexCommands: boolean;
   // Phase 5: User Confirmation System fields
-  confirmationThreshold: number; // Risk score threshold requiring confirmation (0-100)
   trustedCommands: string[]; // Commands that bypass confirmation
   alwaysBlockPatterns: string[]; // Commands that are always blocked regardless of confirmation
   confirmationTimeout: number; // Timeout for user confirmation prompts (in milliseconds)
@@ -2361,7 +1737,6 @@ export class CommandFilter {
     maxExecutionTime: 30,
     allowComplexCommands: false,
     // Phase 5: User Confirmation System fields
-    confirmationThreshold: 50,
     trustedCommands: [
       '^ls($|\\s)',
       '^pwd($|\\s)',
@@ -2395,15 +1770,6 @@ export class CommandFilter {
    * Validate configuration values for Phase 5 fields
    */
   private validateConfig(): void {
-    // Validate confirmationThreshold
-    if (
-      this.config.confirmationThreshold < 0 ||
-      this.config.confirmationThreshold > 100
-    ) {
-      throw new Error(
-        `Invalid confirmationThreshold: ${this.config.confirmationThreshold}. Must be between 0 and 100.`
-      );
-    }
 
     // Validate confirmationTimeout
     if (this.config.confirmationTimeout <= 0) {
@@ -2716,13 +2082,13 @@ export interface ShellExecutionLog {
     };
   };
 
-  /** Risk assessment */
-  riskAssessment: {
-    /** Risk score (0-100) */
-    riskScore: number;
+  /** Category assessment */
+  categoryAssessment: {
+    /** Command category (safe, risky, dangerous, blocked) */
+    category: string;
 
-    /** Risk factors identified */
-    riskFactors: string[];
+    /** Pattern that was matched (if any) */
+    matchedPattern?: string;
 
     /** Whether manual approval was required */
     manualApprovalRequired: boolean;
@@ -2780,11 +2146,8 @@ export interface ShellLogQuery {
   /** Filter by error type */
   errorType?: ShellErrorType;
 
-  /** Filter by risk score range */
-  riskScoreRange?: {
-    min: number;
-    max: number;
-  };
+  /** Filter by command category */
+  category?: string;
 
   /** Filter by execution time range */
   executionTimeRange?: {
@@ -2841,11 +2204,12 @@ export interface ShellLogStatistics {
     percentage: number;
   }>;
 
-  /** Risk score distribution */
-  riskScoreDistribution: {
-    low: number; // 0-30
-    medium: number; // 31-70
-    high: number; // 71-100
+  /** Category distribution */
+  categoryDistribution: {
+    safe: number;
+    risky: number;
+    dangerous: number;
+    blocked: number;
   };
 
   /** Execution time distribution */
@@ -3340,11 +2704,9 @@ export class ShellExecutionLogger {
       results = results.filter(log => log.errorType === query.errorType);
     }
 
-    if (query.riskScoreRange) {
+    if (query.category) {
       results = results.filter(
-        log =>
-          log.riskAssessment.riskScore >= query.riskScoreRange!.min &&
-          log.riskAssessment.riskScore <= query.riskScoreRange!.max
+        log => log.categoryAssessment.category === query.category
       );
     }
 
@@ -3441,16 +2803,17 @@ export class ShellExecutionLogger {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
-    // Calculate risk score distribution
-    const riskScoreDistribution = this.executionLogs.reduce(
+    // Calculate category distribution
+    const categoryDistribution = this.executionLogs.reduce(
       (acc, log) => {
-        const score = log.riskAssessment.riskScore;
-        if (score <= 30) acc.low++;
-        else if (score <= 70) acc.medium++;
-        else acc.high++;
+        const category = log.categoryAssessment.category;
+        if (category === 'safe') acc.safe++;
+        else if (category === 'risky') acc.risky++;
+        else if (category === 'dangerous') acc.dangerous++;
+        else if (category === 'blocked') acc.blocked++;
         return acc;
       },
-      { low: 0, medium: 0, high: 0 }
+      { safe: 0, risky: 0, dangerous: 0, blocked: 0 }
     );
 
     // Calculate execution time distribution
@@ -3490,7 +2853,7 @@ export class ShellExecutionLogger {
       averageExecutionTime: Math.round(averageExecutionTime),
       topCommands,
       topErrors,
-      riskScoreDistribution,
+      categoryDistribution,
       executionTimeDistribution,
       securityEventsSummary,
     };
@@ -3616,7 +2979,7 @@ export class ShellExecutionLogger {
       'executionTime',
       'success',
       'errorType',
-      'riskScore',
+      'category',
     ];
 
     const rows = logs.map(log => [
@@ -3628,7 +2991,7 @@ export class ShellExecutionLogger {
       log.executionTime,
       log.success,
       log.errorType || '',
-      log.riskAssessment.riskScore,
+      log.categoryAssessment.category,
     ]);
 
     return [headers.join(','), ...rows.map(row => row.join(','))].join('\n');
@@ -3666,7 +3029,7 @@ export class ShellExecutionLogger {
           <td>${log.executionTime}ms</td>
           <td>${log.success ? 'Success' : 'Failed'}</td>
           <td>${log.errorType || ''}</td>
-          <td>${log.riskAssessment.riskScore}</td>
+          <td>${log.categoryAssessment.category}</td>
         </tr>
       `;
       })
@@ -3707,7 +3070,7 @@ export class ShellExecutionLogger {
                 <th>Time</th>
                 <th>Status</th>
                 <th>Error Type</th>
-                <th>Risk Score</th>
+                <th>Category</th>
               </tr>
             </thead>
             <tbody>
@@ -3731,7 +3094,7 @@ export class ShellExecutionLogger {
       exitCode: log.exitCode,
       executionTime: log.executionTime,
       success: log.success,
-      riskAssessment: log.riskAssessment,
+      categoryAssessment: log.categoryAssessment,
     };
 
     if (log.errorType) {
@@ -4373,18 +3736,14 @@ export class ShellMCPClient extends MCPClient {
       const dangerCheck =
         DangerousCommandDetector.isDangerous(sanitizedCommand);
       if (dangerCheck.dangerous) {
-        const riskScore =
-          DangerousCommandDetector.calculateRiskScore(sanitizedCommand);
         this.executionLogger.logDangerousCommand(
           sanitizedCommand,
           workingDirectory,
-          dangerCheck.reason!,
-          riskScore
+          dangerCheck.reason!
         );
         const context: ShellErrorContext = {
           command: sanitizedCommand,
           workingDirectory,
-          riskScore,
           timestamp: new Date(),
         };
         throw new ShellCommandBlockedError(
@@ -4505,12 +3864,8 @@ export class ShellMCPClient extends MCPClient {
       // 11. Stop performance monitoring
       const performanceMetrics = performanceMonitor.stopMonitoring();
 
-      // 12. Analyze command risk and extract metadata
-      const riskAnalysis = ShellErrorCategorizer.analyzeCommandRisk(
-        finalCommand,
-        workingDirectory,
-        result.executionTime
-      );
+      // 12. Categorize command and extract metadata
+      const categoryAnalysis = categorizeCommand(finalCommand);
       const commandMetadata =
         ShellErrorCategorizer.extractCommandMetadata(finalCommand);
       const fileOperations = ShellPerformanceMonitor.estimateFileOperations(
@@ -4552,10 +3907,10 @@ export class ShellMCPClient extends MCPClient {
             bytesWritten: fileOperations.bytesWritten,
           },
         },
-        riskAssessment: {
-          riskScore: riskAnalysis.riskScore,
-          riskFactors: riskAnalysis.riskFactors,
-          manualApprovalRequired: riskAnalysis.riskScore > 70,
+        categoryAssessment: {
+          category: categoryAnalysis.category,
+          ...(categoryAnalysis.matchedPattern && { matchedPattern: categoryAnalysis.matchedPattern }),
+          manualApprovalRequired: categoryAnalysis.requiresConfirmation,
           approved: true, // Since it was executed
         },
         metadata: {
@@ -4610,8 +3965,8 @@ export class ShellMCPClient extends MCPClient {
                 security: {
                   validated: true,
                   sanitized: sanitizedCommand !== command,
-                  riskScore: riskAnalysis.riskScore,
-                  riskFactors: riskAnalysis.riskFactors,
+                  category: categoryAnalysis.category,
+                  matchedPattern: categoryAnalysis.matchedPattern,
                   phase: 'Phase 4 - Enhanced Logging and Error Handling',
                 },
                 performance: performanceMetrics,
@@ -4687,9 +4042,8 @@ export class ShellMCPClient extends MCPClient {
             bytesWritten: 0,
           },
         },
-        riskAssessment: {
-          riskScore: 0,
-          riskFactors: ['Execution failed'],
+        categoryAssessment: {
+          category: 'risky', // Default for failed commands
           manualApprovalRequired: false,
           approved: false,
         },
@@ -4872,20 +4226,6 @@ export class ShellMCPClient extends MCPClient {
     return this.sessionId;
   }
 
-  analyzeCommandRisk(
-    command: string,
-    workingDirectory?: string
-  ): {
-    riskScore: number;
-    riskFactors: string[];
-    category: string;
-  } {
-    return ShellErrorCategorizer.analyzeCommandRisk(
-      command,
-      workingDirectory || this.security.getWorkspaceRoot(),
-      0
-    );
-  }
 
   extractCommandMetadata(command: string): {
     category: string;

@@ -242,11 +242,6 @@ export class ConfigurationGenerator {
         return line + '  # Shell command execution and security settings';
       }
 
-      if (trimmed.startsWith('confirmationThreshold:')) {
-        return (
-          line + '  # Risk score threshold for confirmation prompts (0-100)'
-        );
-      }
 
       if (trimmed.startsWith('trustedCommands:')) {
         return (
@@ -534,7 +529,6 @@ export class ConfigurationGenerator {
       ],
       maxExecutionTime: 30,
       allowComplexCommands: false,
-      confirmationThreshold: 50,
       trustedCommands: [
         '^ls($|\\s)',
         '^pwd($|\\s)',
@@ -551,6 +545,9 @@ export class ConfigurationGenerator {
       ],
       confirmationTimeout: 30000,
       sessionMemory: true,
+      requireConfirmationForRisky: true,
+      requireConfirmationForDangerous: true,
+      allowDangerous: false,
     };
   }
 

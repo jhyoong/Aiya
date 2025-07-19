@@ -20,7 +20,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   4. Run: node -e "import('./dist/core/config/manager.js').then(({ConfigManager}) => { const c = new ConfigManager(); c.load().then(r => console.log('Default shell config:', JSON.stringify(r.shell, null, 2))); })"
 
   Expected Results:
-  - confirmationThreshold: 50
+  - requireConfirmationForRisky: true
   - confirmationTimeout: 30000
   - sessionMemory: true
   - requireConfirmation: true
@@ -44,7 +44,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   3. Clear environment variables: unset AIYA_SHELL_*
 
   Expected Results:
-  - confirmationThreshold: 75
+  - requireConfirmationForRisky: false
   - confirmationTimeout: 45000
   - sessionMemory: false
   - requireConfirmation: false
@@ -60,7 +60,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   1. Create a test project directory: mkdir ~/test-aiya-config && cd ~/test-aiya-config
   2. Create .aiya.yaml with shell overrides:
   shell:
-    confirmationThreshold: 90
+    requireConfirmationForRisky: true
     sessionMemory: false
     trustedCommands:
       - ^test-command
@@ -69,7 +69,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   4. Clean up: cd ~ && rm -rf ~/test-aiya-config
 
   Expected Results:
-  - confirmationThreshold: 90 (from project config)
+  - requireConfirmationForRisky: true (from project config)
   - sessionMemory: false (from project config)
   - trustedCommands should include ^test-command and ^custom-pattern
   - Other fields should use defaults
@@ -80,14 +80,14 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   Purpose: Verify precedence: defaults → global → project → environment
 
   Steps:
-  1. Create global config: mkdir -p ~/.aiya && echo 'shell:\n  confirmationThreshold: 60\n  sessionMemory: true' > ~/.aiya/config.yaml
-  2. Create project config: echo 'shell:\n  confirmationThreshold: 80\n  confirmationTimeout: 25000' > .aiya.yaml
-  3. Set environment variable: export AIYA_SHELL_CONFIRMATION_THRESHOLD=95
+  1. Create global config: mkdir -p ~/.aiya && echo 'shell:\n  requireConfirmationForRisky: false\n  sessionMemory: true' > ~/.aiya/config.yaml
+  2. Create project config: echo 'shell:\n  requireConfirmationForRisky: true\n  confirmationTimeout: 25000' > .aiya.yaml
+  3. Set environment variable: export AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY=false
   4. Run config test
-  5. Clean up: rm -rf ~/.aiya .aiya.yaml && unset AIYA_SHELL_CONFIRMATION_THRESHOLD
+  5. Clean up: rm -rf ~/.aiya .aiya.yaml && unset AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY
 
   Expected Results:
-  - confirmationThreshold: 95 (environment wins)
+  - requireConfirmationForRisky: false (environment wins)
   - confirmationTimeout: 25000 (project config)
   - sessionMemory: true (global config)
 
@@ -103,7 +103,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
     const c = new ConfigManager();
     c.save({
       shell: {
-        confirmationThreshold: 85,
+        requireConfirmationForRisky: false,
         sessionMemory: false,
         trustedCommands: ['^saved-command']
       }
@@ -114,7 +114,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   node -e "
   import('./dist/core/config/manager.js').then(({ConfigManager}) => {
     const c = new ConfigManager();
-    c.load().then(r => console.log('Loaded config:', r.shell.confirmationThreshold, r.shell.sessionMemory));
+    c.load().then(r => console.log('Loaded config:', r.shell.requireConfirmationForRisky, r.shell.sessionMemory));
   })
   "
   3. Clean up: rm -rf ~/.aiya
@@ -162,7 +162,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
     const c = new ConfigManager();
     c.load().then(config => {
       console.log('Shell config will be passed to ShellMCPClient:');
-      console.log('- confirmationThreshold:', config.shell.confirmationThreshold);
+      console.log('- requireConfirmationForRisky:', config.shell.requireConfirmationForRisky);
       console.log('- maxExecutionTime:', config.shell.maxExecutionTime);
       console.log('- trustedCommands count:', config.shell.trustedCommands.length);
     });
@@ -181,7 +181,7 @@ Manual Testing Steps for Task 2: AiyaConfig Integration
   Steps:
   1. Create invalid global config:
   mkdir -p ~/.aiya
-  echo 'shell:\n  confirmationThreshold: 150\n  confirmationTimeout: -1000' > ~/.aiya/config.yaml
+  echo 'shell:\n  requireConfirmationForRisky: 150\n  confirmationTimeout: -1000' > ~/.aiya/config.yaml
   2. Run config test
   3. Clean up: rm -rf ~/.aiya
 

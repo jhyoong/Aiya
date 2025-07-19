@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
-import { ShellMCPClient, CommandFilter } from '../../../src/core/mcp/shell.js';
+import { ShellMCPClient } from '../../../src/core/mcp/shell/shell-mcp-client.js';
+import { CommandFilter } from '../../../src/core/mcp/shell/security/command-filter.js';
 import { WorkspaceSecurity } from '../../../src/core/security/workspace.js';
 import * as path from 'path';
 import * as os from 'os';
@@ -25,7 +26,7 @@ describe('Shell Configuration Integration Tests', () => {
       const config = client.getConfiguration();
 
       // Verify all Phase 5 fields are present with correct defaults
-      expect(config.confirmationThreshold).toBe(50);
+      expect(config.requireConfirmationForRisky).toBe(true);
       expect(config.confirmationTimeout).toBe(30000);
       expect(config.sessionMemory).toBe(true);
       expect(Array.isArray(config.trustedCommands)).toBe(true);
@@ -38,18 +39,16 @@ describe('Shell Configuration Integration Tests', () => {
 
       // Verify default block patterns include dangerous commands
       expect(config.alwaysBlockPatterns).toContain('rm -rf /');
-      expect(config.alwaysBlockPatterns).toContain('sudo rm -rf');
+      expect(config.alwaysBlockPatterns).toContain('sudo rm -rf /');
       expect(config.alwaysBlockPatterns).toContain('dd if=/dev/zero');
     });
 
-    test('should validate confirmationThreshold on update', () => {
+    test('should validate boolean configuration options on update', () => {
       expect(() => {
         client.updateConfiguration({
-          confirmationThreshold: 150,
+          requireConfirmationForRisky: 'invalid',
         });
-      }).toThrow(
-        'Invalid confirmationThreshold: 150. Must be between 0 and 100.'
-      );
+      }).toThrow();
     });
 
     test('should validate confirmationTimeout on update', () => {
@@ -80,7 +79,7 @@ describe('Shell Configuration Integration Tests', () => {
 
     test('should successfully update valid Phase 5 configuration', () => {
       const newConfig = {
-        confirmationThreshold: 75,
+        requireConfirmationForDangerous: true,
         confirmationTimeout: 45000,
         sessionMemory: false,
         trustedCommands: ['^ls($|\\s)', '^pwd($|\\s)', '^git status($|\\s)'],
@@ -94,7 +93,7 @@ describe('Shell Configuration Integration Tests', () => {
 
       // Verify configuration was updated
       const updatedConfig = client.getConfiguration();
-      expect(updatedConfig.confirmationThreshold).toBe(75);
+      expect(updatedConfig.requireConfirmationForDangerous).toBe(true);
       expect(updatedConfig.confirmationTimeout).toBe(45000);
       expect(updatedConfig.sessionMemory).toBe(false);
       expect(updatedConfig.trustedCommands).toEqual(newConfig.trustedCommands);
@@ -126,7 +125,7 @@ describe('Shell Configuration Integration Tests', () => {
       expect(config.allowComplexCommands).toBe(true);
 
       // Phase 5 fields should still have default values
-      expect(config.confirmationThreshold).toBe(50);
+      expect(config.requireConfirmationForRisky).toBe(true);
       expect(config.confirmationTimeout).toBe(30000);
       expect(config.sessionMemory).toBe(true);
     });
@@ -135,7 +134,7 @@ describe('Shell Configuration Integration Tests', () => {
       // Test that CommandFilter validates Phase 5 fields independently
       expect(() => {
         new CommandFilter({
-          confirmationThreshold: 25,
+          requireConfirmationForRisky: false,
           confirmationTimeout: 15000,
           sessionMemory: true,
           trustedCommands: ['^ls($|\\s)', '^pwd($|\\s)'],
@@ -145,25 +144,25 @@ describe('Shell Configuration Integration Tests', () => {
 
       expect(() => {
         new CommandFilter({
-          confirmationThreshold: 200, // Invalid
+          requireConfirmationForDangerous: 'invalid', // Invalid
           confirmationTimeout: 15000,
           sessionMemory: true,
           trustedCommands: ['^ls($|\\s)'],
           alwaysBlockPatterns: ['rm -rf /'],
         });
       }).toThrow(
-        'Invalid confirmationThreshold: 200. Must be between 0 and 100.'
+        'requireConfirmationForDangerous must be a boolean'
       );
     });
 
     test('should handle partial configuration updates for Phase 5 fields', () => {
-      // Update only confirmationThreshold
+      // Update only requireConfirmationForDangerous
       client.updateConfiguration({
-        confirmationThreshold: 80,
+        requireConfirmationForDangerous: false,
       });
 
       let config = client.getConfiguration();
-      expect(config.confirmationThreshold).toBe(80);
+      expect(config.requireConfirmationForDangerous).toBe(false);
       // Other Phase 5 fields should remain default
       expect(config.confirmationTimeout).toBe(30000);
       expect(config.sessionMemory).toBe(true);
@@ -179,7 +178,7 @@ describe('Shell Configuration Integration Tests', () => {
       });
 
       config = client.getConfiguration();
-      expect(config.confirmationThreshold).toBe(80); // Should remain from previous update
+      expect(config.requireConfirmationForDangerous).toBe(false); // Should remain from previous update
       expect(config.trustedCommands).toHaveLength(4);
       expect(config.trustedCommands).toContain('^git status($|\\s)');
     });
@@ -187,7 +186,7 @@ describe('Shell Configuration Integration Tests', () => {
     test('should preserve Phase 5 configuration across multiple updates', () => {
       // Set initial Phase 5 configuration
       client.updateConfiguration({
-        confirmationThreshold: 60,
+        allowDangerous: true,
         sessionMemory: false,
       });
 
@@ -199,7 +198,7 @@ describe('Shell Configuration Integration Tests', () => {
 
       // Phase 5 configuration should be preserved
       const config = client.getConfiguration();
-      expect(config.confirmationThreshold).toBe(60);
+      expect(config.allowDangerous).toBe(true);
       expect(config.sessionMemory).toBe(false);
       expect(config.maxExecutionTime).toBe(120);
       expect(config.allowComplexCommands).toBe(true);

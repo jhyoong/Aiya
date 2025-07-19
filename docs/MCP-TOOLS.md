@@ -391,29 +391,38 @@ The MCP system provides two main client implementations:
 - Symbolic link protection
 
 **4. User Confirmation System**:
-- **Risk Assessment**: Commands scored 0-100 based on danger level
+- **Command Categorization**: Pattern-based categorization system
 - **Interactive Prompts**: Allow/Deny/Trust/Block options
 - **Session Memory**: Cache decisions with 30-minute TTL
 - **Trusted Commands**: Bypass confirmation for safe patterns
 - **Always Block**: Critical commands blocked regardless of confirmation
 
-**Risk Categories**:
-- **0-25**: Safe commands (ls, pwd, echo, git status)
-- **26-50**: Low risk (npm test, grep, find)
-- **51-75**: Medium risk (npm install, git push)
-- **76-100**: High risk (rm, chmod, sudo commands)
+**Command Categories**:
+- **SAFE**: Execute without confirmation (ls, pwd, echo, git status)
+- **RISKY**: Require confirmation (npm install, mkdir, chmod)
+- **DANGEROUS**: Require confirmation with warning (rm, sudo commands)
+- **BLOCKED**: Never allow (rm -rf /, format, fork bombs)
 
 **Configuration Options**:
 ```typescript
 interface ShellToolConfig {
-  confirmationThreshold: number;     // Risk score requiring confirmation (0-100)
-  confirmationTimeout: number;       // Timeout for user prompts (ms)
-  sessionMemory: boolean;            // Remember confirmation decisions
-  trustedCommands: string[];         // Commands that bypass confirmation
-  alwaysBlockPatterns: string[];     // Commands always blocked
-  maxExecutionTime: number;          // Maximum command execution time
+  requireConfirmationForRisky: boolean;     // Require confirmation for risky commands
+  requireConfirmationForDangerous: boolean; // Require confirmation for dangerous commands
+  allowDangerous: boolean;                  // Allow dangerous commands (if false, blocks them)
+  confirmationTimeout: number;              // Timeout for user prompts (ms)
+  sessionMemory: boolean;                   // Remember confirmation decisions
+  trustedCommands: string[];                // Commands that bypass confirmation
+  alwaysBlockPatterns: string[];            // Commands always blocked
+  maxExecutionTime: number;                 // Maximum command execution time
 }
 ```
+
+**Category Decision Logic**:
+Commands are categorized by pattern matching:
+1. **Blocked patterns** checked first (auto-block)
+2. **Dangerous patterns** checked second (require confirmation)
+3. **Safe patterns** checked third (allow without confirmation)
+4. **Default to risky** for unknown commands (require confirmation)
 
 **Execution Logging**:
 ```typescript

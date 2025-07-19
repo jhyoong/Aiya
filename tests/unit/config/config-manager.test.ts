@@ -44,7 +44,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should load shell configuration from global config', async () => {
       const mockGlobalConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 75,
+          requireConfirmationForRisky: false,
           confirmationTimeout: 45000,
           sessionMemory: false,
           requireConfirmation: true,
@@ -68,7 +68,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       const config = await configManager.load();
 
       expect(config.shell).toBeDefined();
-      expect(config.shell?.confirmationThreshold).toBe(75);
+      expect(config.shell?.requireConfirmationForRisky).toBe(false);
       expect(config.shell?.confirmationTimeout).toBe(45000);
       expect(config.shell?.sessionMemory).toBe(false);
       expect(config.shell?.requireConfirmation).toBe(true);
@@ -79,7 +79,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should merge project config with global config', async () => {
       const mockGlobalConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 30000,
           sessionMemory: true,
           requireConfirmation: true,
@@ -95,7 +95,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
 
       const mockProjectConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 80,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 60000,
           trustedCommands: ['^ls', '^pwd', '^git status'],
         },
@@ -112,7 +112,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
 
       const config = await configManager.load();
 
-      expect(config.shell?.confirmationThreshold).toBe(80); // Overridden by project
+      expect(config.shell?.requireConfirmationForRisky).toBe(true); // Overridden by project
       expect(config.shell?.confirmationTimeout).toBe(60000); // Overridden by project
       expect(config.shell?.sessionMemory).toBe(true); // From global
       expect(config.shell?.trustedCommands).toEqual([
@@ -125,7 +125,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should apply environment variable overrides', async () => {
       // Set environment variables using test utility
       setTestEnvironmentVariables({
-        'AIYA_SHELL_CONFIRMATION_THRESHOLD': '90',
+        'AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY': 'true',
         'AIYA_SHELL_CONFIRMATION_TIMEOUT': '50000',
         'AIYA_SHELL_SESSION_MEMORY': 'false',
         'AIYA_SHELL_REQUIRE_CONFIRMATION': 'false',
@@ -142,7 +142,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
 
       const config = await configManager.load();
 
-      expect(config.shell?.confirmationThreshold).toBe(90);
+      expect(config.shell?.requireConfirmationForRisky).toBe(true);
       expect(config.shell?.confirmationTimeout).toBe(50000);
       expect(config.shell?.sessionMemory).toBe(false);
       expect(config.shell?.requireConfirmation).toBe(false);
@@ -160,7 +160,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       expect(config.shell).toBeDefined();
       // Note: These values may come from project .aiya.yaml if not properly isolated
       // The actual implementation should fall back to DEFAULT_CONFIG when no files exist
-      expect(config.shell?.confirmationThreshold).toBeGreaterThanOrEqual(50);
+      expect(typeof config.shell?.requireConfirmationForRisky).toBe('boolean');
       expect(config.shell?.confirmationTimeout).toBeGreaterThanOrEqual(30000);
       expect(typeof config.shell?.sessionMemory).toBe('boolean');
       expect(typeof config.shell?.requireConfirmation).toBe('boolean');
@@ -174,7 +174,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
   describe('Shell Configuration Saving', () => {
     it('should save shell configuration to global config', async () => {
       const shellConfig = {
-        confirmationThreshold: 70,
+        requireConfirmationForRisky: false,
         confirmationTimeout: 40000,
         sessionMemory: false,
         requireConfirmation: true,
@@ -202,7 +202,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       // Parse the YAML content to verify shell config was saved
       const { parse: yamlParse } = await import('yaml');
       const savedConfig = yamlParse(content as string);
-      expect(savedConfig.shell.confirmationThreshold).toBe(70);
+      expect(savedConfig.shell.requireConfirmationForRisky).toBe(false);
       expect(savedConfig.shell.sessionMemory).toBe(false);
     });
 
@@ -215,7 +215,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
           model: 'llama2',
         },
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 30000,
           sessionMemory: true,
           requireConfirmation: true,
@@ -239,7 +239,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       // Now save partial shell config update
       const partialUpdate = {
         shell: {
-          confirmationThreshold: 80,
+          requireConfirmationForRisky: true,
           sessionMemory: false,
         },
       };
@@ -257,7 +257,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       expect(savedConfig.provider.type).toBe('ollama');
 
       // Should merge shell config
-      expect(savedConfig.shell.confirmationThreshold).toBe(80); // Updated
+      expect(savedConfig.shell.requireConfirmationForRisky).toBe(80); // Updated
       expect(savedConfig.shell.sessionMemory).toBe(false); // Updated
       expect(savedConfig.shell.requireConfirmation).toBe(true); // Preserved
       expect(savedConfig.shell.maxExecutionTime).toBe(30); // Preserved
@@ -265,10 +265,10 @@ describe('ConfigManager Shell Configuration Tests', () => {
   });
 
   describe('Shell Configuration Validation', () => {
-    it('should validate confirmationThreshold range', async () => {
+    it('should validate requireConfirmationForRisky as boolean', async () => {
       const invalidConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 150, // Invalid: > 100
+          requireConfirmationForRisky: 'invalid', // Invalid: not a boolean
           confirmationTimeout: 30000,
           sessionMemory: true,
           requireConfirmation: true,
@@ -290,14 +290,13 @@ describe('ConfigManager Shell Configuration Tests', () => {
       const config = await configManager.load();
 
       // Should have fallen back to sensible config (may be project defaults)
-      expect(config.shell?.confirmationThreshold).toBeLessThanOrEqual(100);
-      expect(config.shell?.confirmationThreshold).toBeGreaterThanOrEqual(0);
+      expect(typeof config.shell?.requireConfirmationForRisky).toBe('boolean');
     });
 
     it('should validate confirmationTimeout is positive', async () => {
       const invalidConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: -1000, // Invalid: negative
           sessionMemory: true,
           requireConfirmation: true,
@@ -326,7 +325,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should validate regex patterns in trustedCommands', async () => {
       const invalidConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 30000,
           sessionMemory: true,
           requireConfirmation: true,
@@ -360,7 +359,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should validate array types', async () => {
       const invalidConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 30000,
           sessionMemory: true,
           requireConfirmation: true,
@@ -389,7 +388,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should validate boolean types', async () => {
       const invalidConfig: Partial<AiyaConfig> = {
         shell: {
-          confirmationThreshold: 50,
+          requireConfirmationForRisky: true,
           confirmationTimeout: 30000,
           sessionMemory: 'true' as any, // Invalid: string instead of boolean
           requireConfirmation: true,
@@ -419,7 +418,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should ignore invalid environment variable values', async () => {
       // Set invalid environment variables using test utility
       setTestEnvironmentVariables({
-        'AIYA_SHELL_CONFIRMATION_THRESHOLD': 'invalid', // Not a number
+        'AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY': 'invalid', // Not a boolean
         'AIYA_SHELL_CONFIRMATION_TIMEOUT': '-100', // Negative
         'AIYA_SHELL_MAX_EXECUTION_TIME': 'not-a-number'
       });
@@ -431,7 +430,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
       const config = await configManager.load();
 
       // Should use sensible values when env vars are invalid (may be project defaults)
-      expect(config.shell?.confirmationThreshold).toBeGreaterThanOrEqual(50); 
+      expect(typeof config.shell?.requireConfirmationForRisky).toBe('boolean'); 
       expect(config.shell?.confirmationTimeout).toBeGreaterThanOrEqual(30000);
       expect(config.shell?.maxExecutionTime).toBeGreaterThanOrEqual(30);
     });
@@ -439,7 +438,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
     it('should handle edge case environment variable values', async () => {
       // Set edge case values using test utility
       setTestEnvironmentVariables({
-        'AIYA_SHELL_CONFIRMATION_THRESHOLD': '0', // Minimum valid
+        'AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY': 'false', // Valid boolean
         'AIYA_SHELL_CONFIRMATION_TIMEOUT': '1', // Minimum valid
         'AIYA_SHELL_MAX_EXECUTION_TIME': '1'
       });
@@ -453,7 +452,7 @@ describe('ConfigManager Shell Configuration Tests', () => {
 
       const config = await configManager.load();
 
-      expect(config.shell?.confirmationThreshold).toBe(0);
+      expect(config.shell?.requireConfirmationForRisky).toBe(0);
       expect(config.shell?.confirmationTimeout).toBe(1);
       expect(config.shell?.maxExecutionTime).toBe(1);
     });

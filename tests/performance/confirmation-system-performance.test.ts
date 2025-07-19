@@ -9,30 +9,13 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SessionMemoryManager, ConfirmationPromptOptions } from '../../src/core/mcp/confirmation.js';
-import { CommandRiskAssessor } from '../../src/core/mcp/shell.js';
+import { categorizeCommand } from '../../src/core/mcp/shell/command-categorization.js';
 
 describe('Confirmation System Performance Benchmarks', () => {
   let sessionMemory: SessionMemoryManager;
-  let riskAssessor: CommandRiskAssessor;
 
   beforeEach(() => {
-    // Initialize components with default configuration
-    const defaultConfig = {
-      allowedCommands: [],
-      blockedCommands: [],
-      requireConfirmation: true,
-      autoApprovePatterns: [],
-      maxExecutionTime: 30,
-      allowComplexCommands: false,
-      confirmationThreshold: 50,
-      trustedCommands: [],
-      alwaysBlockPatterns: [],
-      confirmationTimeout: 30000,
-      sessionMemory: true,
-    };
-
     sessionMemory = new SessionMemoryManager();
-    riskAssessor = new CommandRiskAssessor(defaultConfig);
   });
 
   describe('Session Memory Performance', () => {
@@ -49,9 +32,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       commands.forEach((command, index) => {
         sessionMemory.recordDecision(command, {
           commandPattern: command,
-          decision: index % 2 === 0 ? 'allow' : 'trust',
+          action: index % 2 === 0 ? 'allow' : 'trust',
           timestamp: new Date(),
-          riskScore: 50,
         });
       });
 
@@ -71,9 +53,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       // Record some patterns
       sessionMemory.recordDecision('npm install react', {
         commandPattern: '^npm install.*',
-        decision: 'trust',
+        action: 'trust',
         timestamp: new Date(),
-        riskScore: 40,
       });
 
       const similarCommands = [
@@ -99,9 +80,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       for (let i = 0; i < 95; i++) {
         sessionMemory.recordDecision(`command-${i}`, {
           commandPattern: `command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: new Date(),
-          riskScore: 30,
         });
       }
 
@@ -109,9 +89,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       const startTime = performance.now();
       sessionMemory.recordDecision('new-command', {
         commandPattern: 'new-command',
-        decision: 'trust',
+        action: 'trust',
         timestamp: new Date(),
-        riskScore: 40,
       });
       const endTime = performance.now();
       const duration = endTime - startTime;
@@ -133,8 +112,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       commands.forEach(command => {
         const startTime = performance.now();
         
-        // Step 1: Risk assessment (should be < 10ms)
-        const riskAssessment = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+        // Step 1: Command categorization (should be < 10ms)
+        const categorization = categorizeCommand(command);
         
         // Step 2: Session memory check (should be < 1ms)
         const previousDecision = sessionMemory.checkPreviousDecision(command);
@@ -143,9 +122,9 @@ describe('Confirmation System Performance Benchmarks', () => {
         const totalDuration = endTime - startTime;
 
         expect(totalDuration).toBeLessThan(15); // Total flow should be fast
-        expect(riskAssessment).toBeDefined();
-        expect(riskAssessment.riskScore).toBeGreaterThanOrEqual(0);
-        expect(riskAssessment.riskScore).toBeLessThanOrEqual(100);
+        expect(categorization).toBeDefined();
+        expect(categorization.category).toBeDefined();
+        expect(categorization.requiresConfirmation).toBeDefined();
       });
     });
 
@@ -163,8 +142,8 @@ describe('Confirmation System Performance Benchmarks', () => {
         const startTime = performance.now();
         
         // Quick bypass check (simulating trusted command logic)
-        const riskAssessment = riskAssessor.assessRisk(command, '/tmp/test-workspace');
-        const shouldBypass = riskAssessment.riskScore < 25; // Low risk commands
+        const categorization = categorizeCommand(command);
+        const shouldBypass = categorization.category === 'safe'; // Safe commands
         
         const endTime = performance.now();
         const duration = endTime - startTime;
@@ -181,13 +160,12 @@ describe('Confirmation System Performance Benchmarks', () => {
       const startTime = performance.now();
       
       // Prepare confirmation options (simulating what happens before user prompt)
-      const riskAssessment = riskAssessor.assessRisk(command, '/tmp/test-workspace');
+      const categorization = categorizeCommand(command);
       const confirmationOptions: ConfirmationPromptOptions = {
         command,
-        riskAssessment,
+        categorization,
         workingDirectory: '/tmp/test-workspace',
         timeout: 30000,
-        sessionMemory: true,
       };
       
       const endTime = performance.now();
@@ -196,7 +174,7 @@ describe('Confirmation System Performance Benchmarks', () => {
       expect(duration).toBeLessThan(5); // Option preparation should be very fast
       expect(confirmationOptions).toBeDefined();
       expect(confirmationOptions.command).toBe(command);
-      expect(confirmationOptions.riskAssessment).toBeDefined();
+      expect(confirmationOptions.categorization).toBeDefined();
     });
   });
 
@@ -211,9 +189,8 @@ describe('Confirmation System Performance Benchmarks', () => {
           // Record decision
           sessionMemory.recordDecision(command, {
             commandPattern: command,
-            decision: 'allow',
+            action: 'allow',
             timestamp: new Date(),
-            riskScore: 30 + (i % 40),
           });
           
           // Immediately check it
@@ -249,9 +226,8 @@ describe('Confirmation System Performance Benchmarks', () => {
         if (i % 2 === 0) {
           sessionMemory.recordDecision(`${command}-${i}`, {
             commandPattern: `${command}-${i}`,
-            decision: 'allow',
+            action: 'allow',
             timestamp: new Date(),
-            riskScore: 30,
           });
         } else {
           sessionMemory.checkPreviousDecision(`${command}-${i-1}`);
@@ -275,9 +251,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       for (let i = 0; i < 500; i++) {
         sessionMemory.recordDecision(`command-${i}`, {
           commandPattern: `command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: new Date(),
-          riskScore: 30,
         });
         
         if (i % 10 === 0) {
@@ -306,9 +281,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       for (let i = 0; i < 50; i++) {
         sessionMemory.recordDecision(`old-command-${i}`, {
           commandPattern: `old-command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: pastTime,
-          riskScore: 30,
         });
       }
       
@@ -316,9 +290,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       for (let i = 0; i < 50; i++) {
         sessionMemory.recordDecision(`new-command-${i}`, {
           commandPattern: `new-command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: new Date(),
-          riskScore: 30,
         });
       }
       
@@ -335,9 +308,8 @@ describe('Confirmation System Performance Benchmarks', () => {
       for (let i = 0; i < 200; i++) {
         sessionMemory.recordDecision(`command-${i}`, {
           commandPattern: `command-${i}`,
-          decision: 'allow',
+          action: 'allow',
           timestamp: new Date(),
-          riskScore: 30,
         });
       }
       

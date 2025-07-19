@@ -134,7 +134,7 @@ src/
 - **Responsibilities**:
   - Execute shell commands with structured output (stdout, stderr, exitCode)
   - Implement comprehensive security measures and dangerous command detection
-  - Provide user confirmation system with risk assessment
+  - Provide user confirmation system with command categorization
   - Maintain execution logging and audit trails
   - Enforce workspace restrictions and timeout protection
 - **Pattern**: Command Pattern + Security Pattern + Observer Pattern
@@ -236,8 +236,8 @@ src/
 1. **Dangerous Command Detection**: Block harmful patterns (rm -rf, format, etc.)
 2. **Command Sanitization**: Prevent injection and shell expansion attacks
 3. **Workspace Boundary Enforcement**: Restrict command execution to workspace
-4. **User Confirmation System**: Interactive prompts for risky commands
-5. **Risk Assessment**: Score commands 0-100 based on danger level
+4. **User Confirmation System**: Interactive prompts for categorized commands
+5. **Command Categorization**: Classify commands into SAFE/RISKY/DANGEROUS/BLOCKED categories
 6. **Session Memory**: Cache confirmation decisions to reduce prompt fatigue
 7. **Audit Logging**: Comprehensive logging of all command executions
 
@@ -268,9 +268,9 @@ CommandSanitizer.sanitize()
         ↓
 WorkspaceBoundaryEnforcer.validate()
         ↓
-CommandRiskAssessor.assess()
+categorizeCommand()
         ↓
-User Confirmation (if risk > threshold)
+User Confirmation (if requires confirmation)
         ↓
 ShellExecutionLogger.log()
         ↓

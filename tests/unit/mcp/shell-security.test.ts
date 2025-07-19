@@ -399,9 +399,9 @@ describe('Shell MCP Security Tests', () => {
         // Valid update should work
         const filter4 = new CommandFilter();
         expect(() =>
-          filter4.updateConfig({ confirmationThreshold: 75 })
+          filter4.updateConfig({ requireConfirmationForRisky: true })
         ).not.toThrow();
-        expect(filter4.getConfig().confirmationThreshold).toBe(75);
+        expect(filter4.getConfig().requireConfirmationForRisky).toBe(true);
       });
     });
   });

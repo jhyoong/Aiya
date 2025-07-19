@@ -74,11 +74,13 @@ export interface AiyaConfig {
     autoApprovePatterns: string[];
     maxExecutionTime: number;
     allowComplexCommands: boolean;
-    confirmationThreshold: number;
     trustedCommands: string[];
     alwaysBlockPatterns: string[];
     confirmationTimeout: number;
     sessionMemory: boolean;
+    requireConfirmationForRisky: boolean;
+    requireConfirmationForDangerous: boolean;
+    allowDangerous: boolean;
   };
   max_tokens?: number;
 }
@@ -251,7 +253,6 @@ const DEFAULT_CONFIG: AiyaConfig = {
     ],
     maxExecutionTime: 30,
     allowComplexCommands: false,
-    confirmationThreshold: 50,
     trustedCommands: [
       '^ls($|\\s)',
       '^pwd($|\\s)',
@@ -268,6 +269,9 @@ const DEFAULT_CONFIG: AiyaConfig = {
     ],
     confirmationTimeout: 30000,
     sessionMemory: true,
+    requireConfirmationForRisky: true,
+    requireConfirmationForDangerous: true,
+    allowDangerous: false,
   },
   max_tokens: 4096,
 };
@@ -573,11 +577,13 @@ export class ConfigManager {
         autoApprovePatterns: [],
         maxExecutionTime: 30,
         allowComplexCommands: false,
-        confirmationThreshold: 50,
         trustedCommands: [],
         alwaysBlockPatterns: [],
         confirmationTimeout: 30000,
         sessionMemory: true,
+        requireConfirmationForRisky: true,
+        requireConfirmationForDangerous: true,
+        allowDangerous: false,
       };
     }
 
@@ -587,37 +593,51 @@ export class ConfigManager {
         10
       );
       if (!isNaN(threshold) && threshold >= 0 && threshold <= 100) {
-        this.config.shell.confirmationThreshold = threshold;
       }
     }
 
     if (process.env.AIYA_SHELL_CONFIRMATION_TIMEOUT) {
       const timeout = parseInt(process.env.AIYA_SHELL_CONFIRMATION_TIMEOUT, 10);
       if (!isNaN(timeout) && timeout > 0) {
-        this.config.shell.confirmationTimeout = timeout;
+        this.config.shell!.confirmationTimeout = timeout;
       }
     }
 
     if (process.env.AIYA_SHELL_SESSION_MEMORY) {
-      this.config.shell.sessionMemory =
+      this.config.shell!.sessionMemory =
         process.env.AIYA_SHELL_SESSION_MEMORY === 'true';
     }
 
     if (process.env.AIYA_SHELL_REQUIRE_CONFIRMATION) {
-      this.config.shell.requireConfirmation =
+      this.config.shell!.requireConfirmation =
         process.env.AIYA_SHELL_REQUIRE_CONFIRMATION === 'true';
     }
 
     if (process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS) {
-      this.config.shell.allowComplexCommands =
+      this.config.shell!.allowComplexCommands =
         process.env.AIYA_SHELL_ALLOW_COMPLEX_COMMANDS === 'true';
     }
 
     if (process.env.AIYA_SHELL_MAX_EXECUTION_TIME) {
       const maxTime = parseInt(process.env.AIYA_SHELL_MAX_EXECUTION_TIME, 10);
       if (!isNaN(maxTime) && maxTime > 0) {
-        this.config.shell.maxExecutionTime = maxTime;
+        this.config.shell!.maxExecutionTime = maxTime;
       }
+    }
+
+    if (process.env.AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY) {
+      this.config.shell!.requireConfirmationForRisky =
+        process.env.AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_RISKY === 'true';
+    }
+
+    if (process.env.AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_DANGEROUS) {
+      this.config.shell!.requireConfirmationForDangerous =
+        process.env.AIYA_SHELL_REQUIRE_CONFIRMATION_FOR_DANGEROUS === 'true';
+    }
+
+    if (process.env.AIYA_SHELL_ALLOW_DANGEROUS) {
+      this.config.shell!.allowDangerous =
+        process.env.AIYA_SHELL_ALLOW_DANGEROUS === 'true';
     }
   }
 
@@ -651,15 +671,6 @@ export class ConfigManager {
   private validateShellConfig(): void {
     if (!this.config.shell) return;
 
-    // Validate confirmationThreshold
-    if (
-      this.config.shell.confirmationThreshold < 0 ||
-      this.config.shell.confirmationThreshold > 100
-    ) {
-      throw new Error(
-        `Invalid confirmationThreshold: ${this.config.shell.confirmationThreshold}. Must be between 0 and 100.`
-      );
-    }
 
     // Validate confirmationTimeout
     if (this.config.shell.confirmationTimeout <= 0) {

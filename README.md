@@ -171,7 +171,9 @@ security:
   maxFileSize: 1048576
 
 shell:
-  confirmationThreshold: 50
+  requireConfirmationForRisky: true
+  requireConfirmationForDangerous: true
+  allowDangerous: false
   confirmationTimeout: 30000
   sessionMemory: true
   trustedCommands:

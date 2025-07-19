@@ -529,6 +529,7 @@ export const DEFAULT_SHELL_CONFIG: ShellToolConfig = {
     'rm -rf /*',
     'sudo rm -rf /',
     'format.*',
+    'dd if=/dev/zero',
     ':(\\(\\))',
     'shutdown.*',
     'reboot.*',
