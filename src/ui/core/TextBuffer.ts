@@ -17,6 +17,7 @@ import {
   useReducer,
   useRef,
 } from 'react';
+import { BUFFER, TEXT } from '../../core/config/ui-constants.js';
 import {
   toCodePoints,
   cpLen,
@@ -56,7 +57,7 @@ function stripUnsafeCharacters(str: string): string {
         return false;
       }
       const isUnsafe =
-        code === 127 || (code <= 31 && code !== 13 && code !== 10);
+        code === TEXT.DELETE_CHAR_CODE || (code <= TEXT.MAX_CONTROL_CHAR && code !== TEXT.CARRIAGE_RETURN && code !== TEXT.LINE_FEED);
       return !isUnsafe;
     })
     .join('');
@@ -273,7 +274,7 @@ interface TextBufferState {
   viewportWidth: number;
 }
 
-const historyLimit = 100;
+const historyLimit = BUFFER.HISTORY_LIMIT;
 
 type TextBufferAction =
   | { type: 'set_text'; payload: string; pushToUndo?: boolean }
@@ -921,7 +922,7 @@ export function useTextBuffer({
         return;
       }
 
-      const minLengthToInferAsDragDrop = 3;
+      const minLengthToInferAsDragDrop = TEXT.MIN_DRAG_DROP_LENGTH;
       if (
         ch.length >= minLengthToInferAsDragDrop &&
         !shellModeActive &&
@@ -944,7 +945,7 @@ export function useTextBuffer({
 
       let currentText = '';
       for (const char of toCodePoints(ch)) {
-        if (char.codePointAt(0) === 127) {
+        if (char.codePointAt(0) === TEXT.DELETE_CHAR_CODE) {
           if (currentText.length > 0) {
             dispatch({ type: 'insert', payload: currentText });
             currentText = '';
@@ -1068,7 +1069,7 @@ export function useTextBuffer({
       // Detect potential paste operations (fallback for terminals without bracketed paste)
       const isPotentialPaste =
         key.sequence &&
-        key.sequence.length > 50 &&
+        key.sequence.length > TEXT.MAX_KEY_SEQUENCE_LENGTH &&
         key.sequence.includes('\n') &&
         !key.name;
 

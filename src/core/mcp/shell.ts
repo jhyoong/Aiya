@@ -8,6 +8,7 @@ import {
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { extractCommandName } from './shell-constants.js';
+import { TIMEOUTS } from '../config/timing-constants.js';
 import { ToolMemoryService, ToolPreference } from '../tools/memory.js';
 import { ShellLogger } from '../tools/shell-logger.js';
 
@@ -67,8 +68,8 @@ export class ShellMCPClient extends MCPClient {
             },
             timeout: {
               type: 'number',
-              description: 'Timeout in milliseconds (default: 30000)',
-              default: 30000,
+              description: `Timeout in milliseconds (default: ${TIMEOUTS.SHELL_DEFAULT})`,
+              default: TIMEOUTS.SHELL_DEFAULT,
             },
           },
           required: ['command'],
@@ -97,7 +98,7 @@ export class ShellMCPClient extends MCPClient {
   }
 
   private async runCommand(args: Record<string, any>): Promise<ToolResult> {
-    const { command, timeout = 30000 } = args;
+    const { command, timeout = TIMEOUTS.SHELL_DEFAULT } = args;
 
     if (!command || typeof command !== 'string') {
       return {

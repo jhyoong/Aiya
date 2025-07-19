@@ -1,4 +1,5 @@
 import Fuse from 'fuse.js';
+import { MATCHING } from '../config/threshold-constants.js';
 
 export interface FuzzyMatch {
   line: number;
@@ -9,8 +10,8 @@ export interface FuzzyMatch {
 }
 
 export interface FuzzySearchOptions {
-  threshold?: number; // 0.0 (exact) to 1.0 (anything), default 0.6
-  minConfidence?: number; // Minimum confidence score 0-100, default 20
+  threshold?: number; // 0.0 (exact) to 1.0 (anything), default from MATCHING.DEFAULT_THRESHOLD
+  minConfidence?: number; // Minimum confidence score 0-100, default from MATCHING.DEFAULT_MIN_CONFIDENCE
   includeScore?: boolean; // Include Fuse.js score in results
 }
 
@@ -25,8 +26,8 @@ export class FuzzyMatcher {
 
   constructor(options: FuzzySearchOptions = {}) {
     this.options = {
-      threshold: options.threshold ?? 0.6,
-      minConfidence: options.minConfidence ?? 20,
+      threshold: options.threshold ?? MATCHING.DEFAULT_THRESHOLD,
+      minConfidence: options.minConfidence ?? MATCHING.DEFAULT_MIN_CONFIDENCE,
       includeScore: options.includeScore ?? true,
     };
   }

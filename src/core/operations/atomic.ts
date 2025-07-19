@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { WorkspaceSecurity } from '../security/workspace.js';
+import { TIMEOUTS } from '../config/timing-constants.js';
 
 export interface AtomicOperationOptions {
   createBackup?: boolean;
@@ -29,7 +30,7 @@ export class AtomicFileOperations {
   private security: WorkspaceSecurity;
   private defaultOptions: AtomicOperationOptions = {
     createBackup: true,
-    timeout: 30000, // 30 seconds
+    timeout: TIMEOUTS.LONG,
   };
   private activeOperations = new Map<string, RollbackInfo>();
 

@@ -10,6 +10,8 @@ import {
   requiresApproval,
   extractCommandName,
 } from '../../core/mcp/shell-constants.js';
+import { DELAYS } from '../../core/config/timing-constants.js';
+import { PROCESSING } from '../../core/config/limits-constants.js';
 import { Message, ToolCall } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
@@ -217,7 +219,7 @@ export const chatCommand = new Command('chat')
 
     try {
       // Small delay to ensure the component is mounted
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, DELAYS.UI_SHORT));
 
       // Initialize command system for slash commands
       initializeCommandSystem();
@@ -452,7 +454,7 @@ export const chatCommand = new Command('chat')
       );
 
       // Small delay to show the completion message
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, DELAYS.UI_LONG));
 
       hideLoader();
       unmount(); // Clean up the startup loader
@@ -578,7 +580,7 @@ async function* handleMessageStream(
     if (session.toolExecutor) {
       let currentMessage = assistantMessage;
       let iterationCount = 0;
-      const maxIterations = 10; // Prevent infinite loops
+      const maxIterations = PROCESSING.MAX_ITERATIONS; // Prevent infinite loops
 
       // Keep processing tool calls until no more are found
       while (iterationCount < maxIterations) {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
+import { DELAYS } from '../../../core/config/timing-constants.js';
 import { Spinner, Alert, ConfirmInput } from '@inkjs/ui';
 import { ExtendedProviderConfig } from '../../../core/config/manager.js';
 import { ConnectionTester } from '../../../core/config/testing.js';
@@ -41,13 +42,13 @@ export const ConnectionTest: React.FC<ConnectionTestProps> = ({
       if (result.success) {
         setState('success');
         // Auto-proceed after showing success message
-        setTimeout(onSuccess, 1500);
+        setTimeout(onSuccess, DELAYS.LOADING_SHOW);
       } else {
         setState('error');
         setError(result.error || 'Connection test failed');
         setSuggestions(result.suggestions || []);
         // Show skip option after a delay
-        setTimeout(() => setShowSkipOption(true), 3000);
+        setTimeout(() => setShowSkipOption(true), DELAYS.SKIP_OPTION_SHOW);
       }
     } catch (err) {
       setState('error');

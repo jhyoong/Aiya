@@ -1,4 +1,5 @@
 import { CommandDefinition } from './CommandRegistry.js';
+import { CONTENT } from '../core/config/threshold-constants.js';
 
 export interface ArgumentDefinition {
   name: string;
@@ -253,7 +254,7 @@ export class CommandUtils {
 
       // Levenshtein distance for typo detection
       const distance = this.levenshteinDistance(inputLower, commandLower);
-      if (distance <= 2 && command.length > 2) {
+      if (distance <= CONTENT.EDIT_DISTANCE_THRESHOLD && command.length > CONTENT.MIN_STRING_LENGTH) {
         suggestions.push(command);
       }
     }

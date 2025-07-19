@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
+import { LAYOUT } from '../../core/config/ui-constants.js';
 
 interface ToolExecutionProps {
   toolName: string;
@@ -63,7 +64,7 @@ export const ToolExecution: React.FC<ToolExecutionProps> = ({
   const renderProgressBar = () => {
     if (progress === undefined) return null;
 
-    const barWidth = 20;
+    const barWidth = LAYOUT.PROGRESS_BAR_WIDTH;
     const filled = Math.round((progress / 100) * barWidth);
     const empty = barWidth - filled;
 

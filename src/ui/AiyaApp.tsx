@@ -12,6 +12,7 @@ import { useTextBuffer } from './core/TextBuffer.js';
 import { useTerminalSize } from './hooks/useTerminalSize.js';
 import * as fs from 'fs';
 import { unescapePath } from './utils/textUtils.js';
+import { TERMINAL, LAYOUT } from '../core/config/ui-constants.js';
 
 interface AiyaAppProps {
   onMessage?: (message: string) => Promise<string>;
@@ -69,15 +70,14 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
     }
   }, []);
 
-  const widthFraction = 0.9;
   const inputWidth = Math.max(
-    20,
-    Math.floor(terminalWidth * widthFraction) - 3
+    LAYOUT.MIN_INPUT_WIDTH,
+    Math.floor(terminalWidth * TERMINAL.WIDTH_FRACTION) - TERMINAL.WIDTH_PADDING
   );
 
   const buffer = useTextBuffer({
     initialText: '',
-    viewport: { height: 10, width: inputWidth },
+    viewport: { height: LAYOUT.INPUT_VIEWPORT_HEIGHT, width: inputWidth },
     stdin,
     setRawMode,
     isValidPath,
@@ -170,7 +170,7 @@ export const AiyaApp: React.FC<AiyaAppProps> = ({
   };
 
   return (
-    <Box flexDirection='column' height={24}>
+    <Box flexDirection='column' height={LAYOUT.MAIN_BOX_HEIGHT}>
       <Box flexGrow={1} paddingY={1}>
         {renderCurrentMode()}
       </Box>

@@ -3,6 +3,7 @@ import { CommandContext } from '../CommandExecutor.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { TokenCounter } from '../../core/tokens/counter.js';
 import { glob } from 'glob';
+import { SEARCH } from '../../core/config/limits-constants.js';
 
 /**
  * Parse search command arguments to determine search mode and options
@@ -15,7 +16,7 @@ function parseSearchArgs(args: string[]): {
   const query = args[0] || '';
   const options: any = {
     searchType: 'fuzzy',
-    maxResults: 50,
+    maxResults: SEARCH.DEFAULT_MAX_RESULTS,
     contextLines: 2,
   };
 
@@ -45,7 +46,7 @@ function parseSearchArgs(args: string[]): {
             break;
           case 'maxResults':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.maxResults = parseInt(nextArg, 10) || 50;
+              options.maxResults = parseInt(nextArg, 10) || SEARCH.DEFAULT_MAX_RESULTS;
               i++; // Skip next arg as it's the value
             }
             break;
@@ -168,7 +169,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
     examples: [
       '/search component',
       '/search utils.ts',
-      '/search "import React" --searchType literal --maxResults 10',
+      `/search "import React" --searchType literal --maxResults ${SEARCH.SMALL_MAX_RESULTS}`,
       '/search error --includeGlobs "*.ts" "*.js" --excludeGlobs "*.test.*"',
     ],
     requiresConfig: false,
@@ -221,7 +222,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
                 '**/build/**',
               ],
               nodir: true,
-              maxDepth: 10,
+              maxDepth: SEARCH.MAX_DIRECTORY_DEPTH,
             });
 
             if (files.length === 0) {
@@ -229,7 +230,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
             }
 
             // Limit results for readability
-            const maxResults = options.maxResults || 20;
+            const maxResults = options.maxResults || SEARCH.ALT_MAX_RESULTS;
             const displayFiles = files.slice(0, maxResults);
             const truncated = files.length > maxResults;
 

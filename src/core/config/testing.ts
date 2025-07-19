@@ -10,9 +10,10 @@ import {
   ProviderErrorType,
 } from '../errors/index.js';
 import { isObject, hasProperty } from '../../types/UtilityTypes.js';
+import { TIMEOUTS } from './timing-constants.js';
 
 export class ConnectionTester {
-  private static readonly TIMEOUT_MS = 10000; // 10 seconds
+  private static readonly TIMEOUT_MS = TIMEOUTS.MEDIUM;
 
   /**
    * Convert ProviderResult to ConnectionTestResult for backward compatibility

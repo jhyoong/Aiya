@@ -2,12 +2,16 @@
  * Memory management utilities for preventing memory leaks and managing resources
  */
 
-// Default configuration constants
+import { MEMORY } from '../../core/config/limits-constants.js';
+import { TIMEOUTS } from '../../core/config/timing-constants.js';
+import { UI_RATIOS, PERFORMANCE, TOKEN_THRESHOLDS } from '../../core/config/threshold-constants.js';
+
+// Default configuration constants - using centralized constants
 export const MEMORY_LIMITS = {
-  MAX_MESSAGE_HISTORY: 10000, // Increased from 100 to allow much longer chat history
-  MAX_STREAMING_CONTENT_SIZE: 500 * 1024, // Increased from 50KB to 500KB for longer content
-  MAX_TIMEOUT_POOL_SIZE: 10,
-  CLEANUP_INTERVAL_MS: 30000, // 30 seconds
+  MAX_MESSAGE_HISTORY: MEMORY.MAX_MESSAGE_HISTORY,
+  MAX_STREAMING_CONTENT_SIZE: MEMORY.MAX_STREAMING_CONTENT_SIZE,
+  MAX_TIMEOUT_POOL_SIZE: MEMORY.MAX_TIMEOUT_POOL_SIZE,
+  CLEANUP_INTERVAL_MS: TIMEOUTS.LONG, // 30 seconds
 } as const;
 
 // Timeout management utilities
@@ -149,7 +153,7 @@ export class ContentSizeLimiter {
     this.content += chunk;
     if (this.content.length > this.maxSize) {
       // Keep the last part of the content, with some buffer
-      const keepSize = Math.floor(this.maxSize * 0.8);
+      const keepSize = Math.floor(this.maxSize * UI_RATIOS.MEMORY_POOL_WARNING);
       this.content = '...' + this.content.slice(-keepSize);
     }
   }
@@ -167,7 +171,7 @@ export class ContentSizeLimiter {
   }
 
   get isNearLimit(): boolean {
-    return this.content.length > this.maxSize * 0.9;
+    return this.content.length > this.maxSize * TOKEN_THRESHOLDS.MEMORY_DANGER;
   }
 }
 
@@ -243,7 +247,7 @@ export function createCleanupFunction(
 }
 
 // Memory leak detection utility (development mode)
-export function detectMemoryLeaks(thresholdMB = 100): () => void {
+export function detectMemoryLeaks(thresholdMB = PERFORMANCE.MEMORY_GROWTH_THRESHOLD): () => void {
   const initialUsage = process.memoryUsage();
   let checkCount = 0;
 
@@ -254,7 +258,7 @@ export function detectMemoryLeaks(thresholdMB = 100): () => void {
     const initialHeapUsedMB = initialUsage.heapUsed / 1024 / 1024;
     const growth = heapUsedMB - initialHeapUsedMB;
 
-    if (growth > thresholdMB && checkCount > 10) {
+    if (growth > thresholdMB && checkCount > PERFORMANCE.MIN_CHECKS_THRESHOLD) {
       console.warn(
         `[MemoryLeak] Potential memory leak detected: ` +
           `${growth.toFixed(2)}MB growth (threshold: ${thresholdMB}MB)`

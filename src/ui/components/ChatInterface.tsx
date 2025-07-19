@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
+import { TERMINAL } from '../../core/config/ui-constants.js';
 import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './UnifiedStatusBar.js';
 import {
@@ -145,7 +146,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     if (!content.trim()) return '';
 
     // Get terminal width, default to 80 if not available
-    const terminalWidth = process.stdout.columns || 80;
+    const terminalWidth = process.stdout.columns || TERMINAL.DEFAULT_COLUMNS;
     const prefix = '│ ';
     const maxLineLength = terminalWidth - prefix.length - 2;
 

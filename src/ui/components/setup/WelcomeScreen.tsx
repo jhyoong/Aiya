@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { Alert } from '@inkjs/ui';
+import { DELAYS } from '../../../core/config/timing-constants.js';
 
 interface WelcomeScreenProps {
   onContinue: () => void;
@@ -9,7 +10,7 @@ interface WelcomeScreenProps {
 export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onContinue }) => {
   React.useEffect(() => {
     // Auto-continue after showing welcome message
-    const timer = setTimeout(onContinue, 2000);
+    const timer = setTimeout(onContinue, DELAYS.WELCOME_AUTO_CONTINUE);
     return () => clearTimeout(timer);
   }, [onContinue]);
 

@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { WorkspaceSecurity } from '../security/workspace.js';
+import { TIMEOUTS } from '../config/timing-constants.js';
 import { AtomicFileOperations, AtomicOperationResult } from './atomic.js';
 import { DiffPreviewSystem, PreviewResult } from '../diff/preview.js';
 
@@ -56,7 +57,7 @@ export class OperationQueue {
       maxConcurrency: 1, // Sequential by default for safety
       enableRollback: true,
       autoCleanup: true,
-      timeoutMs: 300000, // 5 minutes
+      timeoutMs: TIMEOUTS.QUEUE,
       ...options,
     };
   }

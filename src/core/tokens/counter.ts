@@ -1,6 +1,8 @@
 import { LLMProvider } from '../providers/base.js';
 import { TokenLogger } from './logger.js';
 import { EventEmitter } from 'events';
+import { TOKENS } from '../config/limits-constants.js';
+import { TOKEN_THRESHOLDS } from '../config/threshold-constants.js';
 
 export interface TokenUsage {
   input: number;
@@ -36,7 +38,7 @@ export class TokenCounter extends EventEmitter {
   ) {
     super();
     this.provider = provider;
-    this.contextLimit = contextLimit || 4096;
+    this.contextLimit = contextLimit || TOKENS.DEFAULT_CONTEXT_LIMIT;
     this.logger = new TokenLogger(providerType, model);
     this.logger.logSessionStart();
   }
@@ -211,7 +213,7 @@ export class TokenCounter extends EventEmitter {
       withinLimit,
       tokenCount,
       contextLimit,
-      suggestTruncation: tokenCount > contextLimit * 0.8, // Suggest truncation at 80%
+      suggestTruncation: tokenCount > contextLimit * TOKEN_THRESHOLDS.TRUNCATION_SUGGESTION,
     };
   }
 
@@ -219,7 +221,7 @@ export class TokenCounter extends EventEmitter {
     messages: Array<{ role: string; content: string }>,
     maxTokens?: number
   ): Array<{ role: string; content: string }> {
-    const targetTokens = maxTokens || Math.floor(this.getContextLimit() * 0.7);
+    const targetTokens = maxTokens || Math.floor(this.getContextLimit() * TOKEN_THRESHOLDS.TARGET_USAGE);
     const truncated = [...messages];
 
     // Always keep system message if present

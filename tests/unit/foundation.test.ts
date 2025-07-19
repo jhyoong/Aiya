@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { TestConfigBuilder, TEST_CONFIGS } from '@tests/utils/config-builder';
+import { TEST_CONFIG } from '../../src/core/config/test-constants.js';
 import {
   assertValidConfig,
   assertValidProviderResponse,
@@ -37,7 +38,7 @@ describe('Testing Infrastructure Foundation', () => {
         .withModel('custom-model')
         .withBaseUrl('http://custom-host:11434')
         .withCapabilities({
-          maxTokens: 8192,
+          maxTokens: TEST_CONFIG.MAX_TOKENS,
           supportsVision: true,
         })
         .build();
@@ -45,7 +46,7 @@ describe('Testing Infrastructure Foundation', () => {
       assertValidConfig(config);
       expect(config.model).toBe('custom-model');
       expect(config.baseUrl).toBe('http://custom-host:11434');
-      expect(config.capabilities?.maxTokens).toBe(8192);
+      expect(config.capabilities?.maxTokens).toBe(TEST_CONFIG.MAX_TOKENS);
       expect(config.capabilities?.supportsVision).toBe(true);
     });
 
