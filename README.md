@@ -2,7 +2,7 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-**Version 1.4.0** - Added shell command execution capabilities to the MCP tools system.
+**Version 1.4.1** - Added user confirmation check before executing tools.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -226,6 +226,7 @@ npm run format:check      # Check code formatting
 
 ## Changelog
 
+- **Version 1.4.1** - Added user confirmation check before executing tools.
 - **Version 1.4.0** - Added shell command execution capabilities to the MCP tools.
 - **Version 1.3.0** - Reworked MCP tools system with improved file operations and better error handling. Also added more documentation.
 - **Version 1.2.0** - Multi-provider support (Ollama, OpenAI, Gemini), runtime provider switching, unified CommandRegistry system, development quality setup (ESLint/Prettier), vitest setup, and improved setup wizard.
