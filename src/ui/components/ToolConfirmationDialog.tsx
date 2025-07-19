@@ -3,16 +3,16 @@ import { Box, Text } from 'ink';
 import { Select } from '@inkjs/ui';
 import { ToolCall } from '../../core/providers/base.js';
 
+export type ToolConfirmationChoice = 'allow-once' | 'reject' | 'allow-always';
+
 interface ToolConfirmationDialogProps {
   toolCalls: ToolCall[];
-  onConfirm: () => void;
-  onCancel: () => void;
+  onChoice: (choice: ToolConfirmationChoice) => void;
 }
 
 export const ToolConfirmationDialog: React.FC<ToolConfirmationDialogProps> = ({
   toolCalls,
-  onConfirm,
-  onCancel,
+  onChoice,
 }) => {
   const formatArguments = (args: any): string => {
     return Object.entries(args)
@@ -21,11 +21,7 @@ export const ToolConfirmationDialog: React.FC<ToolConfirmationDialogProps> = ({
   };
 
   const handleSelect = (value: string) => {
-    if (value === 'confirm') {
-      onConfirm();
-    } else {
-      onCancel();
-    }
+    onChoice(value as ToolConfirmationChoice);
   };
 
   return (
@@ -57,8 +53,9 @@ export const ToolConfirmationDialog: React.FC<ToolConfirmationDialogProps> = ({
 
       <Select
         options={[
-          { label: 'Execute Tools', value: 'confirm' },
-          { label: 'Cancel', value: 'cancel' },
+          { label: 'Allow Once', value: 'allow-once' },
+          { label: 'Reject', value: 'reject' },
+          { label: 'Allow Always', value: 'allow-always' },
         ]}
         onChange={handleSelect}
       />

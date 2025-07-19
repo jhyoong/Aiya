@@ -9,6 +9,7 @@ import { ShellMCPClient } from '../../core/mcp/shell.js';
 import { Message, ToolCall } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
+import { ToolMemoryService } from '../../core/tools/memory.js';
 import { ChatInterface } from '../../ui/components/ChatInterface.js';
 import { StartupLoader } from '../../ui/components/StartupLoader.js';
 import { ThinkingParser } from '../../utils/thinking-parser.js';
@@ -257,19 +258,30 @@ export const chatCommand = new Command('chat')
       await toolService.initialize();
       showLoader('MCP tool service initialized');
 
+      // Create tool memory service for session
+      const toolMemoryService = new ToolMemoryService();
+      
       // Create tool confirmation callback that will be set by ChatInterface
-      const toolConfirmationRef = { current: null as ((toolCalls: ToolCall[]) => Promise<boolean>) | null };
+      const toolConfirmationRef = { current: null as ((toolCalls: ToolCall[], storePreference?: (toolName: string, choice: any) => void) => Promise<boolean>) | null };
       
       const toolExecutor = new ToolExecutor(
         toolService,
         process.env.AIYA_VERBOSE === 'true',
         config.tools?.requireConfirmation !== false ? async (toolCalls: ToolCall[]) => {
           if (toolConfirmationRef.current) {
-            return await toolConfirmationRef.current(toolCalls);
+            const storePreference = (toolName: string, choice: any) => {
+              if (choice === 'allow-always') {
+                toolExecutor.storeToolPreference(toolName, 'allow');
+              } else if (choice === 'reject') {
+                toolExecutor.storeToolPreference(toolName, 'reject');
+              }
+            };
+            return await toolConfirmationRef.current(toolCalls, storePreference);
           }
           // Default to allow execution if no confirmation callback is set
           return true;
-        } : undefined
+        } : undefined,
+        toolMemoryService
       );
       showLoader('Tool executor created');
 

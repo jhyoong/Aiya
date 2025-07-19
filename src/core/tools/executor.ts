@@ -1,5 +1,6 @@
 import { ToolResult, Message, ToolCall } from '../providers/base.js';
 import { MCPToolService } from './mcp-tools.js';
+import { ToolMemoryService, ToolPreference } from './memory.js';
 import chalk from 'chalk';
 
 /**
@@ -9,15 +10,18 @@ export class ToolExecutor {
   private mcpService: MCPToolService;
   private verbose: boolean;
   private confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined;
+  private memoryService: ToolMemoryService;
 
   constructor(
     mcpService: MCPToolService, 
     verbose: boolean = false,
-    confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined
+    confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined,
+    memoryService?: ToolMemoryService
   ) {
     this.mcpService = mcpService;
     this.verbose = verbose;
     this.confirmationCallback = confirmationCallback;
+    this.memoryService = memoryService || new ToolMemoryService();
   }
 
   /**
@@ -52,9 +56,43 @@ export class ToolExecutor {
       console.log(chalk.yellow(` Detected ${toolCalls.length} tool call(s)`));
     }
 
-    // Request confirmation if callback provided
-    if (this.confirmationCallback) {
-      const confirmed = await this.confirmationCallback(toolCalls);
+    // Check memory for stored preferences first
+    const toolsNeedingConfirmation: ToolCall[] = [];
+    let shouldExecute = true;
+
+    for (const toolCall of toolCalls) {
+      const storedPreference = this.memoryService.getPreference(toolCall.name);
+      
+      if (storedPreference === 'reject') {
+        // Auto-reject due to stored preference
+        if (this.verbose) {
+          console.log(chalk.red(`🚫 Tool '${toolCall.name}' auto-rejected due to stored preference`));
+        }
+        shouldExecute = false;
+        break;
+      } else if (storedPreference === 'allow') {
+        // Auto-allow due to stored preference
+        if (this.verbose) {
+          console.log(chalk.green(`✓ Tool '${toolCall.name}' auto-allowed due to stored preference`));
+        }
+      } else {
+        // No stored preference, needs confirmation
+        toolsNeedingConfirmation.push(toolCall);
+      }
+    }
+
+    // If any tool was auto-rejected, cancel execution
+    if (!shouldExecute) {
+      return {
+        updatedMessage: message,
+        toolResults: [],
+        hasToolCalls: false,
+      };
+    }
+
+    // Request confirmation for tools without stored preferences
+    if (toolsNeedingConfirmation.length > 0 && this.confirmationCallback) {
+      const confirmed = await this.confirmationCallback(toolsNeedingConfirmation);
       if (!confirmed) {
         // User cancelled - return message without tool execution
         if (this.verbose) {
@@ -183,5 +221,22 @@ export class ToolExecutor {
     } else {
       return `⚠️  ${successful} successful, ${failed} failed tool call(s)`;
     }
+  }
+
+  /**
+   * Store tool preference in memory
+   */
+  storeToolPreference(toolName: string, preference: ToolPreference): void {
+    this.memoryService.setPreference(toolName, preference);
+    if (this.verbose) {
+      console.log(chalk.blue(`📝 Stored preference for '${toolName}': ${preference}`));
+    }
+  }
+
+  /**
+   * Get memory service instance (for external access)
+   */
+  getMemoryService(): ToolMemoryService {
+    return this.memoryService;
   }
 }

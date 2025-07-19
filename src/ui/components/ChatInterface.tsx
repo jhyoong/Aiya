@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
-import { ToolConfirmationDialog } from './ToolConfirmationDialog.js';
+import { ToolConfirmationDialog, ToolConfirmationChoice } from './ToolConfirmationDialog.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
 import { TextBuffer } from '../core/TextBuffer.js';
 import { ToolCall } from '../../core/providers/base.js';
@@ -61,7 +61,7 @@ interface ChatInterfaceProps {
   onProviderChange?:
     | ((provider: { name: string; type: string; model: string }) => void)
     | undefined;
-  onToolConfirmationRequest?: React.MutableRefObject<((toolCalls: ToolCall[]) => Promise<boolean>) | null>;
+  onToolConfirmationRequest?: React.MutableRefObject<((toolCalls: ToolCall[], storePreference?: (toolName: string, choice: ToolConfirmationChoice) => void) => Promise<boolean>) | null>;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -96,7 +96,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   // Tool confirmation state
   const [pendingToolCalls, setPendingToolCalls] = useState<ToolCall[] | null>(null);
   const [toolConfirmationResolver, setToolConfirmationResolver] = useState<
-    ((confirmed: boolean) => void) | null
+    ((choice: ToolConfirmationChoice) => void) | null
   >(null);
 
   // Add scroll detection state
@@ -175,29 +175,34 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   };
 
   // Tool confirmation handlers
-  const handleToolConfirmation = async (toolCalls: ToolCall[]): Promise<boolean> => {
+  const handleToolConfirmation = async (
+    toolCalls: ToolCall[], 
+    storePreference?: (toolName: string, choice: ToolConfirmationChoice) => void
+  ): Promise<boolean> => {
     return new Promise((resolve) => {
       setPendingToolCalls(toolCalls);
-      setToolConfirmationResolver(() => resolve);
+      setToolConfirmationResolver(() => (choice: ToolConfirmationChoice) => {
+        // Store preferences for "allow-always" choices
+        if (choice === 'allow-always' && storePreference) {
+          toolCalls.forEach(toolCall => {
+            storePreference(toolCall.name, choice);
+          });
+        }
+        
+        // Return boolean result based on choice
+        const shouldExecute = choice === 'allow-once' || choice === 'allow-always';
+        resolve(shouldExecute);
+      });
       setStatus('waiting-for-tool-confirmation');
     });
   };
 
-  const handleConfirmTools = () => {
+  const handleToolChoice = (choice: ToolConfirmationChoice) => {
     if (toolConfirmationResolver) {
-      toolConfirmationResolver(true);
+      toolConfirmationResolver(choice);
       setToolConfirmationResolver(null);
       setPendingToolCalls(null);
       setStatus('processing');
-    }
-  };
-
-  const handleCancelTools = () => {
-    if (toolConfirmationResolver) {
-      toolConfirmationResolver(false);
-      setToolConfirmationResolver(null);
-      setPendingToolCalls(null);
-      setStatus('idle');
     }
   };
 
@@ -469,8 +474,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       {status === 'waiting-for-tool-confirmation' && pendingToolCalls ? (
         <ToolConfirmationDialog
           toolCalls={pendingToolCalls}
-          onConfirm={handleConfirmTools}
-          onCancel={handleCancelTools}
+          onChoice={handleToolChoice}
         />
       ) : status !== 'processing' ? (
         <UnifiedInput
