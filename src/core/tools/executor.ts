@@ -1,4 +1,4 @@
-import { ToolResult, Message } from '../providers/base.js';
+import { ToolResult, Message, ToolCall } from '../providers/base.js';
 import { MCPToolService } from './mcp-tools.js';
 import chalk from 'chalk';
 
@@ -8,10 +8,16 @@ import chalk from 'chalk';
 export class ToolExecutor {
   private mcpService: MCPToolService;
   private verbose: boolean;
+  private confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined;
 
-  constructor(mcpService: MCPToolService, verbose: boolean = false) {
+  constructor(
+    mcpService: MCPToolService, 
+    verbose: boolean = false,
+    confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined
+  ) {
     this.mcpService = mcpService;
     this.verbose = verbose;
+    this.confirmationCallback = confirmationCallback;
   }
 
   /**
@@ -44,6 +50,22 @@ export class ToolExecutor {
 
     if (this.verbose) {
       console.log(chalk.yellow(` Detected ${toolCalls.length} tool call(s)`));
+    }
+
+    // Request confirmation if callback provided
+    if (this.confirmationCallback) {
+      const confirmed = await this.confirmationCallback(toolCalls);
+      if (!confirmed) {
+        // User cancelled - return message without tool execution
+        if (this.verbose) {
+          console.log(chalk.red('🚫 Tool execution cancelled by user'));
+        }
+        return {
+          updatedMessage: message,
+          toolResults: [],
+          hasToolCalls: false,
+        };
+      }
     }
 
     // Execute all tool calls

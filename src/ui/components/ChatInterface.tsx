@@ -2,8 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { UnifiedInput } from './UnifiedInput.js';
 import { SimpleStatusBar } from './SimpleStatusBar.js';
+import { ToolConfirmationDialog } from './ToolConfirmationDialog.js';
 import { SuggestionEngine } from '../../cli/suggestions.js';
 import { TextBuffer } from '../core/TextBuffer.js';
+import { ToolCall } from '../../core/providers/base.js';
 import {
   BoundedArray,
   ContentSizeLimiter,
@@ -59,6 +61,7 @@ interface ChatInterfaceProps {
   onProviderChange?:
     | ((provider: { name: string; type: string; model: string }) => void)
     | undefined;
+  onToolConfirmationRequest?: React.MutableRefObject<((toolCalls: ToolCall[]) => Promise<boolean>) | null>;
 }
 
 export const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -74,6 +77,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   tokenUsage,
   currentProvider,
   onProviderChange,
+  onToolConfirmationRequest,
 }) => {
   const messagesRef = useRef(
     new BoundedArray<Message>(MEMORY_LIMITS.MAX_MESSAGE_HISTORY)
@@ -82,12 +86,18 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const streamingContentRef = useRef(new ContentSizeLimiter());
   const subscriptionManagerRef = useRef(new SubscriptionManager());
   const [status, setStatus] = useState<
-    'idle' | 'processing' | 'error' | 'success'
+    'idle' | 'processing' | 'error' | 'success' | 'waiting-for-tool-confirmation'
   >('idle');
   const [statusMessage, setStatusMessage] = useState<string>();
   const [currentThinking, setCurrentThinking] = useState<string>('');
   const [currentContent, setCurrentContent] = useState<string>('');
   const [suggestionEngine] = useState(new SuggestionEngine());
+
+  // Tool confirmation state
+  const [pendingToolCalls, setPendingToolCalls] = useState<ToolCall[] | null>(null);
+  const [toolConfirmationResolver, setToolConfirmationResolver] = useState<
+    ((confirmed: boolean) => void) | null
+  >(null);
 
   // Add scroll detection state
   const [isUserScrolling, setIsUserScrolling] = useState<boolean>(false);
@@ -163,6 +173,41 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
       }
     }
   };
+
+  // Tool confirmation handlers
+  const handleToolConfirmation = async (toolCalls: ToolCall[]): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setPendingToolCalls(toolCalls);
+      setToolConfirmationResolver(() => resolve);
+      setStatus('waiting-for-tool-confirmation');
+    });
+  };
+
+  const handleConfirmTools = () => {
+    if (toolConfirmationResolver) {
+      toolConfirmationResolver(true);
+      setToolConfirmationResolver(null);
+      setPendingToolCalls(null);
+      setStatus('processing');
+    }
+  };
+
+  const handleCancelTools = () => {
+    if (toolConfirmationResolver) {
+      toolConfirmationResolver(false);
+      setToolConfirmationResolver(null);
+      setPendingToolCalls(null);
+      setStatus('idle');
+    }
+  };
+
+  // Make tool confirmation handler available to parent
+  useEffect(() => {
+    if (onToolConfirmationRequest) {
+      // Replace the parent's callback with our handler
+      onToolConfirmationRequest.current = handleToolConfirmation;
+    }
+  }, [onToolConfirmationRequest]);
 
   useEffect(() => {
     if (initialMessage) {
@@ -421,7 +466,13 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         )}
       </Box>
 
-      {status !== 'processing' ? (
+      {status === 'waiting-for-tool-confirmation' && pendingToolCalls ? (
+        <ToolConfirmationDialog
+          toolCalls={pendingToolCalls}
+          onConfirm={handleConfirmTools}
+          onCancel={handleCancelTools}
+        />
+      ) : status !== 'processing' ? (
         <UnifiedInput
           buffer={buffer}
           inputWidth={inputWidth}

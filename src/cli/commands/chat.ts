@@ -6,7 +6,7 @@ import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { ShellMCPClient } from '../../core/mcp/shell.js';
-import { Message } from '../../core/providers/base.js';
+import { Message, ToolCall } from '../../core/providers/base.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ChatInterface } from '../../ui/components/ChatInterface.js';
@@ -42,11 +42,15 @@ interface ChatWrapperProps {
   initialProviderName: string;
   configManager: ConfigManager;
   session: ChatSession;
+  toolConfirmationRef: { current: ((toolCalls: ToolCall[]) => Promise<boolean>) | null };
 }
 
 const ChatWrapper: React.FC<ChatWrapperProps> = props => {
   const { stdin, setRawMode } = useStdin();
   const { columns: terminalWidth } = useTerminalSize();
+
+  // Use the tool confirmation ref from props
+  const { toolConfirmationRef } = props;
 
   // Use state to track current provider information
   const [currentProvider, setCurrentProvider] = React.useState(() => {
@@ -153,6 +157,7 @@ const ChatWrapper: React.FC<ChatWrapperProps> = props => {
     provider: currentProvider.type,
     model: currentProvider.model,
     contextLength: contextLength,
+    onToolConfirmationRequest: toolConfirmationRef,
   });
 };
 
@@ -252,9 +257,19 @@ export const chatCommand = new Command('chat')
       await toolService.initialize();
       showLoader('MCP tool service initialized');
 
+      // Create tool confirmation callback that will be set by ChatInterface
+      const toolConfirmationRef = { current: null as ((toolCalls: ToolCall[]) => Promise<boolean>) | null };
+      
       const toolExecutor = new ToolExecutor(
         toolService,
-        process.env.AIYA_VERBOSE === 'true'
+        process.env.AIYA_VERBOSE === 'true',
+        config.tools?.requireConfirmation !== false ? async (toolCalls: ToolCall[]) => {
+          if (toolConfirmationRef.current) {
+            return await toolConfirmationRef.current(toolCalls);
+          }
+          // Default to allow execution if no confirmation callback is set
+          return true;
+        } : undefined
       );
       showLoader('Tool executor created');
 
@@ -322,6 +337,7 @@ export const chatCommand = new Command('chat')
           initialProviderName: currentProviderName,
           configManager: configManager,
           session: session,
+          toolConfirmationRef: toolConfirmationRef,
         })
       );
     } catch (error) {

@@ -3,7 +3,7 @@ import { Box, Text } from 'ink';
 import { Spinner, StatusMessage } from '@inkjs/ui';
 
 interface SimpleStatusBarProps {
-  status: 'idle' | 'processing' | 'error' | 'success';
+  status: 'idle' | 'processing' | 'error' | 'success' | 'waiting-for-tool-confirmation';
   message?: string | undefined;
   provider?: string | undefined;
   model?: string | undefined;
@@ -46,6 +46,12 @@ export const SimpleStatusBar: React.FC<SimpleStatusBarProps> = ({
         return (
           <StatusMessage variant='success'>
             {message || 'Success'}
+          </StatusMessage>
+        );
+      case 'waiting-for-tool-confirmation':
+        return (
+          <StatusMessage variant='warning'>
+            {message || 'Waiting for tool confirmation...'}
           </StatusMessage>
         );
       case 'idle':
