@@ -54,8 +54,8 @@ export const ToolConfirmationDialog: React.FC<ToolConfirmationDialogProps> = ({
       <Select
         options={[
           { label: 'Allow Once', value: 'allow-once' },
-          { label: 'Reject', value: 'reject' },
           { label: 'Allow Always', value: 'allow-always' },
+          { label: 'Reject', value: 'reject' },
         ]}
         onChange={handleSelect}
       />
