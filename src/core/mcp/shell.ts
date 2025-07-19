@@ -12,7 +12,7 @@ const execAsync = promisify(exec);
 
 /**
  * ShellMCPClient - MCP client for executing shell commands
- * 
+ *
  * Provides a single tool:
  * - RunCommand: Execute bash commands and return output
  */
@@ -82,7 +82,10 @@ export class ShellMCPClient extends MCPClient {
   }
 
   async readResource(): Promise<ToolResult> {
-    throw new MCPToolError('readResource', 'Resources not supported by shell client');
+    throw new MCPToolError(
+      'readResource',
+      'Resources not supported by shell client'
+    );
   }
 
   private async runCommand(args: Record<string, any>): Promise<ToolResult> {
@@ -114,7 +117,7 @@ export class ShellMCPClient extends MCPClient {
         if (output) output += '\n\n';
         output += `stderr:\n${stderr}`;
       }
-      
+
       if (!output) {
         output = 'Command executed successfully with no output';
       }
@@ -130,7 +133,7 @@ export class ShellMCPClient extends MCPClient {
       };
     } catch (error: any) {
       let errorMessage = `Command failed: ${command}\n`;
-      
+
       if (error.code === 'ETIMEOUT') {
         errorMessage += `Error: Command timed out after ${timeout}ms`;
       } else if (error.stdout || error.stderr) {
