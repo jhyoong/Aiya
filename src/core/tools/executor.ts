@@ -2,7 +2,6 @@ import { ToolResult, Message, ToolCall } from '../providers/base.js';
 import { MCPToolService } from './mcp-tools.js';
 import { ToolMemoryService, ToolPreference } from './memory.js';
 import { ToolLogger } from './logger.js';
-import chalk from 'chalk';
 
 /**
  * Tool execution coordinator for handling LLM tool calls
@@ -57,7 +56,7 @@ export class ToolExecutor {
     }
 
     if (this.verbose) {
-      console.log(chalk.yellow(` Detected ${toolCalls.length} tool call(s)`));
+      this.toolLogger.logToolDetection(toolCalls.length);
     }
 
     // Check memory for stored preferences first
@@ -77,14 +76,14 @@ export class ToolExecutor {
       if (storedPreference === 'reject') {
         // Auto-reject due to stored preference
         if (this.verbose) {
-          console.log(chalk.red(`🚫 Tool '${toolCall.name}' auto-rejected due to stored preference`));
+          this.toolLogger.logAutoDecision(toolCall.name, 'reject');
         }
         shouldExecute = false;
         break;
       } else if (storedPreference === 'allow') {
         // Auto-allow due to stored preference
         if (this.verbose) {
-          console.log(chalk.green(`✓ Tool '${toolCall.name}' auto-allowed due to stored preference`));
+          this.toolLogger.logAutoDecision(toolCall.name, 'allow');
         }
       } else {
         // No stored preference, needs confirmation
@@ -107,7 +106,7 @@ export class ToolExecutor {
       if (!confirmed) {
         // User cancelled - return message without tool execution
         if (this.verbose) {
-          console.log(chalk.red('🚫 Tool execution cancelled by user'));
+          this.toolLogger.logUserCancellation();
         }
         return {
           updatedMessage: message,
@@ -121,11 +120,7 @@ export class ToolExecutor {
     const toolResults: ToolResult[] = [];
     for (const toolCall of toolCalls) {
       if (this.verbose) {
-        console.log(
-          chalk.blue(
-            `  → Executing: ${toolCall.name}(${JSON.stringify(toolCall.arguments)})`
-          )
-        );
+        this.toolLogger.logToolExecutionStart(toolCall.name, toolCall.arguments);
       }
 
       const startTime = Date.now();
@@ -144,10 +139,7 @@ export class ToolExecutor {
       toolResults.push(result);
 
       if (this.verbose) {
-        const status = result.isError ? chalk.red('✗') : chalk.green('✓');
-        console.log(
-          `  ${status} ${toolCall.name}: ${result.result.substring(0, 100)}${result.result.length > 100 ? '...' : ''}`
-        );
+        this.toolLogger.logToolExecutionResult(toolCall.name, result.result, result.isError || false);
       }
     }
 
@@ -252,7 +244,7 @@ export class ToolExecutor {
   storeToolPreference(toolName: string, preference: ToolPreference): void {
     this.memoryService.setPreference(toolName, preference);
     if (this.verbose) {
-      console.log(chalk.blue(`📝 Stored preference for '${toolName}': ${preference}`));
+      this.toolLogger.logPreferenceStorage(toolName, preference);
     }
   }
 

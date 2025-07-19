@@ -281,32 +281,22 @@ export const chatCommand = new Command('chat')
         toolService,
         process.env.AIYA_VERBOSE === 'true',
         config.tools?.requireConfirmation !== false ? async (toolCalls: ToolCall[]) => {
-          shellLogger.logApprovalRequest(`CONFIRMATION_CALLBACK_TRIGGERED`, `${toolCalls.length} tools: ${toolCalls.map(tc => tc.name).join(', ')}`);
-          
           // Handle shell commands specially - these bypass the normal confirmation flow
           const shellCalls = toolCalls.filter(call => call.name === 'shell_RunCommand');
           const nonShellCalls = toolCalls.filter(call => call.name !== 'shell_RunCommand');
           
-          shellLogger.logApprovalRequest(`SHELL_VS_NONSHELL`, `Shell: ${shellCalls.length}, Non-shell: ${nonShellCalls.length}`);
-          
           // Process shell commands with command-specific approval FIRST
           for (const shellCall of shellCalls) {
             const command = shellCall.arguments.command;
-            shellLogger.logApprovalRequest(`PROCESSING_SHELL_CMD`, String(command || 'undefined'));
             if (!command || typeof command !== 'string') continue;
             
             // Check if command requires approval
-            const needsApproval = requiresApproval(command);
-            shellLogger.logApprovalRequest(`REQUIRES_APPROVAL_CHECK`, `${command} -> ${needsApproval}`);
-            
-            if (needsApproval) {
+            if (requiresApproval(command)) {
               const commandType = extractCommandName(command);
               const memoryKey = `shell:${commandType}`;
-              shellLogger.logApprovalRequest(`MEMORY_KEY_GENERATED`, memoryKey);
               
               // Check stored preference first
               const storedPreference = toolMemoryService.getPreference(memoryKey);
-              shellLogger.logApprovalRequest(`STORED_PREFERENCE_CHECK`, `${memoryKey} -> ${storedPreference || 'none'}`);
               
               if (storedPreference === 'reject') {
                 shellLogger.logApprovalResult(command, commandType, false, 'rejected');
@@ -314,7 +304,6 @@ export const chatCommand = new Command('chat')
               }
               
               if (storedPreference !== 'allow') {
-                shellLogger.logApprovalRequest(`NEED_USER_APPROVAL`, `${memoryKey} not auto-allowed`);
                 // Log approval request
                 shellLogger.logApprovalRequest(command, commandType);
                 

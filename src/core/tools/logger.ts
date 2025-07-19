@@ -105,6 +105,43 @@ export class ToolLogger {
     }
   }
 
+  logVerboseEvent(event: string, details?: string): void {
+    const detailsStr = details ? ` ${details}` : '';
+    const logLine = `[${new Date().toISOString()}] [${this.sessionId}] VERBOSE: ${event}${detailsStr}`;
+    try {
+      fs.appendFileSync(this.logFile, logLine + '\n', 'utf8');
+    } catch (error) {
+      console.error('Failed to write verbose log:', error);
+    }
+  }
+
+  logToolDetection(count: number): void {
+    this.logVerboseEvent('TOOL_DETECTION', `Detected ${count} tool call(s)`);
+  }
+
+  logAutoDecision(toolName: string, decision: 'allow' | 'reject'): void {
+    this.logVerboseEvent('AUTO_DECISION', `Tool '${toolName}' auto-${decision}ed due to stored preference`);
+  }
+
+  logUserCancellation(): void {
+    this.logVerboseEvent('USER_CANCELLATION', 'Tool execution cancelled by user');
+  }
+
+  logToolExecutionStart(toolName: string, args: any): void {
+    const argsStr = this.sanitizeArgs(args);
+    this.logVerboseEvent('TOOL_EXECUTION_START', `Executing: ${toolName}(${argsStr})`);
+  }
+
+  logToolExecutionResult(toolName: string, result: string, isError: boolean): void {
+    const status = isError ? 'ERROR' : 'SUCCESS';
+    const truncatedResult = result.length > 100 ? result.substring(0, 100) + '...' : result;
+    this.logVerboseEvent('TOOL_EXECUTION_RESULT', `${toolName}: ${status} - ${truncatedResult}`);
+  }
+
+  logPreferenceStorage(toolName: string, preference: string): void {
+    this.logVerboseEvent('PREFERENCE_STORAGE', `Stored preference for '${toolName}': ${preference}`);
+  }
+
   isNewSessionStart(): boolean {
     return this.isNewSession;
   }
