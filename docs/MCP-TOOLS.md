@@ -442,6 +442,143 @@ getMemoryService(): ToolMemoryService
 - `always` - Always approve this command type
 - `reject` - Always reject this command type
 
+### Todo MCP Client
+
+#### TodoMCPAdapter
+**Location**: `src/core/mcp/todo-adapter.ts`
+
+The todo MCP client implementation provides comprehensive todo management capabilities through integration with the aiya-todo-mcp package:
+
+**Core Dependencies**:
+- `aiya-todo-mcp` - External package for todo management functionality
+- `TodoManager` - Core todo management with JSON persistence
+- Comprehensive validation and error handling
+
+**Architecture Pattern**: The client follows an **Adapter Pattern** where the `TodoMCPAdapter` wraps the external `aiya-todo-mcp` package to work seamlessly with Aiya's custom MCP architecture.
+
+#### Five Todo Management Tools
+
+### 1. CreateTodo Tool
+
+**Purpose**: Create new todo tasks with titles
+
+**Parameters**:
+```typescript
+{
+  title: string;
+}
+```
+
+**Features**:
+- **Title Validation**: Ensures non-empty titles
+- **Automatic ID Generation**: Sequential ID assignment
+- **Timestamp Creation**: Automatic createdAt timestamp
+- **Persistence**: Immediate save to JSON file
+
+### 2. ListTodos Tool
+
+**Purpose**: List todo tasks with optional filtering and pagination
+
+**Parameters**:
+```typescript
+{
+  completed?: boolean;
+  limit?: number;
+  offset?: number;
+}
+```
+
+**Features**:
+- **Completion Filtering**: Filter by completed status
+- **Pagination Support**: Limit and offset for large todo lists
+- **Efficient Retrieval**: In-memory operations with file persistence
+
+### 3. GetTodo Tool
+
+**Purpose**: Retrieve a specific todo task by ID
+
+**Parameters**:
+```typescript
+{
+  id: string;
+}
+```
+
+**Features**:
+- **ID Validation**: Ensures valid todo ID
+- **Not Found Handling**: Clear error messages for missing todos
+- **Complete Todo Data**: Returns all todo properties
+
+### 4. UpdateTodo Tool
+
+**Purpose**: Update existing todo tasks (title and completion status)
+
+**Parameters**:
+```typescript
+{
+  id: string;
+  title?: string;
+  completed?: boolean;
+}
+```
+
+**Features**:
+- **Partial Updates**: Update only specified fields
+- **Title Validation**: Ensures non-empty titles when updating
+- **Completion Toggle**: Easy task completion management
+- **Atomic Operations**: Consistent state updates
+
+### 5. DeleteTodo Tool
+
+**Purpose**: Remove todo tasks by ID
+
+**Parameters**:
+```typescript
+{
+  id: string;
+}
+```
+
+**Features**:
+- **ID Validation**: Ensures valid todo ID
+- **Confirmation Response**: Clear success/failure messages
+- **Persistent Deletion**: Immediate removal from storage
+
+#### Todo Persistence
+
+**Storage Format**:
+```json
+{
+  "todos": [
+    {
+      "id": "1",
+      "title": "Example Todo",
+      "completed": false,
+      "createdAt": "2025-07-20T12:00:00.000Z"
+    }
+  ],
+  "nextId": 2
+}
+```
+
+**Key Features**:
+- **JSON File Storage**: Persistent storage in `todos.json`
+- **Sequential IDs**: Automatic ID generation and management
+- **ISO Timestamps**: Standardized date formats
+
+#### Integration Benefits
+
+**Adapter Pattern Advantages**:
+- **Zero Breaking Changes**: No impact on existing Aiya functionality
+- **Seamless Integration**: Works with existing MCP tool architecture
+- **Tool Prefixing**: Tools appear as `todo_CreateTodo`, etc.
+- **Future Upgrades**: Easy to update underlying aiya-todo-mcp package
+
+**Error Handling**:
+- **Comprehensive Validation**: Input parameter validation
+- **Clear Error Messages**: Helpful error descriptions
+- **Graceful Degradation**: Handles package failures gracefully
+
 ### Supporting Components
 
 #### FileSystemState
@@ -607,10 +744,11 @@ Both filesystem and shell tools are available to all AI providers through the st
 **Tool Registration**:
 - Filesystem tools: `filesystem_ReadFile`, `filesystem_WriteFile`, `filesystem_EditFile`, `filesystem_SearchFiles`, `filesystem_ListDirectory`
 - Shell tools: `shell_RunCommand`
+- Todo tools: `todo_CreateTodo`, `todo_ListTodos`, `todo_GetTodo`, `todo_UpdateTodo`, `todo_DeleteTodo`
 
 **Tool Call Flow**:
 1. **Provider Request**: AI provider requests tool execution
-2. **Tool Service**: Routes to appropriate MCP client (filesystem or shell)
+2. **Tool Service**: Routes to appropriate MCP client (filesystem, shell, or todo)
 3. **Security Check**: Validation and approval for sensitive operations
 4. **Execution**: Tool executed with full validation and logging
 5. **Response**: Results returned to provider
