@@ -10,8 +10,19 @@ import {
   ProviderError,
   ProviderConfig,
 } from './base.js';
-import { CapabilityManager } from '../config/CapabilityManager.js';
 import { OllamaErrorMapper, ErrorContext } from '../errors/index.js';
+
+// Ollama-specific type definitions
+interface OllamaModelInfo {
+  parameters?: string;
+  model_info?:
+    | Map<string, unknown>
+    | {
+        'llama.context_length'?: number;
+        [key: string]: unknown;
+      };
+  [key: string]: unknown;
+}
 
 export class OllamaProvider extends LLMProvider {
   private client: Ollama;
@@ -26,7 +37,7 @@ export class OllamaProvider extends LLMProvider {
   /**
    * Handle errors using the standardized error mapper
    */
-  private handleError(error: any, operation: string): never {
+  private handleError(error: unknown, operation: string): never {
     const context: ErrorContext = {
       provider: 'ollama',
       operation,
@@ -46,9 +57,15 @@ export class OllamaProvider extends LLMProvider {
       case 'model_not_found':
         throw new ModelNotFoundError(this.model);
       case 'connection_failed':
-        throw new ConnectionError(result.error, error);
+        throw new ConnectionError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
       default:
-        throw new ProviderError(result.error, error);
+        throw new ProviderError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
     }
   }
 
@@ -109,16 +126,19 @@ export class OllamaProvider extends LLMProvider {
   async getModelInfo(): Promise<ModelInfo> {
     try {
       const modelInfo = await this.client.show({ model: this.model });
+      const contextLength = this.extractContextLength(
+        modelInfo as unknown as OllamaModelInfo
+      );
 
       return {
         name: this.model,
-        contextLength: this.extractContextLength(modelInfo),
+        contextLength,
         supportedFeatures: ['chat', 'streaming'],
         capabilities: {
           supportsVision: false, // Ollama generally doesn't support vision
           supportsFunctionCalling: false, // Ollama doesn't support function calling
           supportsThinking: false, // Ollama doesn't support thinking tokens
-          maxTokens: this.extractContextLength(modelInfo),
+          maxTokens: contextLength,
           supportsStreaming: true,
         },
       };
@@ -166,15 +186,16 @@ export class OllamaProvider extends LLMProvider {
     supportsThinking: boolean;
     maxTokens: number;
   }> {
-    const capabilities = CapabilityManager.getCapabilities(
-      'ollama',
-      this.model
+    const modelInfo = await this.client.show({ model: this.model });
+    const contextLength = this.extractContextLength(
+      modelInfo as unknown as OllamaModelInfo
     );
+
     return {
-      supportsVision: capabilities.supportsVision,
-      supportsFunctionCalling: capabilities.supportsFunctionCalling,
-      supportsThinking: capabilities.supportsThinking,
-      maxTokens: capabilities.maxTokens,
+      supportsVision: false,
+      supportsFunctionCalling: false,
+      supportsThinking: false,
+      maxTokens: contextLength,
     };
   }
 
@@ -182,7 +203,7 @@ export class OllamaProvider extends LLMProvider {
     return '1.0'; // Could be enhanced to fetch actual Ollama version
   }
 
-  private extractContextLength(modelInfo: any): number {
+  private extractContextLength(modelInfo: OllamaModelInfo): number {
     // If max_tokens is configured, use that as override
     if (this.configuredMaxTokens !== undefined) {
       return this.configuredMaxTokens;
@@ -193,13 +214,26 @@ export class OllamaProvider extends LLMProvider {
     try {
       if (modelInfo.parameters?.includes('context_length')) {
         const match = modelInfo.parameters.match(/context_length\s+(\d+)/);
-        if (match) {
+        if (match && match[1]) {
           return parseInt(match[1], 10);
         }
       }
 
-      if (modelInfo.model_info?.['llama.context_length']) {
-        return modelInfo.model_info['llama.context_length'];
+      if (modelInfo.model_info) {
+        // Handle both Map and object types
+        if (modelInfo.model_info instanceof Map) {
+          const contextLength = modelInfo.model_info.get(
+            'llama.context_length'
+          );
+          if (typeof contextLength === 'number') {
+            return contextLength;
+          }
+        } else if (modelInfo.model_info['llama.context_length']) {
+          const contextLength = modelInfo.model_info['llama.context_length'];
+          if (typeof contextLength === 'number') {
+            return contextLength;
+          }
+        }
       }
 
       return defaultContextLength;

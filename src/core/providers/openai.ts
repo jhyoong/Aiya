@@ -36,7 +36,7 @@ export class OpenAIProvider extends LLMProvider {
   /**
    * Handle errors using the standardized error mapper
    */
-  private handleError(error: any, operation: string): never {
+  private handleError(error: unknown, operation: string): never {
     const context: ErrorContext = {
       provider: 'openai',
       operation,
@@ -56,11 +56,20 @@ export class OpenAIProvider extends LLMProvider {
       case 'model_not_found':
         throw new ModelNotFoundError(this.model);
       case 'authentication_failed':
-        throw new ProviderError(result.error, error);
+        throw new ProviderError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
       case 'connection_failed':
-        throw new ConnectionError(result.error, error);
+        throw new ConnectionError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
       default:
-        throw new ProviderError(result.error, error);
+        throw new ProviderError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
     }
   }
 

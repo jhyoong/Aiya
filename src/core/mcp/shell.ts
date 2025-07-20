@@ -14,6 +14,12 @@ import { ShellLogger } from '../tools/shell-logger.js';
 
 const execAsync = promisify(exec);
 
+interface ExecError extends Error {
+  code?: string | number;
+  stdout?: string;
+  stderr?: string;
+}
+
 /**
  * ShellMCPClient - MCP client for executing shell commands
  *
@@ -78,7 +84,10 @@ export class ShellMCPClient extends MCPClient {
     ];
   }
 
-  async callTool(name: string, args: Record<string, any>): Promise<ToolResult> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<ToolResult> {
     if (name !== 'RunCommand') {
       throw new MCPToolError(name, `Unknown tool: ${name}`);
     }
@@ -97,8 +106,9 @@ export class ShellMCPClient extends MCPClient {
     );
   }
 
-  private async runCommand(args: Record<string, any>): Promise<ToolResult> {
-    const { command, timeout = TIMEOUTS.SHELL_DEFAULT } = args;
+  private async runCommand(args: Record<string, unknown>): Promise<ToolResult> {
+    const command = args.command as string;
+    const timeout = (args.timeout as number) || TIMEOUTS.SHELL_DEFAULT;
 
     if (!command || typeof command !== 'string') {
       return {
@@ -153,33 +163,48 @@ export class ShellMCPClient extends MCPClient {
         ],
         isError: false,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const duration = Date.now() - startTime;
+
+      // Type guard for exec error
+      const isExecError = (err: unknown): err is ExecError => {
+        return err instanceof Error;
+      };
+
+      const execError = isExecError(error)
+        ? error
+        : ({ message: String(error) } as ExecError);
+
+      // Convert code to number if it's a string
+      const exitCode =
+        typeof execError.code === 'string'
+          ? parseInt(execError.code, 10) || -1
+          : execError.code || -1;
 
       // Log failed command execution
       this.shellLogger.logShellCommand(
         command,
-        error.code || -1,
-        error.stdout,
-        error.stderr,
+        exitCode,
+        execError.stdout,
+        execError.stderr,
         duration,
-        error.message
+        execError.message
       );
 
       let errorMessage = `Command failed: ${command}\n`;
 
-      if (error.code === 'ETIMEOUT') {
+      if (execError.code === 'ETIMEOUT') {
         errorMessage += `Error: Command timed out after ${timeout}ms`;
-      } else if (error.stdout || error.stderr) {
-        if (error.stdout) {
-          errorMessage += `stdout:\n${error.stdout}\n\n`;
+      } else if (execError.stdout || execError.stderr) {
+        if (execError.stdout) {
+          errorMessage += `stdout:\n${execError.stdout}\n\n`;
         }
-        if (error.stderr) {
-          errorMessage += `stderr:\n${error.stderr}\n\n`;
+        if (execError.stderr) {
+          errorMessage += `stderr:\n${execError.stderr}\n\n`;
         }
-        errorMessage += `Exit code: ${error.code || 'unknown'}`;
+        errorMessage += `Exit code: ${execError.code || 'unknown'}`;
       } else {
-        errorMessage += `Error: ${error.message}`;
+        errorMessage += `Error: ${execError.message}`;
       }
 
       return {

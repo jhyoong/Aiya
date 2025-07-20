@@ -117,7 +117,7 @@ export class FuzzyMatcher {
   private findBestMatchPosition(
     line: string,
     pattern: string,
-    fuseMatch?: any
+    fuseMatch?: { indices?: readonly [number, number][] }
   ): { column: number; matchedText: string } {
     // Try simple substring match first for better results
     const normalizedLine = line.toLowerCase();
@@ -133,7 +133,11 @@ export class FuzzyMatcher {
     }
 
     // If Fuse.js provided match indices, use them
-    if (fuseMatch?.indices && fuseMatch.indices.length > 0) {
+    if (
+      fuseMatch?.indices &&
+      fuseMatch.indices.length > 0 &&
+      fuseMatch.indices[0]
+    ) {
       const [startIndex, endIndex] = fuseMatch.indices[0];
 
       // Use the normalized match indices directly on the original line

@@ -4,56 +4,70 @@ import {
   ErrorContext,
   ProviderError,
   ProviderResult,
+  ErrorInput,
+  safeGetMessage,
+  safeGetStatusCode,
 } from './BaseProviderErrorHandler.js';
 
 export class OpenAIErrorMapper extends BaseProviderErrorHandler {
   /**
    * Detect OpenAI-specific authentication errors
    */
-  static detectAuthenticationError(error: any, statusCode?: number): boolean {
+  static detectAuthenticationError(
+    error: ErrorInput,
+    statusCode?: number
+  ): boolean {
+    const message = safeGetMessage(error);
     return (
       statusCode === 401 ||
-      error.message?.includes('401') ||
-      error.message?.includes('Unauthorized') ||
-      error.message?.includes('Invalid API key') ||
-      error.message?.includes('authentication')
+      message?.includes('401') ||
+      message?.includes('Unauthorized') ||
+      message?.includes('Invalid API key') ||
+      message?.includes('authentication') ||
+      false
     );
   }
 
   /**
    * Detect OpenAI-specific rate limiting errors
    */
-  static detectRateLimitError(error: any, statusCode?: number): boolean {
+  static detectRateLimitError(error: ErrorInput, statusCode?: number): boolean {
+    const message = safeGetMessage(error);
     return (
       statusCode === 429 ||
-      error.message?.includes('429') ||
-      error.message?.includes('rate limit') ||
-      error.message?.includes('Too Many Requests')
+      message?.includes('429') ||
+      message?.includes('rate limit') ||
+      message?.includes('Too Many Requests') ||
+      false
     );
   }
 
   /**
    * Detect OpenAI-specific model not found errors
    */
-  static detectModelNotFound(error: any, statusCode?: number): boolean {
+  static detectModelNotFound(error: ErrorInput, statusCode?: number): boolean {
+    const message = safeGetMessage(error);
     return (
       statusCode === 404 ||
-      error.message?.includes('404') ||
-      (error.message?.includes('model') &&
-        (error.message?.includes('not found') ||
-          error.message?.includes('does not exist')))
+      message?.includes('404') ||
+      (message?.includes('model') &&
+        (message?.includes('not found') ||
+          message?.includes('does not exist'))) ||
+      false
     );
   }
 
   /**
    * Detect OpenAI-specific billing/quota errors
    */
-  static detectBillingError(error: any): boolean {
+  static detectBillingError(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('billing') ||
-      error.message?.includes('quota') ||
-      error.message?.includes('insufficient') ||
-      error.message?.includes('exceeded')
+      message?.includes('billing') ||
+      message?.includes('quota') ||
+      message?.includes('insufficient') ||
+      message?.includes('exceeded') ||
+      false
     );
   }
 
@@ -164,7 +178,10 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
   /**
    * Handle OpenAI-specific error classification and response
    */
-  static handleOpenAIError(error: any, context: ErrorContext): ProviderResult {
+  static handleOpenAIError(
+    error: ErrorInput,
+    context: ErrorContext
+  ): ProviderResult {
     // Enhanced context with OpenAI-specific information
     const openaiContext: ErrorContext = {
       ...context,
@@ -172,14 +189,14 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
     };
 
     // Extract status code from error if available
-    const statusCode = error.status || error.statusCode || context.statusCode;
+    const statusCode = safeGetStatusCode(error) || context.statusCode;
 
     // OpenAI-specific error detection
     if (this.detectAuthenticationError(error, statusCode)) {
       return this.createOpenAIError(
         ProviderErrorType.AUTHENTICATION_FAILED,
         'OpenAI API authentication failed',
-        { ...openaiContext, statusCode }
+        { ...openaiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -187,7 +204,7 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
       return this.createOpenAIError(
         ProviderErrorType.RATE_LIMITED,
         'OpenAI API rate limit exceeded',
-        { ...openaiContext, statusCode }
+        { ...openaiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -195,7 +212,7 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
       return this.createOpenAIError(
         ProviderErrorType.MODEL_NOT_FOUND,
         `OpenAI model ${context.model} not found`,
-        { ...openaiContext, statusCode }
+        { ...openaiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -203,7 +220,7 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
       return this.createOpenAIError(
         ProviderErrorType.AUTHENTICATION_FAILED,
         'OpenAI billing or quota issue',
-        { ...openaiContext, statusCode },
+        { ...openaiContext, ...(statusCode ? { statusCode } : {}) },
         [
           'Check OpenAI account billing status',
           'Verify payment method is valid',
@@ -216,13 +233,13 @@ export class OpenAIErrorMapper extends BaseProviderErrorHandler {
     // Fall back to generic error handling
     const errorType = this.classifyError(error, {
       ...openaiContext,
-      statusCode,
+      ...(statusCode ? { statusCode } : {}),
     });
-    const message = error.message || 'Unknown OpenAI error occurred';
+    const message = safeGetMessage(error) || 'Unknown OpenAI error occurred';
 
     return this.createOpenAIError(errorType, message, {
       ...openaiContext,
-      statusCode,
+      ...(statusCode ? { statusCode } : {}),
     });
   }
 }

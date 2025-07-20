@@ -69,7 +69,7 @@ export const GenericConfirmationDialog: React.FC<
 export interface ToolConfirmationDialogProps {
   toolCalls: Array<{
     name: string;
-    arguments: any;
+    arguments: Record<string, unknown>;
   }>;
   onChoice: (choice: ConfirmationChoice) => void;
 }
@@ -78,7 +78,7 @@ export const ToolConfirmationDialog: React.FC<ToolConfirmationDialogProps> = ({
   toolCalls,
   onChoice,
 }) => {
-  const formatArguments = (args: any): string => {
+  const formatArguments = (args: Record<string, unknown>): string => {
     return Object.entries(args)
       .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
       .join(', ');
@@ -155,16 +155,13 @@ export const ShellCommandConfirmationDialog: React.FC<
     ? 'This command could modify your system. Use caution!'
     : undefined;
 
-  const props: any = {
+  const props: GenericConfirmationDialogProps = {
     title: 'The assistant wants to execute a shell command:',
     content: content,
     choices: customChoices,
     onChoice: onChoice,
+    ...(warningMessage && { warningMessage }),
   };
-
-  if (warningMessage) {
-    props.warningMessage = warningMessage;
-  }
 
   return <GenericConfirmationDialog {...props} />;
 };

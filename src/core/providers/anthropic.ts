@@ -354,7 +354,15 @@ export class AnthropicProvider extends LLMProvider {
     costPerToken?: { input: number; output: number };
   } {
     // Known capabilities for Claude models
-    const capabilities: Record<string, any> = {
+    const capabilities: Record<
+      string,
+      {
+        contextLength: number;
+        supportsVision: boolean;
+        supportsFunctionCalling: boolean;
+        costPerToken?: { input: number; output: number };
+      }
+    > = {
       'claude-3-5-sonnet': {
         contextLength: 200000,
         supportsVision: true,

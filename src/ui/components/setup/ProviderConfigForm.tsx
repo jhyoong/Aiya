@@ -45,7 +45,9 @@ export const ProviderConfigForm: React.FC<ProviderConfigFormProps> = ({
     // Initialize with dynamic defaults from centralized model system
     // Only use centralized defaults for supported providers
     const supportedProviders = ['ollama', 'openai', 'gemini'] as const;
-    const defaultModel = supportedProviders.includes(providerType as any)
+    const defaultModel = supportedProviders.includes(
+      providerType as (typeof supportedProviders)[number]
+    )
       ? getDefaultModel(providerType as 'ollama' | 'openai' | 'gemini')
       : '';
 
@@ -199,7 +201,9 @@ export const ProviderConfigForm: React.FC<ProviderConfigFormProps> = ({
     // Use centralized model capabilities for supported providers
     const supportedProviders = ['ollama', 'openai', 'gemini'] as const;
 
-    if (supportedProviders.includes(type as any)) {
+    if (
+      supportedProviders.includes(type as (typeof supportedProviders)[number])
+    ) {
       const capabilities = getModelCapabilities(
         type as 'ollama' | 'openai' | 'gemini',
         state.model

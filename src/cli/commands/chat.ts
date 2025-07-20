@@ -13,6 +13,7 @@ import {
 import { DELAYS } from '../../core/config/timing-constants.js';
 import { PROCESSING } from '../../core/config/limits-constants.js';
 import { Message, ToolCall } from '../../core/providers/base.js';
+import { ProviderResponse } from '../../types/ProviderTypes.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ToolMemoryService } from '../../core/tools/memory.js';
@@ -288,7 +289,10 @@ export const chatCommand = new Command('chat')
         current: null as
           | ((
               toolCalls: ToolCall[],
-              storePreference?: (toolName: string, choice: any) => void
+              storePreference?: (
+                toolName: string,
+                choice: 'allow' | 'allow-always' | 'reject'
+              ) => void
             ) => Promise<boolean>)
           | null,
       };
@@ -345,7 +349,7 @@ export const chatCommand = new Command('chat')
 
                       const storeShellPreference = (
                         _toolName: string,
-                        choice: any
+                        choice: 'allow' | 'allow-always' | 'reject'
                       ) => {
                         if (choice === 'allow-always') {
                           toolMemoryService.setPreference(memoryKey, 'allow');
@@ -394,7 +398,10 @@ export const chatCommand = new Command('chat')
 
               // Process non-shell tool calls normally (only if ChatInterface has set up callback)
               if (nonShellCalls.length > 0 && toolConfirmationRef.current) {
-                const storePreference = (toolName: string, choice: any) => {
+                const storePreference = (
+                  toolName: string,
+                  choice: 'allow' | 'allow-always' | 'reject'
+                ) => {
                   if (choice === 'allow-always') {
                     toolExecutor.storeToolPreference(toolName, 'allow');
                   } else if (choice === 'reject') {
@@ -551,7 +558,7 @@ async function* handleMessageStream(
   try {
     let response = '';
     const thinkingParser = new ThinkingParser(session.thinkingMode, true); // Enable incremental mode
-    let streamResponse: any = null;
+    let streamResponse: ProviderResponse | null = null;
 
     for await (const chunk of session.provider.stream(session.messages)) {
       const results = thinkingParser.processChunk(chunk.content);
@@ -728,7 +735,7 @@ async function handleMessage(
 
   try {
     let assistantMessage: Message;
-    let providerResponse: any = null;
+    let providerResponse: ProviderResponse | null = null;
 
     if (useStreaming) {
       let response = '';

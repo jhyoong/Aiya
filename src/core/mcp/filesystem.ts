@@ -4,14 +4,155 @@ import {
   ToolResult,
   MCPServerInfo,
   FileSystemError,
+  Resource,
 } from './base.js';
 import { WorkspaceSecurity } from '../security/workspace.js';
 import { FileSystemState } from './filesystem-state.js';
 import { FuzzyMatcher } from './fuzzy-matcher.js';
 import { ASTSearcher } from './ast-searcher.js';
 import * as fs from 'fs/promises';
+import { Dirent } from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
+
+// ===== TYPE DEFINITIONS =====
+
+// Tool parameter interfaces
+interface LineRange {
+  start: number;
+  end: number;
+}
+
+interface ReadFileParams {
+  path: string;
+  encoding?: 'utf8' | 'base64' | 'binary';
+  lineRange?: LineRange;
+}
+
+interface WriteFileParams {
+  path: string;
+  content: string;
+  createDirectories?: boolean;
+  mode?: 'overwrite' | 'create-only' | 'append';
+}
+
+// Edit operation types
+interface SearchCriteria {
+  pattern: string;
+  isRegex?: boolean;
+  occurrence?: 'first' | 'last' | 'all' | number;
+}
+
+type PositionCriteria =
+  | {
+      line: number;
+      column?: number;
+    }
+  | 'start'
+  | 'end';
+
+interface EditOperation {
+  type: 'replace' | 'insert' | 'delete';
+  search?: SearchCriteria;
+  position?: PositionCriteria;
+  content?: string;
+}
+
+interface EditFileParams {
+  path: string;
+  edits: EditOperation[];
+}
+
+// Search types
+interface SearchOptions {
+  includeGlobs?: string[];
+  excludeGlobs?: string[];
+  maxResults?: number;
+  contextLines?: number;
+  searchType: 'literal' | 'regex' | 'fuzzy' | 'ast' | 'filename';
+}
+
+interface SearchFilesParams {
+  pattern: string;
+  options: SearchOptions;
+}
+
+// Directory listing types
+interface ListDirectoryParams {
+  path: string;
+  recursive?: boolean;
+  maxDepth?: number;
+  includeHidden?: boolean;
+  sortBy?: 'name' | 'size' | 'modified' | 'type' | 'importance';
+  sortOrder?: 'asc' | 'desc';
+  filterExtensions?: string[];
+  excludePatterns?: string[];
+  maxEntries?: number;
+  offset?: number;
+  mode?: 'full' | 'summary' | 'project-files';
+  includeCommonBuildDirs?: boolean;
+  quick?: boolean;
+}
+
+// Search result types
+interface SearchMatch {
+  line: number;
+  column: number;
+  text: string;
+  confidence?: number;
+}
+
+interface SearchContext {
+  before: string[];
+  after: string[];
+}
+
+interface SearchResult {
+  file: string;
+  line: number;
+  column: number;
+  match: string;
+  context: SearchContext;
+  confidence?: number;
+}
+
+// Directory entry types
+interface EntryPermissions {
+  readable: boolean;
+  writable?: boolean | undefined;
+}
+
+interface DirectoryEntry {
+  name: string;
+  path: string;
+  type: 'directory' | 'file' | 'other';
+  size?: number | undefined;
+  modified?: Date | undefined;
+  permissions?: EntryPermissions | undefined;
+  extension?: string | undefined;
+  language?: string | undefined;
+  importance?: number | undefined;
+}
+
+interface DirectoryResult {
+  entries: DirectoryEntry[];
+  totalFound: number;
+  truncated: boolean;
+  skippedDirs: string[];
+}
+
+// Enhanced directory traversal options
+interface DirectoryTraversalOptions {
+  recursive: boolean;
+  maxDepth: number;
+  includeHidden: boolean;
+  filterExtensions?: string[] | undefined;
+  excludePatterns: string[];
+  maxEntries: number;
+  offset: number;
+  mode: string;
+  quick: boolean;
+}
 
 /**
  * FilesystemMCPClient - MCP client for file operations
@@ -35,6 +176,70 @@ export class FilesystemMCPClient extends MCPClient {
     this.state = new FileSystemState();
     this.fuzzyMatcher = new FuzzyMatcher();
     this.astSearcher = new ASTSearcher();
+  }
+
+  // ===== TYPE GUARDS =====
+
+  private isReadFileParams(obj: unknown): obj is ReadFileParams {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'path' in obj &&
+      typeof (obj as ReadFileParams).path === 'string'
+    );
+  }
+
+  private isWriteFileParams(obj: unknown): obj is WriteFileParams {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'path' in obj &&
+      'content' in obj &&
+      typeof (obj as WriteFileParams).path === 'string' &&
+      typeof (obj as WriteFileParams).content === 'string'
+    );
+  }
+
+  private isEditFileParams(obj: unknown): obj is EditFileParams {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'path' in obj &&
+      'edits' in obj &&
+      typeof (obj as EditFileParams).path === 'string' &&
+      Array.isArray((obj as EditFileParams).edits)
+    );
+  }
+
+  private isSearchFilesParams(obj: unknown): obj is SearchFilesParams {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'pattern' in obj &&
+      'options' in obj &&
+      typeof (obj as SearchFilesParams).pattern === 'string' &&
+      typeof (obj as SearchFilesParams).options === 'object'
+    );
+  }
+
+  private isListDirectoryParams(obj: unknown): obj is ListDirectoryParams {
+    return (
+      typeof obj === 'object' &&
+      obj !== null &&
+      'path' in obj &&
+      typeof (obj as ListDirectoryParams).path === 'string'
+    );
+  }
+
+  private isPositionObject(
+    position: PositionCriteria
+  ): position is { line: number; column?: number } {
+    return (
+      typeof position === 'object' &&
+      position !== null &&
+      'line' in position &&
+      typeof (position as { line: number }).line === 'number'
+    );
   }
 
   async connect(): Promise<void> {
@@ -354,18 +559,36 @@ export class FilesystemMCPClient extends MCPClient {
     ];
   }
 
-  async callTool(name: string, args: Record<string, any>): Promise<ToolResult> {
+  async callTool(
+    name: string,
+    args: Record<string, unknown>
+  ): Promise<ToolResult> {
     try {
       switch (name) {
         case 'ReadFile':
+          if (!this.isReadFileParams(args)) {
+            throw new Error('Invalid ReadFile parameters');
+          }
           return await this.readFile(args);
         case 'WriteFile':
+          if (!this.isWriteFileParams(args)) {
+            throw new Error('Invalid WriteFile parameters');
+          }
           return await this.writeFile(args);
         case 'EditFile':
+          if (!this.isEditFileParams(args)) {
+            throw new Error('Invalid EditFile parameters');
+          }
           return await this.editFile(args);
         case 'SearchFiles':
+          if (!this.isSearchFilesParams(args)) {
+            throw new Error('Invalid SearchFiles parameters');
+          }
           return await this.searchFiles(args);
         case 'ListDirectory':
+          if (!this.isListDirectoryParams(args)) {
+            throw new Error('Invalid ListDirectory parameters');
+          }
           return await this.listDirectory(args);
         default:
           return {
@@ -402,7 +625,7 @@ export class FilesystemMCPClient extends MCPClient {
     }
   }
 
-  async listResources(): Promise<any[]> {
+  async listResources(): Promise<Resource[]> {
     return [];
   }
 
@@ -451,7 +674,7 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * ReadFile tool implementation
    */
-  private async readFile(params: any): Promise<ToolResult> {
+  private async readFile(params: ReadFileParams): Promise<ToolResult> {
     const { path: filePath, encoding = 'utf8', lineRange } = params;
 
     try {
@@ -571,7 +794,7 @@ export class FilesystemMCPClient extends MCPClient {
         throw error;
       }
 
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new FileSystemError(
           `File not found: ${filePath}`,
           'FILE_NOT_FOUND',
@@ -580,7 +803,7 @@ export class FilesystemMCPClient extends MCPClient {
         );
       }
 
-      if ((error as any).code === 'EACCES') {
+      if ((error as NodeJS.ErrnoException).code === 'EACCES') {
         throw new FileSystemError(
           `Permission denied: ${filePath}`,
           'PERMISSION_DENIED',
@@ -600,7 +823,7 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * WriteFile tool implementation
    */
-  private async writeFile(params: any): Promise<ToolResult> {
+  private async writeFile(params: WriteFileParams): Promise<ToolResult> {
     const {
       path: filePath,
       content,
@@ -693,7 +916,7 @@ export class FilesystemMCPClient extends MCPClient {
           // Ignore cleanup errors
         }
 
-        if ((error as any).code === 'ENOSPC') {
+        if ((error as NodeJS.ErrnoException).code === 'ENOSPC') {
           throw new FileSystemError(
             `Insufficient disk space to write file: ${filePath}`,
             'DISK_FULL',
@@ -766,7 +989,7 @@ export class FilesystemMCPClient extends MCPClient {
         throw error;
       }
 
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new FileSystemError(
           `File or directory not found: ${filePath}`,
           'FILE_NOT_FOUND',
@@ -775,7 +998,7 @@ export class FilesystemMCPClient extends MCPClient {
         );
       }
 
-      if ((error as any).code === 'EACCES') {
+      if ((error as NodeJS.ErrnoException).code === 'EACCES') {
         throw new FileSystemError(
           `Permission denied: ${filePath}`,
           'PERMISSION_DENIED',
@@ -795,7 +1018,7 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * EditFile tool implementation
    */
-  private async editFile(params: any): Promise<ToolResult> {
+  private async editFile(params: EditFileParams): Promise<ToolResult> {
     const { path: filePath, edits } = params;
 
     try {
@@ -828,6 +1051,9 @@ export class FilesystemMCPClient extends MCPClient {
       // Apply each edit in sequence
       for (let i = 0; i < edits.length; i++) {
         const edit = edits[i];
+        if (!edit) {
+          throw new Error(`Edit ${i + 1} is undefined`);
+        }
         const { type, search, position, content: editContent } = edit;
 
         try {
@@ -961,7 +1187,7 @@ export class FilesystemMCPClient extends MCPClient {
         throw error;
       }
 
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new FileSystemError(
           `File not found: ${filePath}`,
           'FILE_NOT_FOUND',
@@ -970,7 +1196,7 @@ export class FilesystemMCPClient extends MCPClient {
         );
       }
 
-      if ((error as any).code === 'EACCES') {
+      if ((error as NodeJS.ErrnoException).code === 'EACCES') {
         throw new FileSystemError(
           `Permission denied: ${filePath}`,
           'PERMISSION_DENIED',
@@ -992,7 +1218,7 @@ export class FilesystemMCPClient extends MCPClient {
    */
   private applyReplaceEdit(
     content: string,
-    search: any,
+    search: SearchCriteria,
     replacement: string
   ): string {
     const { pattern, isRegex = false, occurrence = 'first' } = search;
@@ -1058,6 +1284,9 @@ export class FilesystemMCPClient extends MCPClient {
         return content.split(pattern).join(replacement);
       } else if (occurrence === 'first') {
         const firstIndex = indices[0];
+        if (firstIndex === undefined) {
+          throw new Error('First occurrence index is undefined');
+        }
         return (
           content.substring(0, firstIndex) +
           replacement +
@@ -1065,6 +1294,9 @@ export class FilesystemMCPClient extends MCPClient {
         );
       } else if (occurrence === 'last') {
         const lastIndex = indices[indices.length - 1];
+        if (lastIndex === undefined) {
+          throw new Error('Last occurrence index is undefined');
+        }
         return (
           content.substring(0, lastIndex) +
           replacement +
@@ -1077,6 +1309,9 @@ export class FilesystemMCPClient extends MCPClient {
           );
         }
         const targetIndex = indices[occurrence - 1];
+        if (targetIndex === undefined) {
+          throw new Error('Target occurrence index is undefined');
+        }
         return (
           content.substring(0, targetIndex) +
           replacement +
@@ -1093,14 +1328,14 @@ export class FilesystemMCPClient extends MCPClient {
    */
   private applyInsertEdit(
     content: string,
-    position: any,
+    position: PositionCriteria,
     insertContent: string
   ): string {
     if (position === 'start') {
       return insertContent + content;
     } else if (position === 'end') {
       return content + insertContent;
-    } else if (typeof position === 'object' && position.line) {
+    } else if (this.isPositionObject(position)) {
       const lines = content.split('\n');
       const lineIndex = position.line - 1; // Convert to 0-based
 
@@ -1139,15 +1374,18 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * Apply delete by search operation
    */
-  private applyDeleteBySearch(content: string, search: any): string {
+  private applyDeleteBySearch(content: string, search: SearchCriteria): string {
     return this.applyReplaceEdit(content, search, '');
   }
 
   /**
    * Apply delete by position operation
    */
-  private applyDeleteByPosition(content: string, position: any): string {
-    if (typeof position === 'object' && position.line) {
+  private applyDeleteByPosition(
+    content: string,
+    position: PositionCriteria
+  ): string {
+    if (this.isPositionObject(position)) {
       const lines = content.split('\n');
       const lineIndex = position.line - 1; // Convert to 0-based
 
@@ -1169,7 +1407,7 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * SearchFiles tool implementation
    */
-  private async searchFiles(params: any): Promise<ToolResult> {
+  private async searchFiles(params: SearchFilesParams): Promise<ToolResult> {
     const { pattern, options } = params;
     const {
       includeGlobs = ['**/*'],
@@ -1225,7 +1463,7 @@ export class FilesystemMCPClient extends MCPClient {
         }
       }
 
-      const results: any[] = [];
+      const results: SearchResult[] = [];
       let resultCount = 0;
 
       // Search each file
@@ -1249,7 +1487,7 @@ export class FilesystemMCPClient extends MCPClient {
                 break;
               }
 
-              const result: any = {
+              const result: SearchResult = {
                 file: path.relative(workspaceRoot, filePath),
                 line: 1, // Filename matches don't have line numbers
                 column: match.column,
@@ -1284,7 +1522,7 @@ export class FilesystemMCPClient extends MCPClient {
                 contextLines
               );
 
-              const result: any = {
+              const result: SearchResult = {
                 file: path.relative(workspaceRoot, filePath),
                 line: match.line,
                 column: match.column,
@@ -1348,12 +1586,7 @@ export class FilesystemMCPClient extends MCPClient {
     pattern: string,
     searchType: string,
     filePath: string
-  ): Array<{
-    line: number;
-    column: number;
-    text: string;
-    confidence?: number;
-  }> {
+  ): SearchMatch[] {
     switch (searchType) {
       case 'fuzzy':
         return this.performFuzzySearch(content, pattern, filePath);
@@ -1376,7 +1609,7 @@ export class FilesystemMCPClient extends MCPClient {
     content: string,
     pattern: string,
     filePath: string
-  ): Array<{ line: number; column: number; text: string; confidence: number }> {
+  ): SearchMatch[] {
     const fuzzyMatches = this.fuzzyMatcher.searchInContent(
       content,
       pattern,
@@ -1398,12 +1631,7 @@ export class FilesystemMCPClient extends MCPClient {
     content: string,
     pattern: string,
     filePath: string
-  ): Array<{
-    line: number;
-    column: number;
-    text: string;
-    confidence?: number;
-  }> {
+  ): SearchMatch[] {
     const astMatches = this.astSearcher.searchInContent(
       content,
       pattern,
@@ -1422,11 +1650,8 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * Perform regex search
    */
-  private performRegexSearch(
-    content: string,
-    pattern: string
-  ): Array<{ line: number; column: number; text: string }> {
-    const matches: Array<{ line: number; column: number; text: string }> = [];
+  private performRegexSearch(content: string, pattern: string): SearchMatch[] {
+    const matches: SearchMatch[] = [];
     const lines = content.split('\n');
 
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -1463,8 +1688,8 @@ export class FilesystemMCPClient extends MCPClient {
   private performLiteralSearch(
     content: string,
     pattern: string
-  ): Array<{ line: number; column: number; text: string }> {
-    const matches: Array<{ line: number; column: number; text: string }> = [];
+  ): SearchMatch[] {
+    const matches: SearchMatch[] = [];
     const lines = content.split('\n');
 
     for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -1500,12 +1725,8 @@ export class FilesystemMCPClient extends MCPClient {
     fileName: string,
     pattern: string,
     _searchType: string
-  ): Array<{
-    line: number;
-    column: number;
-    text: string;
-  }> {
-    const matches: Array<{ line: number; column: number; text: string }> = [];
+  ): SearchMatch[] {
+    const matches: SearchMatch[] = [];
 
     // For filename search, we use case-insensitive literal matching by default
     const searchText = fileName.toLowerCase();
@@ -1589,7 +1810,9 @@ export class FilesystemMCPClient extends MCPClient {
   /**
    * ListDirectory tool implementation
    */
-  private async listDirectory(params: any): Promise<ToolResult> {
+  private async listDirectory(
+    params: ListDirectoryParams
+  ): Promise<ToolResult> {
     const {
       path: dirPath,
       recursive = false,
@@ -1683,7 +1906,7 @@ export class FilesystemMCPClient extends MCPClient {
         throw error;
       }
 
-      if ((error as any).code === 'ENOENT') {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         throw new FileSystemError(
           `Directory not found: ${dirPath}`,
           'FILE_NOT_FOUND',
@@ -1692,7 +1915,7 @@ export class FilesystemMCPClient extends MCPClient {
         );
       }
 
-      if ((error as any).code === 'EACCES') {
+      if ((error as NodeJS.ErrnoException).code === 'EACCES') {
         throw new FileSystemError(
           `Permission denied: ${dirPath}`,
           'PERMISSION_DENIED',
@@ -1714,24 +1937,9 @@ export class FilesystemMCPClient extends MCPClient {
    */
   private async getDirectoryEntriesEnhanced(
     dirPath: string,
-    options: {
-      recursive: boolean;
-      maxDepth: number;
-      includeHidden: boolean;
-      filterExtensions?: string[];
-      excludePatterns: string[];
-      maxEntries: number;
-      offset: number;
-      mode: string;
-      quick: boolean;
-    }
-  ): Promise<{
-    entries: any[];
-    totalFound: number;
-    truncated: boolean;
-    skippedDirs: string[];
-  }> {
-    const entries: any[] = [];
+    options: DirectoryTraversalOptions
+  ): Promise<DirectoryResult> {
+    const entries: DirectoryEntry[] = [];
     const skippedDirs: string[] = [];
     const workspaceRoot = this.security.getWorkspaceRoot();
     let totalFound = 0;
@@ -1902,14 +2110,14 @@ export class FilesystemMCPClient extends MCPClient {
    * Create entry data with performance optimizations
    */
   private async createEntryData(
-    entry: any,
+    entry: Dirent,
     fullPath: string,
     relativePath: string,
     isDirectory: boolean,
     isFile: boolean,
-    options: any
-  ): Promise<any> {
-    const baseData = {
+    options: DirectoryTraversalOptions
+  ): Promise<DirectoryEntry> {
+    const baseData: Pick<DirectoryEntry, 'name' | 'path' | 'type'> = {
       name: entry.name,
       path: relativePath,
       type: isDirectory ? 'directory' : isFile ? 'file' : 'other',
@@ -2024,10 +2232,10 @@ export class FilesystemMCPClient extends MCPClient {
   private buildResponse(
     validatedPath: string,
     workspaceRoot: string,
-    result: any,
-    params: any,
+    result: DirectoryResult,
+    params: ListDirectoryParams,
     processingTime: number
-  ): any {
+  ): Record<string, unknown> {
     const basePath = path.relative(workspaceRoot, validatedPath);
 
     const baseResponse = {
@@ -2049,12 +2257,17 @@ export class FilesystemMCPClient extends MCPClient {
           summary: {
             totalEntries: result.totalFound,
             directories: result.entries.filter(
-              (e: any) => e.type === 'directory'
+              (e: DirectoryEntry) => e.type === 'directory'
             ).length,
-            files: result.entries.filter((e: any) => e.type === 'file').length,
+            files: result.entries.filter(
+              (e: DirectoryEntry) => e.type === 'file'
+            ).length,
             importantFiles: result.entries
-              .filter((e: any) => e.type === 'file' && (e.importance || 0) > 70)
-              .map((e: any) => ({
+              .filter(
+                (e: DirectoryEntry) =>
+                  e.type === 'file' && (e.importance || 0) > 70
+              )
+              .map((e: DirectoryEntry) => ({
                 name: e.name,
                 path: e.path,
                 importance: e.importance,
@@ -2072,13 +2285,15 @@ export class FilesystemMCPClient extends MCPClient {
           ...baseResponse,
           projectStructure: {
             importantFiles: result.entries
-              .filter((e: any) => (e.importance || 0) > 50)
+              .filter((e: DirectoryEntry) => (e.importance || 0) > 50)
               .slice(0, 50), // Limit to top 50 important files
             sourceDirectories: result.entries.filter(
-              (e: any) => e.type === 'directory' && (e.importance || 0) > 60
+              (e: DirectoryEntry) =>
+                e.type === 'directory' && (e.importance || 0) > 60
             ),
             configFiles: result.entries.filter(
-              (e: any) => e.type === 'file' && (e.importance || 0) > 80
+              (e: DirectoryEntry) =>
+                e.type === 'file' && (e.importance || 0) > 80
             ),
           },
           pagination: {
@@ -2092,9 +2307,11 @@ export class FilesystemMCPClient extends MCPClient {
         return {
           ...baseResponse,
           totalEntries: result.entries.length,
-          directories: result.entries.filter((e: any) => e.type === 'directory')
+          directories: result.entries.filter(
+            (e: DirectoryEntry) => e.type === 'directory'
+          ).length,
+          files: result.entries.filter((e: DirectoryEntry) => e.type === 'file')
             .length,
-          files: result.entries.filter((e: any) => e.type === 'file').length,
           entries: result.entries,
           pagination: {
             offset: params.offset,
@@ -2128,7 +2345,7 @@ export class FilesystemMCPClient extends MCPClient {
    * Enhanced sorting with importance-based ordering
    */
   private sortEntriesEnhanced(
-    entries: any[],
+    entries: DirectoryEntry[],
     sortBy: string,
     sortOrder: string,
     _mode: string

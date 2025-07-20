@@ -3,7 +3,7 @@ export interface Tool {
   description: string;
   inputSchema: {
     type: 'object';
-    properties: Record<string, any>;
+    properties: Record<string, unknown>;
     required?: string[];
   };
 }
@@ -55,7 +55,7 @@ export abstract class MCPClient {
 
   abstract callTool(
     name: string,
-    args: Record<string, any>
+    args: Record<string, unknown>
   ): Promise<ToolResult>;
 
   abstract listResources(): Promise<Resource[]>;

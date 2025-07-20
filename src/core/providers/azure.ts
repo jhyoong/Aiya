@@ -328,7 +328,15 @@ export class AzureOpenAIProvider extends LLMProvider {
     costPerToken?: { input: number; output: number };
   } {
     // Use the same capabilities as OpenAI models since Azure hosts the same models
-    const capabilities: Record<string, any> = {
+    const capabilities: Record<
+      string,
+      {
+        contextLength: number;
+        supportsVision: boolean;
+        supportsFunctionCalling: boolean;
+        costPerToken?: { input: number; output: number };
+      }
+    > = {
       'gpt-4o': {
         contextLength: 128000,
         supportsVision: true,

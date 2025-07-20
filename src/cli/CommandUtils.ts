@@ -6,12 +6,12 @@ export interface ArgumentDefinition {
   required: boolean;
   type: 'string' | 'number' | 'boolean' | 'file' | 'directory';
   description?: string;
-  defaultValue?: any;
+  defaultValue?: string | number | boolean;
   allowedValues?: string[];
 }
 
 export interface ParsedArguments {
-  [key: string]: any;
+  [key: string]: string | number | boolean;
 }
 
 export class CommandUtils {
@@ -96,7 +96,7 @@ export class CommandUtils {
         switch (def.type) {
           case 'number':
             parsed[def.name] = parseFloat(value);
-            if (isNaN(parsed[def.name])) {
+            if (isNaN(parsed[def.name] as number)) {
               throw new Error(`Invalid number: ${value}`);
             }
             break;
@@ -117,14 +117,16 @@ export class CommandUtils {
         // Validate allowed values
         if (
           def.allowedValues &&
-          !def.allowedValues.includes(parsed[def.name])
+          !def.allowedValues.includes(parsed[def.name] as string)
         ) {
           throw new Error(
             `Invalid value for ${def.name}. Allowed values: ${def.allowedValues.join(', ')}`
           );
         }
-      } catch (error: any) {
-        throw new Error(`Error parsing argument ${def.name}: ${error.message}`);
+      } catch (error: unknown) {
+        throw new Error(
+          `Error parsing argument ${def.name}: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     }
 
@@ -213,7 +215,7 @@ export class CommandUtils {
   /**
    * Format command execution result for display
    */
-  static formatResult(result: any): string {
+  static formatResult(result: unknown): string {
     if (typeof result === 'string') {
       return result;
     }

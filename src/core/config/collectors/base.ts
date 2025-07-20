@@ -196,8 +196,9 @@ export abstract class BaseProviderCollector {
   /**
    * Common error handling helper
    */
-  protected handleConnectionError(error: any): ConnectionTestResult {
-    const errorMessage = error?.message || 'Unknown error occurred';
+  protected handleConnectionError(error: unknown): ConnectionTestResult {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
 
     if (errorMessage.includes('ECONNREFUSED')) {
       return {

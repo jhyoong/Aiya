@@ -4,8 +4,8 @@ export interface ToolLogEntry {
   timestamp: string;
   sessionId: string;
   toolName: string;
-  args: any;
-  result?: any;
+  args: unknown;
+  result?: unknown;
   error?: string | undefined;
   duration?: number | undefined;
 }
@@ -21,8 +21,8 @@ export class ToolLogger extends BaseLogger {
 
   logToolExecution(
     toolName: string,
-    args: any,
-    result?: any,
+    args: unknown,
+    result?: unknown,
     error?: string,
     duration?: number
   ): void {
@@ -47,7 +47,7 @@ export class ToolLogger extends BaseLogger {
     return `[${entry.timestamp}] [${entry.sessionId}] ${entry.toolName} ${argsStr}${durationTag}${errorTag}`;
   }
 
-  private sanitizeArgs(args: any): string {
+  private sanitizeArgs(args: unknown): string {
     try {
       // Truncate large arguments to avoid massive log files
       const argsStr = JSON.stringify(args);
@@ -84,7 +84,7 @@ export class ToolLogger extends BaseLogger {
     );
   }
 
-  logToolExecutionStart(toolName: string, args: any): void {
+  logToolExecutionStart(toolName: string, args: unknown): void {
     const argsStr = this.sanitizeArgs(args);
     this.logVerboseEvent(
       'TOOL_EXECUTION_START',

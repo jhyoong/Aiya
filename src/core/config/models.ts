@@ -3,6 +3,8 @@
  * This file serves as the single source of truth for model metadata
  */
 
+import type { ExtendedProviderConfig } from './manager.js';
+
 export interface ModelMetadata {
   name: string;
   description: string;
@@ -743,9 +745,9 @@ export function getProviderCapabilities(
 
 export function createDefaultConfig(
   providerType: keyof ProviderModels
-): Partial<any> {
+): Partial<ExtendedProviderConfig> {
   const defaults = PROVIDER_DEFAULTS[providerType];
-  const config: any = {
+  const config: Partial<ExtendedProviderConfig> = {
     type: providerType,
     model: defaults.model,
     capabilities: defaults.capabilities,

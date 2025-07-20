@@ -152,45 +152,94 @@ export class TokenCounter extends EventEmitter {
    * Returns input/output tokens if available, otherwise estimates
    */
   extractTokenUsage(
-    response: any,
+    response: unknown,
     userMessage: string
   ): { input: number; output: number; estimated: boolean } {
     // Try to extract provider-specific token usage
-    if (response?.usage) {
-      // OpenAI/Azure format
-      if (response.usage.prompt_tokens && response.usage.completion_tokens) {
-        return {
-          input: response.usage.prompt_tokens,
-          output: response.usage.completion_tokens,
-          estimated: false,
-        };
-      }
-      // Anthropic format
-      if (response.usage.input_tokens && response.usage.output_tokens) {
-        return {
-          input: response.usage.input_tokens,
-          output: response.usage.output_tokens,
-          estimated: false,
-        };
+    if (response && typeof response === 'object' && 'usage' in response) {
+      const usage = (response as { usage: unknown }).usage;
+      if (usage && typeof usage === 'object') {
+        // OpenAI/Azure format
+        if ('prompt_tokens' in usage && 'completion_tokens' in usage) {
+          const promptTokens = (usage as { prompt_tokens: unknown })
+            .prompt_tokens;
+          const completionTokens = (usage as { completion_tokens: unknown })
+            .completion_tokens;
+          if (
+            typeof promptTokens === 'number' &&
+            typeof completionTokens === 'number'
+          ) {
+            return {
+              input: promptTokens,
+              output: completionTokens,
+              estimated: false,
+            };
+          }
+        }
+        // Anthropic format
+        if ('input_tokens' in usage && 'output_tokens' in usage) {
+          const inputTokens = (usage as { input_tokens: unknown }).input_tokens;
+          const outputTokens = (usage as { output_tokens: unknown })
+            .output_tokens;
+          if (
+            typeof inputTokens === 'number' &&
+            typeof outputTokens === 'number'
+          ) {
+            return {
+              input: inputTokens,
+              output: outputTokens,
+              estimated: false,
+            };
+          }
+        }
       }
     }
 
     // Gemini format
-    if (response?.usageMetadata) {
-      return {
-        input: response.usageMetadata.promptTokenCount || 0,
-        output: response.usageMetadata.candidatesTokenCount || 0,
-        estimated: false,
-      };
+    if (
+      response &&
+      typeof response === 'object' &&
+      'usageMetadata' in response
+    ) {
+      const usageMetadata = (response as { usageMetadata: unknown })
+        .usageMetadata;
+      if (usageMetadata && typeof usageMetadata === 'object') {
+        const promptTokenCount =
+          'promptTokenCount' in usageMetadata
+            ? (usageMetadata as { promptTokenCount: unknown }).promptTokenCount
+            : 0;
+        const candidatesTokenCount =
+          'candidatesTokenCount' in usageMetadata
+            ? (usageMetadata as { candidatesTokenCount: unknown })
+                .candidatesTokenCount
+            : 0;
+
+        return {
+          input: typeof promptTokenCount === 'number' ? promptTokenCount : 0,
+          output:
+            typeof candidatesTokenCount === 'number' ? candidatesTokenCount : 0,
+          estimated: false,
+        };
+      }
     }
 
     // Fallback to estimation for Ollama or when metadata is unavailable
     const inputTokens = this.countText(userMessage);
-    const outputTokens = response?.tokensUsed
-      ? Math.max(0, response.tokensUsed - inputTokens)
-      : response?.content
-        ? this.countText(response.content)
-        : 0;
+    let outputTokens = 0;
+
+    if (response && typeof response === 'object') {
+      if ('tokensUsed' in response) {
+        const tokensUsed = (response as { tokensUsed: unknown }).tokensUsed;
+        if (typeof tokensUsed === 'number') {
+          outputTokens = Math.max(0, tokensUsed - inputTokens);
+        }
+      } else if ('content' in response) {
+        const content = (response as { content: unknown }).content;
+        if (typeof content === 'string') {
+          outputTokens = this.countText(content);
+        }
+      }
+    }
 
     return {
       input: inputTokens,

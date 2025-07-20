@@ -8,7 +8,7 @@ export interface ASTMatch {
   text: string;
   nodeType: string;
   context: string; // Full line containing the match
-  metadata?: Record<string, any>; // Additional context like function name, class name, etc.
+  metadata?: Record<string, unknown>; // Additional context like function name, class name, etc.
 }
 
 export interface ASTSearchOptions {
@@ -135,14 +135,14 @@ export class ASTSearcher {
 
       // Recursively traverse child nodes
       for (const key in node) {
-        const value = (node as any)[key];
+        const value = (node as unknown as Record<string, unknown>)[key];
         if (Array.isArray(value)) {
           for (const item of value) {
-            if (item && typeof item === 'object' && item.type) {
+            if (item && typeof item === 'object' && 'type' in item) {
               traverse(item as TSESTree.Node, depth + 1);
             }
           }
-        } else if (value && typeof value === 'object' && value.type) {
+        } else if (value && typeof value === 'object' && 'type' in value) {
           traverse(value as TSESTree.Node, depth + 1);
         }
       }
@@ -273,7 +273,7 @@ export class ASTSearcher {
     const nodeInfo = this.extractNodeInfo(node);
 
     // Check name pattern if specified
-    if (pattern.namePattern && nodeInfo.name) {
+    if (pattern.namePattern && typeof nodeInfo.name === 'string') {
       const nameMatch = nodeInfo.name
         .toLowerCase()
         .includes(pattern.namePattern.toLowerCase());
@@ -301,8 +301,8 @@ export class ASTSearcher {
   /**
    * Extract relevant information from AST node
    */
-  private extractNodeInfo(node: TSESTree.Node): Record<string, any> {
-    const info: Record<string, any> = {};
+  private extractNodeInfo(node: TSESTree.Node): Record<string, unknown> {
+    const info: Record<string, unknown> = {};
 
     switch (node.type) {
       case 'FunctionDeclaration': {
@@ -372,7 +372,7 @@ export class ASTSearcher {
    */
   private extractMatchedText(
     context: string,
-    nodeInfo: Record<string, any>,
+    nodeInfo: Record<string, unknown>,
     pattern: SearchPattern
   ): string {
     // Try to extract a meaningful portion of the line

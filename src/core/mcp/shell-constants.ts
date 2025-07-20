@@ -74,5 +74,7 @@ export function extractCommandName(command: string): string {
  */
 export function requiresApproval(command: string): boolean {
   const commandName = extractCommandName(command);
-  return COMMANDS_REQUIRING_APPROVAL.includes(commandName as any);
+  return COMMANDS_REQUIRING_APPROVAL.includes(
+    commandName as (typeof COMMANDS_REQUIRING_APPROVAL)[number]
+  );
 }

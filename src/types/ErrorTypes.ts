@@ -208,8 +208,10 @@ export function isStructuredError(value: unknown): value is StructuredError {
     'message' in value &&
     'type' in value &&
     'context' in value &&
-    typeof (value as any).message === 'string' &&
-    Object.values(ProviderErrorType).includes((value as any).type)
+    typeof (value as { message: unknown }).message === 'string' &&
+    Object.values(ProviderErrorType).includes(
+      (value as { type: unknown }).type as ProviderErrorType
+    )
   );
 }
 

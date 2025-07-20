@@ -16,6 +16,47 @@ import {
   ProviderConfig,
 } from './base.js';
 
+// Bedrock-specific type definitions
+interface ClaudeRequestBody {
+  prompt: string;
+  max_tokens_to_sample: number;
+  temperature: number;
+  top_p: number;
+  stop_sequences: string[];
+}
+
+interface TitanRequestBody {
+  inputText: string;
+  textGenerationConfig: {
+    maxTokenCount: number;
+    temperature: number;
+    topP: number;
+    stopSequences: string[];
+  };
+}
+
+interface GenericRequestBody {
+  inputText: string;
+  parameters: {
+    max_tokens: number;
+    temperature: number;
+    top_p: number;
+  };
+}
+
+type BedrockRequestBody =
+  | ClaudeRequestBody
+  | TitanRequestBody
+  | GenericRequestBody;
+
+interface BedrockResponseBody {
+  completion?: string;
+  stop_reason?: string;
+  outputText?: string;
+  completionReason?: string;
+  text?: string;
+}
+
 export class BedrockProvider extends LLMProvider {
   private client: BedrockRuntimeClient;
   private region: string;
@@ -317,7 +358,7 @@ export class BedrockProvider extends LLMProvider {
     };
   }
 
-  private formatRequestBody(messages: Message[]): any {
+  private formatRequestBody(messages: Message[]): BedrockRequestBody {
     if (this.isClaudeModel()) {
       return this.formatClaudeRequest(messages);
     } else if (this.isTitanModel()) {
@@ -328,7 +369,7 @@ export class BedrockProvider extends LLMProvider {
     }
   }
 
-  private formatClaudeRequest(messages: Message[]): any {
+  private formatClaudeRequest(messages: Message[]): ClaudeRequestBody {
     // Convert messages to Claude's expected format
     const systemMessages: string[] = [];
     const conversationMessages: string[] = [];
@@ -358,7 +399,7 @@ export class BedrockProvider extends LLMProvider {
     };
   }
 
-  private formatTitanRequest(messages: Message[]): any {
+  private formatTitanRequest(messages: Message[]): TitanRequestBody {
     // Combine all messages into a single input text
     const inputText = messages
       .map(msg => `${msg.role}: ${msg.content}`)
@@ -375,7 +416,7 @@ export class BedrockProvider extends LLMProvider {
     };
   }
 
-  private formatGenericRequest(messages: Message[]): any {
+  private formatGenericRequest(messages: Message[]): GenericRequestBody {
     // Generic format for other models
     const inputText = messages
       .map(msg => `${msg.role}: ${msg.content}`)
@@ -391,7 +432,7 @@ export class BedrockProvider extends LLMProvider {
     };
   }
 
-  private parseResponse(responseBody: any): Response {
+  private parseResponse(responseBody: BedrockResponseBody): Response {
     const result: Response = {
       content: '',
     };
