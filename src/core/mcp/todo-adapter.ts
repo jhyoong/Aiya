@@ -8,13 +8,13 @@ import {
 } from './base.js';
 
 // Import the aiya-todo-mcp package
-import { 
-  createTodoManager, 
-  CreateTodoRequest, 
-  UpdateTodoRequest, 
-  DeleteTodoRequest, 
+import {
+  createTodoManager,
+  CreateTodoRequest,
+  UpdateTodoRequest,
+  DeleteTodoRequest,
   ListTodosRequest,
-  TodoManager 
+  TodoManager,
 } from 'aiya-todo-mcp';
 
 interface CreateTodoParams {
@@ -43,7 +43,7 @@ interface ListTodosParams {
 
 /**
  * TodoMCPAdapter - Adapter for aiya-todo-mcp package
- * 
+ *
  * Wraps the aiya-todo-mcp client to work with Aiya's MCP architecture.
  * Provides todo management tools that integrate seamlessly with Aiya's tool system.
  */
@@ -60,7 +60,7 @@ export class TodoMCPAdapter extends MCPClient {
     try {
       // Initialize the todo manager
       await this.todoManager.initialize();
-      
+
       this.isInitialized = true;
       this.connected = true;
     } catch (error) {
@@ -229,14 +229,18 @@ export class TodoMCPAdapter extends MCPClient {
   }
 
   // Validation methods
-  private validateCreateTodoParams(args: Record<string, unknown>): CreateTodoParams {
+  private validateCreateTodoParams(
+    args: Record<string, unknown>
+  ): CreateTodoParams {
     if (!args.title || typeof args.title !== 'string') {
       throw new Error('Title is required and must be a string');
     }
     return { title: args.title };
   }
 
-  private validateListTodosParams(args: Record<string, unknown>): ListTodosParams {
+  private validateListTodosParams(
+    args: Record<string, unknown>
+  ): ListTodosParams {
     const params: ListTodosParams = {};
     if (args.completed !== undefined) {
       if (typeof args.completed !== 'boolean') {
@@ -266,7 +270,9 @@ export class TodoMCPAdapter extends MCPClient {
     return { id: args.id };
   }
 
-  private validateUpdateTodoParams(args: Record<string, unknown>): UpdateTodoParams {
+  private validateUpdateTodoParams(
+    args: Record<string, unknown>
+  ): UpdateTodoParams {
     if (!args.id || typeof args.id !== 'string') {
       throw new Error('ID is required and must be a string');
     }
@@ -286,7 +292,9 @@ export class TodoMCPAdapter extends MCPClient {
     return params;
   }
 
-  private validateDeleteTodoParams(args: Record<string, unknown>): DeleteTodoParams {
+  private validateDeleteTodoParams(
+    args: Record<string, unknown>
+  ): DeleteTodoParams {
     if (!args.id || typeof args.id !== 'string') {
       throw new Error('ID is required and must be a string');
     }
@@ -327,9 +335,9 @@ export class TodoMCPAdapter extends MCPClient {
       if (params.completed !== undefined) {
         request.completed = params.completed;
       }
-      
+
       let result = this.todoManager.listTodos(request);
-      
+
       // Apply limit and offset if specified
       if (params.offset !== undefined) {
         result = result.slice(params.offset);
@@ -363,7 +371,7 @@ export class TodoMCPAdapter extends MCPClient {
   private async getTodo(params: GetTodoParams): Promise<ToolResult> {
     try {
       const result = this.todoManager.getTodo(params.id);
-      
+
       if (!result) {
         return {
           content: [

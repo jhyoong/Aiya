@@ -285,7 +285,11 @@ export const chatCommand = new Command('chat')
       showLoader('Provider health check passed');
 
       // Initialize MCP tool service
-      const toolService = new MCPToolService([mcpClient, shellClient, todoClient]);
+      const toolService = new MCPToolService([
+        mcpClient,
+        shellClient,
+        todoClient,
+      ]);
       await toolService.initialize();
       showLoader('MCP tool service initialized');
 
