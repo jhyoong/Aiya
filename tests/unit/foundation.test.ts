@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, afterEach } from 'vitest';
 import { TestConfigBuilder, TEST_CONFIGS } from '@tests/utils/config-builder';
 import { TEST_CONFIG } from '../../src/core/config/test-constants.js';
 import {

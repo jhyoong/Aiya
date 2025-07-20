@@ -51,7 +51,11 @@ export class AtomicFileOperations {
         this.security.getRelativePathFromWorkspace(validatedPath);
 
       // Create temporary file
-      const tempPath = await this.createTempFile(validatedPath, content, tempDir);
+      const tempPath = await this.createTempFile(
+        validatedPath,
+        content,
+        tempDir
+      );
 
       // Check if original file exists
       const fileExists = await this.fileExists(validatedPath);

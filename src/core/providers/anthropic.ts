@@ -270,7 +270,7 @@ export class AnthropicProvider extends LLMProvider {
         max_tokens: 1,
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

@@ -239,7 +239,7 @@ export class AzureOpenAIProvider extends LLMProvider {
         max_tokens: 1,
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

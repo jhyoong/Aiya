@@ -297,7 +297,7 @@ export class BedrockProvider extends LLMProvider {
 
       await this.client.send(command);
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

@@ -73,7 +73,7 @@ export class ASTSearcher {
       });
     } catch (error) {
       // If parsing fails, return empty results rather than throwing
-      console.debug(`AST parsing failed for ${filePath}:`, error);
+      console.warn(`AST parsing failed for ${filePath}:`, error);
       return [];
     }
   }
@@ -103,7 +103,7 @@ export class ASTSearcher {
           errorOnTypeScriptSyntacticAndSemanticIssues: false,
         }),
       });
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -305,21 +305,23 @@ export class ASTSearcher {
     const info: Record<string, any> = {};
 
     switch (node.type) {
-      case 'FunctionDeclaration':
+      case 'FunctionDeclaration': {
         const funcNode = node as TSESTree.FunctionDeclaration;
         info.name = funcNode.id?.name || '<anonymous>';
         info.isAsync = funcNode.async;
         info.isGenerator = funcNode.generator;
         info.paramCount = funcNode.params.length;
         break;
+      }
 
-      case 'ClassDeclaration':
+      case 'ClassDeclaration': {
         const classNode = node as TSESTree.ClassDeclaration;
         info.name = classNode.id?.name || '<anonymous>';
         info.hasSuper = !!classNode.superClass;
         break;
+      }
 
-      case 'ImportDeclaration':
+      case 'ImportDeclaration': {
         const importNode = node as TSESTree.ImportDeclaration;
         info.source = importNode.source.value;
         info.specifiers = importNode.specifiers.map(spec => {
@@ -332,8 +334,9 @@ export class ASTSearcher {
           }
         });
         break;
+      }
 
-      case 'VariableDeclaration':
+      case 'VariableDeclaration': {
         const varNode = node as TSESTree.VariableDeclaration;
         info.kind = varNode.kind;
         info.declarations = varNode.declarations.map(decl => {
@@ -344,18 +347,21 @@ export class ASTSearcher {
           return { name: '<complex>' };
         });
         break;
+      }
 
-      case 'TSInterfaceDeclaration':
+      case 'TSInterfaceDeclaration': {
         const interfaceNode = node as TSESTree.TSInterfaceDeclaration;
         info.name = interfaceNode.id.name;
         info.hasExtends =
           interfaceNode.extends && interfaceNode.extends.length > 0;
         break;
+      }
 
-      case 'TSTypeAliasDeclaration':
+      case 'TSTypeAliasDeclaration': {
         const typeNode = node as TSESTree.TSTypeAliasDeclaration;
         info.name = typeNode.id.name;
         break;
+      }
     }
 
     return info;

@@ -30,6 +30,18 @@ export default [
         __dirname: 'readonly',
         __filename: 'readonly',
         global: 'readonly',
+        // Node.js globals and types
+        NodeJS: 'readonly',
+        BufferEncoding: 'readonly',
+        require: 'readonly',
+        // Web APIs
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+        AbortController: 'readonly',
+        Response: 'readonly',
+        TextDecoder: 'readonly',
+        performance: 'readonly',
+        URL: 'readonly',
       },
     },
     plugins: {
@@ -40,7 +52,7 @@ export default [
     },
     rules: {
       // TypeScript specific rules
-      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_', 'caughtErrorsIgnorePattern': '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn',
       
@@ -49,8 +61,8 @@ export default [
       'react/prop-types': 'off', // Using TypeScript for props validation
       'react/display-name': 'off', // Not critical for this project
       
-      // General rules
-      'no-console': 'warn',
+      // General rules - Allow console in CLI applications but warn for oversight  
+      'no-console': ['warn', { allow: ['error', 'warn', 'log'] }],
       'no-debugger': 'error',
       'no-unused-vars': 'off', // Using TypeScript version instead
       'prefer-const': 'error',
@@ -87,6 +99,18 @@ export default [
         __dirname: 'readonly',
         __filename: 'readonly',
         global: 'readonly',
+        // Node.js globals and types
+        NodeJS: 'readonly',
+        BufferEncoding: 'readonly',
+        require: 'readonly',
+        // Web APIs
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+        AbortController: 'readonly',
+        Response: 'readonly',
+        TextDecoder: 'readonly',
+        performance: 'readonly',
+        URL: 'readonly',
         // Vitest globals
         describe: 'readonly',
         test: 'readonly',
@@ -97,8 +121,6 @@ export default [
         beforeAll: 'readonly',
         afterAll: 'readonly',
         vi: 'readonly',
-        // Node.js require for certain test files
-        require: 'readonly',
       },
     },
     plugins: {
@@ -109,7 +131,7 @@ export default [
     },
     rules: {
       // TypeScript specific rules (more relaxed for tests)
-      '@typescript-eslint/no-unused-vars': 'warn',
+      '@typescript-eslint/no-unused-vars': ['warn', { 'argsIgnorePattern': '^_', 'varsIgnorePattern': '^_', 'caughtErrorsIgnorePattern': '^_' }],
       '@typescript-eslint/no-explicit-any': 'off', // Allow any in tests
       '@typescript-eslint/no-non-null-assertion': 'off', // Allow ! in tests
       
@@ -144,6 +166,18 @@ export default [
         __dirname: 'readonly',
         __filename: 'readonly',
         global: 'readonly',
+        // Node.js globals and types
+        NodeJS: 'readonly',
+        BufferEncoding: 'readonly',
+        require: 'readonly',
+        // Web APIs
+        fetch: 'readonly',
+        AbortSignal: 'readonly',
+        AbortController: 'readonly',
+        Response: 'readonly',
+        TextDecoder: 'readonly',
+        performance: 'readonly',
+        URL: 'readonly',
       },
     },
   },

@@ -57,7 +57,7 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
           'Check if the model is spelled correctly',
         ];
 
-      case ProviderErrorType.CONNECTION_FAILED:
+      case ProviderErrorType.CONNECTION_FAILED: {
         const suggestions = [
           'Check if Ollama is running: ollama serve',
           'Verify the server URL is correct',
@@ -70,6 +70,7 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
         }
 
         return suggestions;
+      }
 
       case ProviderErrorType.TIMEOUT:
         return [

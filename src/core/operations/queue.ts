@@ -314,7 +314,9 @@ export class OperationQueue {
     // Rollback in reverse order
     for (const operation of operations.reverse()) {
       try {
-        const result = await this.atomicOps.cleanupActiveOperations(operation.filePath);
+        const result = await this.atomicOps.cleanupActiveOperations(
+          operation.filePath
+        );
 
         if (result.success) {
           operation.status = 'rolled_back';
@@ -322,7 +324,7 @@ export class OperationQueue {
         } else {
           rollbackFailed.push(operation);
         }
-      } catch (error) {
+      } catch (_error) {
         rollbackFailed.push(operation);
       }
     }

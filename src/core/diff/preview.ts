@@ -47,7 +47,7 @@ export class DiffPreviewSystem {
       let currentContent = '';
       try {
         currentContent = await fs.readFile(validatedPath, 'utf8');
-      } catch (error) {
+      } catch (_error) {
         // File doesn't exist, treat as empty
         currentContent = '';
       }
@@ -163,7 +163,7 @@ export class DiffPreviewSystem {
       let currentContent = '';
       try {
         currentContent = await fs.readFile(validatedPath, 'utf8');
-      } catch (error) {
+      } catch (_error) {
         // File doesn't exist, treat as empty
         currentContent = '';
       }
@@ -231,7 +231,7 @@ export class DiffPreviewSystem {
       // Check if file exists and is writable
       try {
         await fs.access(validatedPath, fs.constants.F_OK | fs.constants.W_OK);
-      } catch (error) {
+      } catch (_error) {
         // File doesn't exist - check if directory is writable
         const dir = path.dirname(validatedPath);
         try {

@@ -219,7 +219,7 @@ export class GeminiProvider extends LLMProvider {
         contents: 'Hi',
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, afterEach } from 'vitest';
 import { MockProviderFactory } from '@tests/mocks/providers/mock-factory';
 import { TEST_CONFIGS } from '@tests/utils/config-builder';
 

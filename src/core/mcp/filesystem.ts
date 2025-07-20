@@ -664,7 +664,7 @@ export class FilesystemMCPClient extends MCPClient {
       if (mode === 'overwrite' && fileExists) {
         try {
           originalContent = await fs.readFile(validatedPath, 'utf8');
-        } catch (error) {
+        } catch (_error) {
           // Continue without original content if read fails
           originalContent = null;
         }
@@ -1852,7 +1852,7 @@ export class FilesystemMCPClient extends MCPClient {
             continue;
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // If we can't read the directory, add to skipped
         const relativePath = path.relative(workspaceRoot, currentDirPath);
         skippedDirs.push(relativePath);
@@ -2157,11 +2157,12 @@ export class FilesystemMCPClient extends MCPClient {
             comparison = (a.size || 0) - (b.size || 0);
           }
           break;
-        case 'modified':
+        case 'modified': {
           const aTime = a.modified ? new Date(a.modified).getTime() : 0;
           const bTime = b.modified ? new Date(b.modified).getTime() : 0;
           comparison = aTime - bTime;
           break;
+        }
         case 'type':
           // First by type (directory vs file), then by importance, then by name
           if (a.type !== b.type) {

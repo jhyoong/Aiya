@@ -213,7 +213,7 @@ export class OpenAIProvider extends LLMProvider {
     try {
       await this.client.models.list();
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

@@ -194,6 +194,14 @@ export class ConnectionTester {
   async testOllama(
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
+    if (!config.baseUrl) {
+      return {
+        success: false,
+        error: 'Base URL is required for Ollama connection testing',
+        suggestions: ['Please provide a valid Ollama server URL'],
+      };
+    }
+
     try {
       const { controller, cleanup } =
         ConnectionTester.createTimeoutController();
@@ -209,7 +217,7 @@ export class ConnectionTester {
           response,
           'ollama',
           config,
-          config.baseUrl!
+          config.baseUrl
         );
         return ConnectionTester.convertToConnectionTestResult(result);
       }
@@ -228,7 +236,7 @@ export class ConnectionTester {
         const result = ConnectionTester.createModelNotFoundError(
           'ollama',
           config,
-          config.baseUrl!
+          config.baseUrl
         );
         return ConnectionTester.convertToConnectionTestResult(result);
       }

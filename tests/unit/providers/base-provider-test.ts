@@ -358,7 +358,7 @@ export abstract class ProviderTestSuite {
    * Provider-specific tests (override in subclasses)
    */
   protected testProviderSpecificFeatures(
-    getProvider: () => MockProvider
+    _getProvider: () => MockProvider
   ): void {
     // Override in provider-specific test suites
   }

@@ -330,7 +330,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           />
         );
 
-      case 'additional-connection-test':
+      case 'additional-connection-test': {
         const lastProvider =
           state.additionalProviders[state.additionalProviders.length - 1];
         if (!lastProvider) {
@@ -344,8 +344,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             onSkip={handleConnectionTestSkip}
           />
         );
+      }
 
-      case 'save-and-exit':
+      case 'save-and-exit': {
         if (!state.primaryProvider) {
           handleError('No primary provider configured');
           return null;
@@ -391,8 +392,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             </Box>
           </Box>
         );
+      }
 
-      case 'summary':
+      case 'summary': {
         if (!state.primaryProvider) {
           handleError('No primary provider configured');
           return null;
@@ -431,6 +433,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             </Box>
           </Box>
         );
+      }
 
       case 'complete':
         return (

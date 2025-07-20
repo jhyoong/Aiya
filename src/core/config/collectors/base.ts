@@ -1,5 +1,8 @@
 import { ExtendedProviderConfig } from '../manager.js';
-import { PROVIDER_DISPLAY_NAMES, PROVIDER_CAPABILITIES_DESCRIPTIONS } from '../constants.js';
+import {
+  PROVIDER_DISPLAY_NAMES,
+  PROVIDER_CAPABILITIES_DESCRIPTIONS,
+} from '../constants.js';
 import { CapabilityManager } from '../CapabilityManager.js';
 import type { ProviderModels } from '../models.js';
 
@@ -91,7 +94,10 @@ export abstract class BaseProviderCollector {
       ...(apiKey && { apiKey }),
     };
 
-    return CapabilityManager.getDefaultConfig(providerType as keyof ProviderModels, existingConfig);
+    return CapabilityManager.getDefaultConfig(
+      providerType as keyof ProviderModels,
+      existingConfig
+    );
   }
 
   /**
@@ -150,7 +156,9 @@ export abstract class BaseProviderCollector {
     envVarName: string
   ): Partial<ExtendedProviderConfig> {
     const apiKey = process.env[envVarName];
-    const defaultConfig = CapabilityManager.getDefaultConfig(providerType as keyof ProviderModels);
+    const defaultConfig = CapabilityManager.getDefaultConfig(
+      providerType as keyof ProviderModels
+    );
 
     return {
       ...defaultConfig,

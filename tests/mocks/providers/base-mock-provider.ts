@@ -303,7 +303,7 @@ export abstract class BaseMockProvider implements MockProvider {
   /**
    * Generate realistic response content based on pattern
    */
-  protected generateResponseContent(prompt: string): string {
+  protected generateResponseContent(_prompt: string): string {
     const patterns = {
       technical: [
         'To implement this functionality, you would need to',

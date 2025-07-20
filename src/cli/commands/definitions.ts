@@ -331,14 +331,12 @@ export const CORE_COMMANDS: CommandDefinition[] = [
               return 'Only one provider configured. Please add more provider configurations to enable switching.';
             }
 
+            const session = context.session; // Type narrowing after null check
             const providerList = availableProviders
               .map(name => {
-                const config =
-                  context.session!.configManager.getProviderConfig(name);
+                const config = session.configManager.getProviderConfig(name);
                 const current =
-                  name === context.session!.currentProviderName
-                    ? ' (current)'
-                    : '';
+                  name === session.currentProviderName ? ' (current)' : '';
                 return `  ${name}: ${config?.type || 'unknown'} - ${config?.model || 'unknown'}${current}`;
               })
               .join('\n');
@@ -496,14 +494,12 @@ export const CORE_COMMANDS: CommandDefinition[] = [
             return 'No providers configured.';
           }
 
+          const session = context.session; // Type narrowing after null check
           const providerList = availableProviders
             .map(name => {
-              const config =
-                context.session!.configManager.getProviderConfig(name);
+              const config = session.configManager.getProviderConfig(name);
               const current =
-                name === context.session!.currentProviderName
-                  ? ' (current)'
-                  : '';
+                name === session.currentProviderName ? ' (current)' : '';
               return `  ${name}: ${config?.type || 'unknown'} - ${config?.model || 'unknown'}${current}`;
             })
             .join('\n');

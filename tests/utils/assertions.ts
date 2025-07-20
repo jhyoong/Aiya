@@ -147,7 +147,6 @@ export function assertSafeWorkspacePath(path: string, workspaceRoot: string) {
   expect(path).not.toMatch(/\.\.\\/);
 
   // Path should be within workspace (absolute path check)
-  const fs = require('fs');
   const pathModule = require('path');
 
   const resolvedPath = pathModule.resolve(path);

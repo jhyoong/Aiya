@@ -458,7 +458,7 @@ export function memoizedCalculateVisualLayout(
         if (!logicalToVisualMap[logIndex]) {
           logicalToVisualMap[logIndex] = [];
         }
-        logicalToVisualMap[logIndex]!.push([
+        logicalToVisualMap[logIndex].push([
           actualVisualLineIndex,
           chunk.startPosInLogicalLine,
         ]);
