@@ -1,3 +1,5 @@
+import { CommandContext } from './CommandExecutor.js';
+
 /**
  * Categories for organizing commands in the registry
  */
@@ -7,7 +9,7 @@ export type CommandCategory = 'core' | 'config' | 'utility';
  * Handler interface for command execution
  */
 export interface CommandHandler {
-  execute(args: string[], context?: any): Promise<any> | any;
+  execute(args: string[], context?: CommandContext): Promise<string> | string;
 }
 
 /**

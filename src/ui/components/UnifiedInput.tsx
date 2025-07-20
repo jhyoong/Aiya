@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { Box, Text } from 'ink';
+import { TEXT, LAYOUT } from '../../core/config/ui-constants.js';
 import { TextBuffer } from '../core/TextBuffer.js';
 import { SuggestionEngine, SuggestionResult } from '../../cli/suggestions.js';
 import { cpSlice, cpLen } from '../utils/textUtils.js';
@@ -77,7 +78,7 @@ export function UnifiedInput({
       // Detect potential paste operations (fallback for terminals without bracketed paste)
       const isPotentialPaste =
         key.sequence &&
-        key.sequence.length > 50 &&
+        key.sequence.length > TEXT.MAX_KEY_SEQUENCE_LENGTH &&
         key.sequence.includes('\n') &&
         !key.name;
 
@@ -294,7 +295,7 @@ export function UnifiedInput({
         borderColor={borderColorToUse}
         paddingX={1}
         paddingY={0}
-        minHeight={1}
+        minHeight={LAYOUT.INPUT_MIN_HEIGHT}
       >
         <Box flexDirection='row' width='100%'>
           {prefix && <Text color={textColor}>{prefix}</Text>}

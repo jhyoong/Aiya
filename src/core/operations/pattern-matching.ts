@@ -271,8 +271,8 @@ export class EnhancedPatternMatching {
       }
 
       return { valid: true };
-    } catch (error) {
-      return { valid: false, reason: `Invalid pattern: ${error}` };
+    } catch (_error) {
+      return { valid: false, reason: `Invalid pattern: ${_error}` };
     }
   }
 
@@ -419,8 +419,8 @@ export class EnhancedPatternMatching {
 
   private isDangerousPattern(regex: RegExp): boolean {
     const dangerousPatterns = [
-      /\(\?\!/, // Negative lookahead
-      /\(\?\</, // Negative lookbehind
+      /\(\?!/, // Negative lookahead
+      /\(\?</, // Negative lookbehind
       /\*\*\+/, // Nested quantifiers
       /\+\+/, // Consecutive quantifiers
       /\{\d+,\}/, // Large ranges

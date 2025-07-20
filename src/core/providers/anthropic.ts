@@ -220,6 +220,8 @@ export class AnthropicProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: true, // Claude supports thinking tags
+          maxTokens: capabilities.contextLength,
+          supportsStreaming: true,
           ...(capabilities.costPerToken && {
             costPerToken: capabilities.costPerToken,
           }),
@@ -268,7 +270,7 @@ export class AnthropicProvider extends LLMProvider {
         max_tokens: 1,
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -352,7 +354,15 @@ export class AnthropicProvider extends LLMProvider {
     costPerToken?: { input: number; output: number };
   } {
     // Known capabilities for Claude models
-    const capabilities: Record<string, any> = {
+    const capabilities: Record<
+      string,
+      {
+        contextLength: number;
+        supportsVision: boolean;
+        supportsFunctionCalling: boolean;
+        costPerToken?: { input: number; output: number };
+      }
+    > = {
       'claude-3-5-sonnet': {
         contextLength: 200000,
         supportsVision: true,

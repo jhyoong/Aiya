@@ -6,10 +6,7 @@ import { chatCommand } from './commands/chat.js';
 
 const program = new Command();
 
-program
-  .name('aiya')
-  .description('AI-powered development assistant with secure file operations')
-  .version('1.0.0');
+program.name('aiya').description('Basic CLI AI assistant').version('1.4.2');
 
 // Add commands
 program.addCommand(initCommand);

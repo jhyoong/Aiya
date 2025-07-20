@@ -118,20 +118,21 @@ export class ProviderFactory {
     };
 
     // Add provider-specific configurations with type safety
+    const extendedConfig = baseConfig as ProviderConfig;
     if (config.azure) {
-      (baseConfig as any).azure = config.azure;
+      extendedConfig.azure = config.azure;
     }
     if (config.anthropic) {
-      (baseConfig as any).anthropic = config.anthropic;
+      extendedConfig.anthropic = config.anthropic;
     }
     if (config.gemini) {
-      (baseConfig as any).gemini = config.gemini;
+      extendedConfig.gemini = config.gemini;
     }
     if (config.bedrock) {
-      (baseConfig as any).bedrock = config.bedrock;
+      extendedConfig.bedrock = config.bedrock;
     }
 
-    return baseConfig;
+    return extendedConfig;
   }
 
   static getAvailableProviders(): string[] {

@@ -6,8 +6,14 @@ import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { ShellMCPClient } from '../../core/mcp/shell.js';
-import { requiresApproval, extractCommandName } from '../../core/mcp/shell-constants.js';
+import {
+  requiresApproval,
+  extractCommandName,
+} from '../../core/mcp/shell-constants.js';
+import { DELAYS } from '../../core/config/timing-constants.js';
+import { PROCESSING } from '../../core/config/limits-constants.js';
 import { Message, ToolCall } from '../../core/providers/base.js';
+import { ProviderResponse } from '../../types/ProviderTypes.js';
 import { MCPToolService } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ToolMemoryService } from '../../core/tools/memory.js';
@@ -46,7 +52,9 @@ interface ChatWrapperProps {
   initialProviderName: string;
   configManager: ConfigManager;
   session: ChatSession;
-  toolConfirmationRef: { current: ((toolCalls: ToolCall[]) => Promise<boolean>) | null };
+  toolConfirmationRef: {
+    current: ((toolCalls: ToolCall[]) => Promise<boolean>) | null;
+  };
 }
 
 const ChatWrapper: React.FC<ChatWrapperProps> = props => {
@@ -212,7 +220,7 @@ export const chatCommand = new Command('chat')
 
     try {
       // Small delay to ensure the component is mounted
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, DELAYS.UI_SHORT));
 
       // Initialize command system for slash commands
       initializeCommandSystem();
@@ -220,6 +228,8 @@ export const chatCommand = new Command('chat')
       // Check if configuration exists
       const configExists = await checkConfiguration();
       if (!configExists) {
+        hideLoader();
+        unmount();
         return; // Exit gracefully - user was prompted to run init
       }
 
@@ -237,14 +247,14 @@ export const chatCommand = new Command('chat')
 
       // Create tool memory service for session
       const toolMemoryService = new ToolMemoryService();
-      
+
       // Clear any old generic 'RunCommand' and 'shell_RunCommand' preferences to prevent conflicts with new shell-specific approval
       toolMemoryService.clearPreference('RunCommand');
       toolMemoryService.clearPreference('shell_RunCommand');
-      
+
       // Create shell logger for session
       const shellLogger = new ShellLogger();
-      
+
       // Create tool logger for session (use same session ID as shell logger)
       const toolLogger = new ToolLogger(shellLogger.getSessionId());
 
@@ -275,85 +285,139 @@ export const chatCommand = new Command('chat')
       showLoader('MCP tool service initialized');
 
       // Create tool confirmation callback that will be set by ChatInterface
-      const toolConfirmationRef = { current: null as ((toolCalls: ToolCall[], storePreference?: (toolName: string, choice: any) => void) => Promise<boolean>) | null };
-      
+      const toolConfirmationRef = {
+        current: null as
+          | ((
+              toolCalls: ToolCall[],
+              storePreference?: (
+                toolName: string,
+                choice: 'allow' | 'allow-always' | 'reject'
+              ) => void
+            ) => Promise<boolean>)
+          | null,
+      };
+
       const toolExecutor = new ToolExecutor(
         toolService,
         process.env.AIYA_VERBOSE === 'true',
-        config.tools?.requireConfirmation !== false ? async (toolCalls: ToolCall[]) => {
-          // Handle shell commands specially - these bypass the normal confirmation flow
-          const shellCalls = toolCalls.filter(call => call.name === 'shell_RunCommand');
-          const nonShellCalls = toolCalls.filter(call => call.name !== 'shell_RunCommand');
-          
-          // Process shell commands with command-specific approval FIRST
-          for (const shellCall of shellCalls) {
-            const command = shellCall.arguments.command;
-            if (!command || typeof command !== 'string') continue;
-            
-            // Check if command requires approval
-            if (requiresApproval(command)) {
-              const commandType = extractCommandName(command);
-              const memoryKey = `shell:${commandType}`;
-              
-              // Check stored preference first
-              const storedPreference = toolMemoryService.getPreference(memoryKey);
-              
-              if (storedPreference === 'reject') {
-                shellLogger.logApprovalResult(command, commandType, false, 'rejected');
-                return false;
-              }
-              
-              if (storedPreference !== 'allow') {
-                // Log approval request
-                shellLogger.logApprovalRequest(command, commandType);
-                
-                // Use existing tool confirmation system but with shell-specific logic
-                if (toolConfirmationRef.current) {
-                  // Create a fake tool call that represents this shell command for the existing system
-                  const shellToolCall: ToolCall = {
-                    id: `shell-${Date.now()}`,
-                    name: `shell:${commandType}`, // Use shell:rm, shell:curl etc as the "tool name"
-                    arguments: { command, commandType }
-                  };
-                  
-                  const storeShellPreference = (_toolName: string, choice: any) => {
-                    if (choice === 'allow-always') {
-                      toolMemoryService.setPreference(memoryKey, 'allow');
-                      shellLogger.logApprovalResult(command, commandType, true, 'allow-always');
-                    } else if (choice === 'reject') {
-                      toolMemoryService.setPreference(memoryKey, 'reject');
-                      shellLogger.logApprovalResult(command, commandType, false, 'reject');
+        config.tools?.requireConfirmation !== false
+          ? async (toolCalls: ToolCall[]) => {
+              // Handle shell commands specially - these bypass the normal confirmation flow
+              const shellCalls = toolCalls.filter(
+                call => call.name === 'shell_RunCommand'
+              );
+              const nonShellCalls = toolCalls.filter(
+                call => call.name !== 'shell_RunCommand'
+              );
+
+              // Process shell commands with command-specific approval FIRST
+              for (const shellCall of shellCalls) {
+                const command = shellCall.arguments.command;
+                if (!command || typeof command !== 'string') continue;
+
+                // Check if command requires approval
+                if (requiresApproval(command)) {
+                  const commandType = extractCommandName(command);
+                  const memoryKey = `shell:${commandType}`;
+
+                  // Check stored preference first
+                  const storedPreference =
+                    toolMemoryService.getPreference(memoryKey);
+
+                  if (storedPreference === 'reject') {
+                    shellLogger.logApprovalResult(
+                      command,
+                      commandType,
+                      false,
+                      'rejected'
+                    );
+                    return false;
+                  }
+
+                  if (storedPreference !== 'allow') {
+                    // Log approval request
+                    shellLogger.logApprovalRequest(command, commandType);
+
+                    // Use existing tool confirmation system but with shell-specific logic
+                    if (toolConfirmationRef.current) {
+                      // Create a fake tool call that represents this shell command for the existing system
+                      const shellToolCall: ToolCall = {
+                        id: `shell-${Date.now()}`,
+                        name: `shell:${commandType}`, // Use shell:rm, shell:curl etc as the "tool name"
+                        arguments: { command, commandType },
+                      };
+
+                      const storeShellPreference = (
+                        _toolName: string,
+                        choice: 'allow' | 'allow-always' | 'reject'
+                      ) => {
+                        if (choice === 'allow-always') {
+                          toolMemoryService.setPreference(memoryKey, 'allow');
+                          shellLogger.logApprovalResult(
+                            command,
+                            commandType,
+                            true,
+                            'allow-always'
+                          );
+                        } else if (choice === 'reject') {
+                          toolMemoryService.setPreference(memoryKey, 'reject');
+                          shellLogger.logApprovalResult(
+                            command,
+                            commandType,
+                            false,
+                            'reject'
+                          );
+                        } else {
+                          shellLogger.logApprovalResult(
+                            command,
+                            commandType,
+                            true,
+                            'allow-once'
+                          );
+                        }
+                      };
+
+                      const approved = await toolConfirmationRef.current(
+                        [shellToolCall],
+                        storeShellPreference
+                      );
+                      if (!approved) return false;
                     } else {
-                      shellLogger.logApprovalResult(command, commandType, true, 'allow-once');
+                      // Fallback if no callback available - deny by default
+                      shellLogger.logApprovalResult(
+                        command,
+                        commandType,
+                        false,
+                        'no-callback'
+                      );
+                      return false;
                     }
-                  };
-                  
-                  const approved = await toolConfirmationRef.current([shellToolCall], storeShellPreference);
-                  if (!approved) return false;
-                } else {
-                  // Fallback if no callback available - deny by default
-                  shellLogger.logApprovalResult(command, commandType, false, 'no-callback');
-                  return false;
+                  }
                 }
               }
-            }
-          }
-          
-          // Process non-shell tool calls normally (only if ChatInterface has set up callback)
-          if (nonShellCalls.length > 0 && toolConfirmationRef.current) {
-            const storePreference = (toolName: string, choice: any) => {
-              if (choice === 'allow-always') {
-                toolExecutor.storeToolPreference(toolName, 'allow');
-              } else if (choice === 'reject') {
-                toolExecutor.storeToolPreference(toolName, 'reject');
+
+              // Process non-shell tool calls normally (only if ChatInterface has set up callback)
+              if (nonShellCalls.length > 0 && toolConfirmationRef.current) {
+                const storePreference = (
+                  toolName: string,
+                  choice: 'allow' | 'allow-always' | 'reject'
+                ) => {
+                  if (choice === 'allow-always') {
+                    toolExecutor.storeToolPreference(toolName, 'allow');
+                  } else if (choice === 'reject') {
+                    toolExecutor.storeToolPreference(toolName, 'reject');
+                  }
+                };
+                const approved = await toolConfirmationRef.current(
+                  nonShellCalls,
+                  storePreference
+                );
+                if (!approved) return false;
               }
-            };
-            const approved = await toolConfirmationRef.current(nonShellCalls, storePreference);
-            if (!approved) return false;
-          }
-          
-          return true;
-        } : undefined,
+
+              return true;
+            }
+          : undefined,
         toolMemoryService,
         toolLogger
       );
@@ -399,7 +463,7 @@ export const chatCommand = new Command('chat')
       );
 
       // Small delay to show the completion message
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, DELAYS.UI_LONG));
 
       hideLoader();
       unmount(); // Clean up the startup loader
@@ -494,7 +558,7 @@ async function* handleMessageStream(
   try {
     let response = '';
     const thinkingParser = new ThinkingParser(session.thinkingMode, true); // Enable incremental mode
-    let streamResponse: any = null;
+    let streamResponse: ProviderResponse | null = null;
 
     for await (const chunk of session.provider.stream(session.messages)) {
       const results = thinkingParser.processChunk(chunk.content);
@@ -525,7 +589,7 @@ async function* handleMessageStream(
     if (session.toolExecutor) {
       let currentMessage = assistantMessage;
       let iterationCount = 0;
-      const maxIterations = 10; // Prevent infinite loops
+      const maxIterations = PROCESSING.MAX_ITERATIONS; // Prevent infinite loops
 
       // Keep processing tool calls until no more are found
       while (iterationCount < maxIterations) {
@@ -671,7 +735,7 @@ async function handleMessage(
 
   try {
     let assistantMessage: Message;
-    let providerResponse: any = null;
+    let providerResponse: ProviderResponse | null = null;
 
     if (useStreaming) {
       let response = '';

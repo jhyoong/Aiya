@@ -23,25 +23,35 @@ export const SearchResults: React.FC<SearchResultsProps> = ({
 }) => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  useInput((_input: string, key: any) => {
-    if (key.escape) {
-      onExit?.();
-      return;
-    }
+  useInput(
+    (
+      _input: string,
+      key: {
+        escape?: boolean;
+        return?: boolean;
+        upArrow?: boolean;
+        downArrow?: boolean;
+      }
+    ) => {
+      if (key.escape) {
+        onExit?.();
+        return;
+      }
 
-    if (key.return && results[selectedIndex]) {
-      onSelect?.(results[selectedIndex]);
-      return;
-    }
+      if (key.return && results[selectedIndex]) {
+        onSelect?.(results[selectedIndex]);
+        return;
+      }
 
-    if (key.upArrow) {
-      setSelectedIndex(prev => Math.max(0, prev - 1));
-    }
+      if (key.upArrow) {
+        setSelectedIndex(prev => Math.max(0, prev - 1));
+      }
 
-    if (key.downArrow) {
-      setSelectedIndex(prev => Math.min(results.length - 1, prev + 1));
+      if (key.downArrow) {
+        setSelectedIndex(prev => Math.min(results.length - 1, prev + 1));
+      }
     }
-  });
+  );
 
   if (results.length === 0) {
     return (

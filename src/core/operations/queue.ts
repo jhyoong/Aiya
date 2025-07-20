@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import { WorkspaceSecurity } from '../security/workspace.js';
+import { TIMEOUTS } from '../config/timing-constants.js';
 import { AtomicFileOperations, AtomicOperationResult } from './atomic.js';
 import { DiffPreviewSystem, PreviewResult } from '../diff/preview.js';
 
@@ -56,7 +57,7 @@ export class OperationQueue {
       maxConcurrency: 1, // Sequential by default for safety
       enableRollback: true,
       autoCleanup: true,
-      timeoutMs: 300000, // 5 minutes
+      timeoutMs: TIMEOUTS.QUEUE,
       ...options,
     };
   }
@@ -313,7 +314,9 @@ export class OperationQueue {
     // Rollback in reverse order
     for (const operation of operations.reverse()) {
       try {
-        const result = await this.atomicOps.rollback(operation.filePath);
+        const result = await this.atomicOps.cleanupActiveOperations(
+          operation.filePath
+        );
 
         if (result.success) {
           operation.status = 'rolled_back';
@@ -321,7 +324,7 @@ export class OperationQueue {
         } else {
           rollbackFailed.push(operation);
         }
-      } catch (error) {
+      } catch (_error) {
         rollbackFailed.push(operation);
       }
     }

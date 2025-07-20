@@ -10,6 +10,7 @@ import {
   ProviderError,
   ProviderConfig,
 } from './base.js';
+import { UsageMetadata } from '../../types/ProviderTypes.js';
 import { CapabilityManager } from '../config/CapabilityManager.js';
 import { GeminiErrorMapper, ErrorContext } from '../errors/index.js';
 
@@ -58,7 +59,7 @@ export class GeminiProvider extends LLMProvider {
   /**
    * Handle errors using the standardized error mapper
    */
-  private handleError(error: any, operation: string): never {
+  private handleError(error: unknown, operation: string): never {
     const context: ErrorContext = {
       provider: 'gemini',
       operation,
@@ -78,11 +79,20 @@ export class GeminiProvider extends LLMProvider {
       case 'model_not_found':
         throw new ModelNotFoundError(this.model);
       case 'authentication_failed':
-        throw new ProviderError(result.error, error);
+        throw new ProviderError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
       case 'connection_failed':
-        throw new ConnectionError(result.error, error);
+        throw new ConnectionError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
       default:
-        throw new ProviderError(result.error, error);
+        throw new ProviderError(
+          result.error,
+          error instanceof Error ? error : undefined
+        );
     }
   }
 
@@ -128,7 +138,11 @@ export class GeminiProvider extends LLMProvider {
       });
 
       let totalTokens = 0;
-      let usageMetadata: any = null;
+      let usageMetadata: {
+        totalTokenCount?: number;
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+      } | null = null;
       for await (const chunk of response) {
         const chunkText = chunk.text;
         if (chunkText) {
@@ -145,12 +159,15 @@ export class GeminiProvider extends LLMProvider {
         }
       }
 
-      yield {
+      const finalResponse: StreamResponse = {
         content: '',
         done: true,
         tokensUsed: totalTokens,
-        usageMetadata: usageMetadata, // Include full usage metadata
       };
+      if (usageMetadata) {
+        finalResponse.usage = usageMetadata as UsageMetadata;
+      }
+      yield finalResponse;
     } catch (error) {
       this.handleError(error, 'stream');
     }
@@ -182,6 +199,8 @@ export class GeminiProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: capabilities.supportsThinking,
+          maxTokens: capabilities.maxTokens,
+          supportsStreaming: true,
         },
       };
     } catch (error) {
@@ -217,7 +236,7 @@ export class GeminiProvider extends LLMProvider {
         contents: 'Hi',
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

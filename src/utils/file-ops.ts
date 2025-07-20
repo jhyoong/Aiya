@@ -19,7 +19,6 @@ export interface ReadOptions {
 
 export interface WriteOptions {
   encoding?: BufferEncoding;
-  createBackup?: boolean;
   ensureDir?: boolean;
   atomic?: boolean;
 }
@@ -71,12 +70,7 @@ export class FileOperations {
       'write'
     );
 
-    const {
-      encoding = 'utf8',
-      createBackup = true,
-      ensureDir = true,
-      atomic = true,
-    } = options;
+    const { encoding = 'utf8', ensureDir = true, atomic = true } = options;
 
     // Ensure directory exists
     if (ensureDir) {
@@ -84,17 +78,7 @@ export class FileOperations {
       await fs.mkdir(dir, { recursive: true });
     }
 
-    // Create backup if file exists
-    if (createBackup) {
-      try {
-        await fs.access(validatedPath);
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const backupPath = `${validatedPath}.backup.${timestamp}`;
-        await fs.copyFile(validatedPath, backupPath);
-      } catch {
-        // File doesn't exist, no backup needed
-      }
-    }
+    // File will be written atomically if atomic option is enabled
 
     // Atomic write using temporary file
     if (atomic) {

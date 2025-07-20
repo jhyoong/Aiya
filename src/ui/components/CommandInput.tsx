@@ -30,7 +30,7 @@ export const CommandInput: React.FC<CommandInputProps> = ({
 
     try {
       await onCommand(submittedInput.trim());
-    } catch (error) {
+    } catch (_error) {
       // Error handling will be managed by parent component
     } finally {
       buffer.setText('');

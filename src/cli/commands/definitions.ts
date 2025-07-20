@@ -3,19 +3,28 @@ import { CommandContext } from '../CommandExecutor.js';
 import { ProviderFactory } from '../../core/providers/factory.js';
 import { TokenCounter } from '../../core/tokens/counter.js';
 import { glob } from 'glob';
+import { SEARCH } from '../../core/config/limits-constants.js';
+
+interface SearchOptions {
+  searchType: string;
+  maxResults: number;
+  contextLines: number;
+  includeGlobs?: string[];
+  excludeGlobs?: string[];
+}
 
 /**
  * Parse search command arguments to determine search mode and options
  */
 function parseSearchArgs(args: string[]): {
   query: string;
-  options: any;
+  options: SearchOptions;
   useContentSearch: boolean;
 } {
   const query = args[0] || '';
-  const options: any = {
+  const options: SearchOptions = {
     searchType: 'fuzzy',
-    maxResults: 50,
+    maxResults: SEARCH.DEFAULT_MAX_RESULTS,
     contextLines: 2,
   };
 
@@ -45,7 +54,8 @@ function parseSearchArgs(args: string[]): {
             break;
           case 'maxResults':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.maxResults = parseInt(nextArg, 10) || 50;
+              options.maxResults =
+                parseInt(nextArg, 10) || SEARCH.DEFAULT_MAX_RESULTS;
               i++; // Skip next arg as it's the value
             }
             break;
@@ -57,10 +67,13 @@ function parseSearchArgs(args: string[]): {
             break;
           case 'includeGlobs': {
             // Collect all non-flag arguments following this flag
-            const includeGlobs = [];
+            const includeGlobs: string[] = [];
             let j = i + 1;
-            while (j < args.length && args[j] && !args[j]!.startsWith('--')) {
-              includeGlobs.push(args[j]);
+            while (j < args.length && args[j] && !args[j]?.startsWith('--')) {
+              const arg = args[j];
+              if (arg) {
+                includeGlobs.push(arg);
+              }
               j++;
             }
             if (includeGlobs.length > 0) {
@@ -71,10 +84,13 @@ function parseSearchArgs(args: string[]): {
           }
           case 'excludeGlobs': {
             // Collect all non-flag arguments following this flag
-            const excludeGlobs = [];
+            const excludeGlobs: string[] = [];
             let k = i + 1;
-            while (k < args.length && args[k] && !args[k]!.startsWith('--')) {
-              excludeGlobs.push(args[k]);
+            while (k < args.length && args[k] && !args[k]?.startsWith('--')) {
+              const arg = args[k];
+              if (arg) {
+                excludeGlobs.push(arg);
+              }
               k++;
             }
             if (excludeGlobs.length > 0) {
@@ -168,7 +184,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
     examples: [
       '/search component',
       '/search utils.ts',
-      '/search "import React" --searchType literal --maxResults 10',
+      `/search "import React" --searchType literal --maxResults ${SEARCH.SMALL_MAX_RESULTS}`,
       '/search error --includeGlobs "*.ts" "*.js" --excludeGlobs "*.test.*"',
     ],
     requiresConfig: false,
@@ -205,7 +221,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
             return `No content matches found for pattern: ${query}`;
           }
 
-          return `Found ${results.length} content matches:\n${results.map((match: any) => `  ${match.file}:${match.line} - ${match.match}`).join('\n')}`;
+          return `Found ${results.length} content matches:\n${results.map((match: { file: string; line: number; match: string }) => `  ${match.file}:${match.line} - ${match.match}`).join('\n')}`;
         } else {
           // Default mode: Fuzzy search filenames
           try {
@@ -221,7 +237,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
                 '**/build/**',
               ],
               nodir: true,
-              maxDepth: 10,
+              maxDepth: SEARCH.MAX_DIRECTORY_DEPTH,
             });
 
             if (files.length === 0) {
@@ -229,7 +245,7 @@ export const CORE_COMMANDS: CommandDefinition[] = [
             }
 
             // Limit results for readability
-            const maxResults = options.maxResults || 20;
+            const maxResults = options.maxResults || SEARCH.ALT_MAX_RESULTS;
             const displayFiles = files.slice(0, maxResults);
             const truncated = files.length > maxResults;
 
@@ -329,14 +345,12 @@ export const CORE_COMMANDS: CommandDefinition[] = [
               return 'Only one provider configured. Please add more provider configurations to enable switching.';
             }
 
+            const session = context.session; // Type narrowing after null check
             const providerList = availableProviders
               .map(name => {
-                const config =
-                  context.session!.configManager.getProviderConfig(name);
+                const config = session.configManager.getProviderConfig(name);
                 const current =
-                  name === context.session!.currentProviderName
-                    ? ' (current)'
-                    : '';
+                  name === session.currentProviderName ? ' (current)' : '';
                 return `  ${name}: ${config?.type || 'unknown'} - ${config?.model || 'unknown'}${current}`;
               })
               .join('\n');
@@ -494,14 +508,12 @@ export const CORE_COMMANDS: CommandDefinition[] = [
             return 'No providers configured.';
           }
 
+          const session = context.session; // Type narrowing after null check
           const providerList = availableProviders
             .map(name => {
-              const config =
-                context.session!.configManager.getProviderConfig(name);
+              const config = session.configManager.getProviderConfig(name);
               const current =
-                name === context.session!.currentProviderName
-                  ? ' (current)'
-                  : '';
+                name === session.currentProviderName ? ' (current)' : '';
               return `  ${name}: ${config?.type || 'unknown'} - ${config?.model || 'unknown'}${current}`;
             })
             .join('\n');

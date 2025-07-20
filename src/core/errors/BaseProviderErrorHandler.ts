@@ -5,6 +5,42 @@ import {
   DEFAULT_ERROR_PATTERNS,
 } from '../../types/ErrorTypes.js';
 
+// Interface for error objects from providers
+export interface ProviderErrorObject {
+  message?: string;
+  status?: number;
+  statusCode?: number;
+  code?: string;
+  name?: string;
+  [key: string]: unknown;
+}
+
+// Type for any error object that could be passed to error handlers
+export type ErrorInput = ProviderErrorObject | Error | unknown;
+
+// Helper function to safely access message property from unknown error objects
+export function safeGetMessage(error: unknown): string | undefined {
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message: unknown }).message;
+    return typeof message === 'string' ? message : undefined;
+  }
+  return undefined;
+}
+
+// Helper function to safely access status/statusCode from unknown error objects
+export function safeGetStatusCode(error: unknown): number | undefined {
+  if (error && typeof error === 'object') {
+    const errorObj = error as { status?: unknown; statusCode?: unknown };
+    if (typeof errorObj.status === 'number') {
+      return errorObj.status;
+    }
+    if (typeof errorObj.statusCode === 'number') {
+      return errorObj.statusCode;
+    }
+  }
+  return undefined;
+}
+
 // Re-export types for backward compatibility
 export { ProviderErrorType, ErrorContext } from '../../types/ErrorTypes.js';
 
@@ -80,13 +116,9 @@ export abstract class BaseProviderErrorHandler {
     if (typeof error === 'string') {
       return error;
     }
-    if (
-      error &&
-      typeof error === 'object' &&
-      'message' in error &&
-      typeof (error as any).message === 'string'
-    ) {
-      return (error as any).message;
+    const message = safeGetMessage(error);
+    if (message) {
+      return message;
     }
     return String(error);
   }
@@ -198,10 +230,25 @@ export abstract class BaseProviderErrorHandler {
   /**
    * Standardize any error into a ProviderError format
    */
-  static standardizeError(error: any, context: ErrorContext): ProviderError {
+  static standardizeError(
+    error: unknown,
+    context: ErrorContext
+  ): ProviderError {
     const errorType = this.classifyError(error, context);
-    const message =
-      error.message || error.toString() || 'Unknown error occurred';
+    let message = 'Unknown error occurred';
+
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'string') {
+      message = error;
+    } else {
+      const errorMessage = safeGetMessage(error);
+      if (errorMessage) {
+        message = errorMessage;
+      } else if (error) {
+        message = String(error);
+      }
+    }
 
     return this.createError(errorType, message, {
       ...context,

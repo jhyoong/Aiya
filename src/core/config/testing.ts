@@ -10,9 +10,10 @@ import {
   ProviderErrorType,
 } from '../errors/index.js';
 import { isObject, hasProperty } from '../../types/UtilityTypes.js';
+import { TIMEOUTS } from './timing-constants.js';
 
 export class ConnectionTester {
-  private static readonly TIMEOUT_MS = 10000; // 10 seconds
+  private static readonly TIMEOUT_MS = TIMEOUTS.MEDIUM;
 
   /**
    * Convert ProviderResult to ConnectionTestResult for backward compatibility
@@ -32,27 +33,193 @@ export class ConnectionTester {
   }
 
   /**
+   * Create AbortController with timeout for HTTP requests
+   */
+  private static createTimeoutController(): {
+    controller: AbortController;
+    cleanup: () => void;
+  } {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      ConnectionTester.TIMEOUT_MS
+    );
+
+    return {
+      controller,
+      cleanup: () => clearTimeout(timeoutId),
+    };
+  }
+
+  /**
+   * Create standardized error context
+   */
+  private static createErrorContext(
+    provider: string,
+    config: ExtendedProviderConfig,
+    endpoint?: string,
+    statusCode?: number
+  ): ErrorContext {
+    return {
+      provider,
+      operation: 'connection_test',
+      model: config.model,
+      endpoint: endpoint || config.baseUrl,
+      ...(statusCode && { statusCode }),
+      timestamp: new Date(),
+    };
+  }
+
+  /**
+   * Validate API key and create error if missing
+   */
+  private static validateApiKey(
+    config: ExtendedProviderConfig,
+    provider: string,
+    endpoint: string
+  ): ProviderResult | null {
+    if (!config.apiKey) {
+      const context = ConnectionTester.createErrorContext(
+        provider,
+        config,
+        endpoint
+      );
+
+      switch (provider) {
+        case 'openai':
+          return OpenAIErrorMapper.createOpenAIError(
+            ProviderErrorType.AUTHENTICATION_FAILED,
+            'API key is required',
+            context
+          );
+        case 'gemini':
+          return GeminiErrorMapper.createGeminiError(
+            ProviderErrorType.AUTHENTICATION_FAILED,
+            'API key is required',
+            context
+          );
+        case 'anthropic':
+          return BaseProviderErrorHandler.createError(
+            ProviderErrorType.AUTHENTICATION_FAILED,
+            'API key is required',
+            context,
+            [
+              'Set ANTHROPIC_API_KEY environment variable',
+              'Add apiKey to configuration',
+              'Get API key from Anthropic Console',
+            ]
+          );
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Handle HTTP response errors with provider-specific error mapping
+   */
+  private static handleHttpError(
+    response: Response,
+    provider: string,
+    config: ExtendedProviderConfig,
+    endpoint: string
+  ): ProviderResult {
+    const error = new Error(`HTTP ${response.status}: ${response.statusText}`);
+    const context = ConnectionTester.createErrorContext(
+      provider,
+      config,
+      endpoint,
+      response.status
+    );
+
+    switch (provider) {
+      case 'ollama':
+        return OllamaErrorMapper.handleOllamaError(error, context);
+      case 'openai':
+        return OpenAIErrorMapper.handleOpenAIError(error, context);
+      case 'gemini':
+        return GeminiErrorMapper.handleGeminiError(error, context);
+      case 'anthropic':
+        return BaseProviderErrorHandler.standardizeError(error, context);
+      default:
+        return BaseProviderErrorHandler.standardizeError(error, context);
+    }
+  }
+
+  /**
+   * Create model not found error for provider
+   */
+  private static createModelNotFoundError(
+    provider: string,
+    config: ExtendedProviderConfig,
+    endpoint: string
+  ): ProviderResult {
+    const context = ConnectionTester.createErrorContext(
+      provider,
+      config,
+      endpoint
+    );
+    const message = `Model ${config.model} not found`;
+
+    switch (provider) {
+      case 'ollama':
+        return OllamaErrorMapper.createOllamaError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          message,
+          context
+        );
+      case 'openai':
+        return OpenAIErrorMapper.createOpenAIError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          message,
+          context
+        );
+      case 'gemini':
+        return GeminiErrorMapper.createGeminiError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          message,
+          context
+        );
+      default:
+        return BaseProviderErrorHandler.createError(
+          ProviderErrorType.MODEL_NOT_FOUND,
+          message,
+          context
+        );
+    }
+  }
+
+  /**
    * Test connection to Ollama provider
    */
   async testOllama(
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
+    if (!config.baseUrl) {
+      return {
+        success: false,
+        error: 'Base URL is required for Ollama connection testing',
+        suggestions: ['Please provide a valid Ollama server URL'],
+      };
+    }
+
     try {
-      // Test /api/tags endpoint
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        ConnectionTester.TIMEOUT_MS
-      );
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
       const response = await fetch(`${config.baseUrl}/api/tags`, {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      cleanup();
 
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        const result = ConnectionTester.handleHttpError(
+          response,
+          'ollama',
+          config,
+          config.baseUrl
+        );
+        return ConnectionTester.convertToConnectionTestResult(result);
       }
 
       const data = await response.json();
@@ -66,33 +233,17 @@ export class ConnectionTester {
         );
 
       if (!modelExists) {
-        const context: ErrorContext = {
-          provider: 'ollama',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: config.baseUrl,
-          timestamp: new Date(),
-        };
-
-        const result = OllamaErrorMapper.createOllamaError(
-          ProviderErrorType.MODEL_NOT_FOUND,
-          `Model ${config.model} not found`,
-          context
+        const result = ConnectionTester.createModelNotFoundError(
+          'ollama',
+          config,
+          config.baseUrl
         );
-
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
       return { success: true };
     } catch (error: unknown) {
-      const context: ErrorContext = {
-        provider: 'ollama',
-        operation: 'connection_test',
-        model: config.model,
-        endpoint: config.baseUrl,
-        timestamp: new Date(),
-      };
-
+      const context = ConnectionTester.createErrorContext('ollama', config);
       const result = OllamaErrorMapper.handleOllamaError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }
@@ -105,32 +256,21 @@ export class ConnectionTester {
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
     try {
-      if (!config.apiKey) {
-        const context: ErrorContext = {
-          provider: 'openai',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: config.baseUrl,
-          timestamp: new Date(),
-        };
+      const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
 
-        const result = OpenAIErrorMapper.createOpenAIError(
-          ProviderErrorType.AUTHENTICATION_FAILED,
-          'API key is required',
-          context
-        );
-
-        return ConnectionTester.convertToConnectionTestResult(result);
+      // Validate API key
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'openai',
+        baseUrl
+      );
+      if (apiKeyError) {
+        return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      // Test with minimal models endpoint call
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        ConnectionTester.TIMEOUT_MS
-      );
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
-      const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
       const response = await fetch(`${baseUrl}/models`, {
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
@@ -139,22 +279,15 @@ export class ConnectionTester {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      cleanup();
 
       if (!response.ok) {
-        const error = new Error(
-          `HTTP ${response.status}: ${response.statusText}`
+        const result = ConnectionTester.handleHttpError(
+          response,
+          'openai',
+          config,
+          baseUrl
         );
-        const context: ErrorContext = {
-          provider: 'openai',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: baseUrl,
-          statusCode: response.status,
-          timestamp: new Date(),
-        };
-
-        const result = OpenAIErrorMapper.handleOpenAIError(error, context);
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
@@ -169,33 +302,17 @@ export class ConnectionTester {
         );
 
       if (!modelExists) {
-        const context: ErrorContext = {
-          provider: 'openai',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: baseUrl,
-          timestamp: new Date(),
-        };
-
-        const result = OpenAIErrorMapper.createOpenAIError(
-          ProviderErrorType.MODEL_NOT_FOUND,
-          `Model ${config.model} not found`,
-          context
+        const result = ConnectionTester.createModelNotFoundError(
+          'openai',
+          config,
+          baseUrl
         );
-
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
       return { success: true };
     } catch (error: unknown) {
-      const context: ErrorContext = {
-        provider: 'openai',
-        operation: 'connection_test',
-        model: config.model,
-        endpoint: config.baseUrl,
-        timestamp: new Date(),
-      };
-
+      const context = ConnectionTester.createErrorContext('openai', config);
       const result = OpenAIErrorMapper.handleOpenAIError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }
@@ -208,54 +325,34 @@ export class ConnectionTester {
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
     try {
-      if (!config.apiKey) {
-        const context: ErrorContext = {
-          provider: 'gemini',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: 'https://generativelanguage.googleapis.com/v1',
-          timestamp: new Date(),
-        };
+      const endpoint = 'https://generativelanguage.googleapis.com/v1';
 
-        const result = GeminiErrorMapper.createGeminiError(
-          ProviderErrorType.AUTHENTICATION_FAILED,
-          'API key is required',
-          context
-        );
-
-        return ConnectionTester.convertToConnectionTestResult(result);
+      // Validate API key
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'gemini',
+        endpoint
+      );
+      if (apiKeyError) {
+        return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      // Test with models endpoint
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        ConnectionTester.TIMEOUT_MS
-      );
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1/models?key=${config.apiKey}`,
-        {
-          signal: controller.signal,
-        }
-      );
+      const response = await fetch(`${endpoint}/models?key=${config.apiKey}`, {
+        signal: controller.signal,
+      });
 
-      clearTimeout(timeoutId);
+      cleanup();
 
       if (!response.ok) {
-        const error = new Error(
-          `HTTP ${response.status}: ${response.statusText}`
+        const result = ConnectionTester.handleHttpError(
+          response,
+          'gemini',
+          config,
+          endpoint
         );
-        const context: ErrorContext = {
-          provider: 'gemini',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: 'https://generativelanguage.googleapis.com/v1',
-          statusCode: response.status,
-          timestamp: new Date(),
-        };
-
-        const result = GeminiErrorMapper.handleGeminiError(error, context);
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
@@ -274,33 +371,21 @@ export class ConnectionTester {
       });
 
       if (!modelExists) {
-        const context: ErrorContext = {
-          provider: 'gemini',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: 'https://generativelanguage.googleapis.com/v1',
-          timestamp: new Date(),
-        };
-
-        const result = GeminiErrorMapper.createGeminiError(
-          ProviderErrorType.MODEL_NOT_FOUND,
-          `Model ${config.model} not found`,
-          context
+        const result = ConnectionTester.createModelNotFoundError(
+          'gemini',
+          config,
+          endpoint
         );
-
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
       return { success: true };
     } catch (error: unknown) {
-      const context: ErrorContext = {
-        provider: 'gemini',
-        operation: 'connection_test',
-        model: config.model,
-        endpoint: 'https://generativelanguage.googleapis.com/v1',
-        timestamp: new Date(),
-      };
-
+      const context = ConnectionTester.createErrorContext(
+        'gemini',
+        config,
+        'https://generativelanguage.googleapis.com/v1'
+      );
       const result = GeminiErrorMapper.handleGeminiError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }
@@ -313,37 +398,22 @@ export class ConnectionTester {
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
     try {
-      if (!config.apiKey) {
-        const context: ErrorContext = {
-          provider: 'anthropic',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: 'https://api.anthropic.com/v1',
-          timestamp: new Date(),
-        };
+      const endpoint = 'https://api.anthropic.com/v1';
 
-        const result = BaseProviderErrorHandler.createError(
-          ProviderErrorType.AUTHENTICATION_FAILED,
-          'API key is required',
-          context,
-          [
-            'Set ANTHROPIC_API_KEY environment variable',
-            'Add apiKey to configuration',
-            'Get API key from Anthropic Console',
-          ]
-        );
-
-        return ConnectionTester.convertToConnectionTestResult(result);
+      // Validate API key
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'anthropic',
+        endpoint
+      );
+      if (apiKeyError) {
+        return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      // Test with a minimal message
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        ConnectionTester.TIMEOUT_MS
-      );
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch(`${endpoint}/messages`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${config.apiKey}`,
@@ -358,54 +428,42 @@ export class ConnectionTester {
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
+      cleanup();
 
       if (!response.ok) {
-        let errorType = ProviderErrorType.UNKNOWN;
-        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-
-        if (response.status === 401) {
-          errorType = ProviderErrorType.AUTHENTICATION_FAILED;
-          errorMessage = 'Invalid API key';
-        } else if (response.status === 400) {
+        // Handle specific Anthropic error cases
+        if (response.status === 400) {
           try {
             const errorData = await response.json();
             if (errorData.error?.message?.includes('model')) {
-              errorType = ProviderErrorType.MODEL_NOT_FOUND;
-              errorMessage = `Model ${config.model} not available`;
+              const result = ConnectionTester.createModelNotFoundError(
+                'anthropic',
+                config,
+                endpoint
+              );
+              return ConnectionTester.convertToConnectionTestResult(result);
             }
           } catch {
             // Ignore JSON parsing errors
           }
         }
 
-        const context: ErrorContext = {
-          provider: 'anthropic',
-          operation: 'connection_test',
-          model: config.model,
-          endpoint: 'https://api.anthropic.com/v1',
-          statusCode: response.status,
-          timestamp: new Date(),
-        };
-
-        const result = BaseProviderErrorHandler.createError(
-          errorType,
-          errorMessage,
-          context
+        const result = ConnectionTester.handleHttpError(
+          response,
+          'anthropic',
+          config,
+          endpoint
         );
         return ConnectionTester.convertToConnectionTestResult(result);
       }
 
       return { success: true };
     } catch (error: unknown) {
-      const context: ErrorContext = {
-        provider: 'anthropic',
-        operation: 'connection_test',
-        model: config.model,
-        endpoint: 'https://api.anthropic.com/v1',
-        timestamp: new Date(),
-      };
-
+      const context = ConnectionTester.createErrorContext(
+        'anthropic',
+        config,
+        'https://api.anthropic.com/v1'
+      );
       const result = BaseProviderErrorHandler.standardizeError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }

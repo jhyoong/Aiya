@@ -8,9 +8,10 @@
 
 import stringWidth from 'string-width';
 import { toCodePoints, cpLen } from './textUtils.js';
+import { VISUAL } from '../../core/config/ui-constants.js';
 
 // Memoization utilities for performance optimization
-const CACHE_SIZE_LIMIT = 1000;
+const CACHE_SIZE_LIMIT = VISUAL.CACHE_SIZE_LIMIT;
 
 interface WrapCacheEntry {
   chunks: VisualChunk[];
@@ -71,7 +72,7 @@ function cleanupCache<T extends { lastAccessed: number }>(
   entries.sort((a, b) => a[1].lastAccessed - b[1].lastAccessed);
 
   // Remove oldest 25% of entries
-  const toRemove = Math.floor(entries.length * 0.25);
+  const toRemove = Math.floor(entries.length * VISUAL.CACHE_CLEANUP_RATIO);
   for (let i = 0; i < toRemove; i++) {
     const entry = entries[i];
     if (entry) {
@@ -457,7 +458,7 @@ export function memoizedCalculateVisualLayout(
         if (!logicalToVisualMap[logIndex]) {
           logicalToVisualMap[logIndex] = [];
         }
-        logicalToVisualMap[logIndex]!.push([
+        logicalToVisualMap[logIndex].push([
           actualVisualLineIndex,
           chunk.startPosInLogicalLine,
         ]);

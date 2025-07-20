@@ -1,4 +1,5 @@
 import Fuse from 'fuse.js';
+import { MATCHING } from '../config/threshold-constants.js';
 
 export interface FuzzyMatch {
   line: number;
@@ -9,8 +10,8 @@ export interface FuzzyMatch {
 }
 
 export interface FuzzySearchOptions {
-  threshold?: number; // 0.0 (exact) to 1.0 (anything), default 0.6
-  minConfidence?: number; // Minimum confidence score 0-100, default 20
+  threshold?: number; // 0.0 (exact) to 1.0 (anything), default from MATCHING.DEFAULT_THRESHOLD
+  minConfidence?: number; // Minimum confidence score 0-100, default from MATCHING.DEFAULT_MIN_CONFIDENCE
   includeScore?: boolean; // Include Fuse.js score in results
 }
 
@@ -25,8 +26,8 @@ export class FuzzyMatcher {
 
   constructor(options: FuzzySearchOptions = {}) {
     this.options = {
-      threshold: options.threshold ?? 0.6,
-      minConfidence: options.minConfidence ?? 20,
+      threshold: options.threshold ?? MATCHING.DEFAULT_THRESHOLD,
+      minConfidence: options.minConfidence ?? MATCHING.DEFAULT_MIN_CONFIDENCE,
       includeScore: options.includeScore ?? true,
     };
   }
@@ -116,7 +117,7 @@ export class FuzzyMatcher {
   private findBestMatchPosition(
     line: string,
     pattern: string,
-    fuseMatch?: any
+    fuseMatch?: { indices?: readonly [number, number][] }
   ): { column: number; matchedText: string } {
     // Try simple substring match first for better results
     const normalizedLine = line.toLowerCase();
@@ -132,7 +133,11 @@ export class FuzzyMatcher {
     }
 
     // If Fuse.js provided match indices, use them
-    if (fuseMatch?.indices && fuseMatch.indices.length > 0) {
+    if (
+      fuseMatch?.indices &&
+      fuseMatch.indices.length > 0 &&
+      fuseMatch.indices[0]
+    ) {
       const [startIndex, endIndex] = fuseMatch.indices[0];
 
       // Use the normalized match indices directly on the original line

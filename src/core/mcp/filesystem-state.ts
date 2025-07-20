@@ -9,7 +9,7 @@ export interface FileSnapshot {
 
 export interface Change {
   tool: string;
-  params: any;
+  params: Record<string, unknown>;
   timestamp: Date;
   reversible: boolean;
   reverseOperation?: () => Promise<void>;

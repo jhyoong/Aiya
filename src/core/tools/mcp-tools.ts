@@ -87,7 +87,10 @@ export class MCPToolService {
         description: tool.description,
         parameters: {
           type: 'object',
-          properties: tool.inputSchema.properties,
+          properties: tool.inputSchema.properties as Record<
+            string,
+            JsonSchemaProperty
+          >,
           required: tool.inputSchema.required || [],
         },
       });
@@ -145,7 +148,7 @@ export class MCPToolService {
    */
   private validateToolArguments(
     args: ToolArguments,
-    schema: any
+    schema: unknown
   ): ToolArguments {
     // Basic validation - in a production system, you'd use a JSON Schema validator
     if (!args || typeof args !== 'object') {
@@ -153,12 +156,15 @@ export class MCPToolService {
     }
 
     // Check required fields if they exist in schema
-    if (schema.required) {
-      for (const requiredField of schema.required) {
-        if (!(requiredField in args)) {
-          throw new Error(
-            `Required field '${requiredField}' is missing from tool arguments`
-          );
+    if (schema && typeof schema === 'object' && 'required' in schema) {
+      const required = (schema as { required: unknown }).required;
+      if (Array.isArray(required)) {
+        for (const requiredField of required) {
+          if (typeof requiredField === 'string' && !(requiredField in args)) {
+            throw new Error(
+              `Required field '${requiredField}' is missing from tool arguments`
+            );
+          }
         }
       }
     }
@@ -211,10 +217,11 @@ export class MCPToolService {
         try {
           const parsed = JSON.parse(jsonContent);
           if (parsed.tool_calls && Array.isArray(parsed.tool_calls)) {
-            return parsed.tool_calls.map((call: any) => ({
-              id: call.id || this.generateCallId(),
-              name: call.name,
-              arguments: call.arguments || {},
+            return parsed.tool_calls.map((call: unknown) => ({
+              id: (call as { id?: string }).id || this.generateCallId(),
+              name: (call as { name: string }).name,
+              arguments:
+                (call as { arguments?: ToolArguments }).arguments || {},
             }));
           }
         } catch {

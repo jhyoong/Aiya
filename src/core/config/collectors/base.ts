@@ -1,4 +1,10 @@
 import { ExtendedProviderConfig } from '../manager.js';
+import {
+  PROVIDER_DISPLAY_NAMES,
+  PROVIDER_CAPABILITIES_DESCRIPTIONS,
+} from '../constants.js';
+import { CapabilityManager } from '../CapabilityManager.js';
+import type { ProviderModels } from '../models.js';
 
 export interface ConnectionTestResult {
   success: boolean;
@@ -61,30 +67,103 @@ export abstract class BaseProviderCollector {
    * Get provider display name
    */
   getDisplayName(): string {
-    const displayNames = {
-      ollama: 'Ollama - Local AI models',
-      openai: 'OpenAI - GPT models',
-      gemini: 'Google Gemini - Gemini models',
-      anthropic: 'Anthropic - Claude models',
-      azure: 'Azure OpenAI - Enterprise GPT',
-      bedrock: 'AWS Bedrock - Various models',
-    };
-    return displayNames[this.providerType] || this.providerType;
+    return PROVIDER_DISPLAY_NAMES[this.providerType] || this.providerType;
   }
 
   /**
    * Get provider capabilities description
    */
   getCapabilitiesDescription(): string {
-    const capabilities = {
-      ollama: 'Free, runs locally, good for development',
-      openai: 'Paid API, state-of-the-art models, function calling',
-      gemini: 'Paid API, large context windows, vision support',
-      anthropic: 'Paid API, 200K context, thinking mode',
-      azure: 'Enterprise deployment, custom models',
-      bedrock: 'AWS managed, multiple model providers',
+    return (
+      PROVIDER_CAPABILITIES_DESCRIPTIONS[this.providerType] ||
+      'Provider-specific capabilities'
+    );
+  }
+
+  /**
+   * Common validation pattern for collecting config with API key from environment
+   */
+  protected collectConfigWithApiKey(
+    providerType: string,
+    envVarName: string
+  ): ExtendedProviderConfig {
+    const apiKey =
+      this.options.existingConfig?.apiKey || process.env[envVarName];
+    const existingConfig = {
+      ...this.options.existingConfig,
+      ...(apiKey && { apiKey }),
     };
-    return capabilities[this.providerType] || 'Provider-specific capabilities';
+
+    return CapabilityManager.getDefaultConfig(
+      providerType as keyof ProviderModels,
+      existingConfig
+    );
+  }
+
+  /**
+   * Common validation pattern for basic config fields
+   */
+  protected validateBasicConfig(config: ExtendedProviderConfig): boolean {
+    // Validate required model field
+    if (!config.model || config.model.trim().length === 0) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Common test connection pattern with validation
+   */
+  protected async testConnectionWithValidation(
+    config: ExtendedProviderConfig,
+    testMethod: (
+      config: ExtendedProviderConfig
+    ) => Promise<ConnectionTestResult>,
+    errorSuggestions: string[] = ['Check configuration']
+  ): Promise<ConnectionTestResult> {
+    if (!this.options.skipValidation) {
+      const isValid = await this.validateConfig(config);
+      if (!isValid) {
+        return {
+          success: false,
+          error: 'Invalid configuration',
+          suggestions: errorSuggestions,
+        };
+      }
+    }
+
+    return testMethod(config);
+  }
+
+  /**
+   * Common pattern for getting available models
+   */
+  protected async getModelsFromCapabilityManager(
+    providerType: string,
+    config: Partial<ExtendedProviderConfig>
+  ): Promise<string[]> {
+    return await CapabilityManager.getAvailableModelsWithFetching(
+      providerType as keyof ProviderModels,
+      config
+    );
+  }
+
+  /**
+   * Common pattern for getting default config with API key
+   */
+  protected getDefaultConfigWithApiKey(
+    providerType: string,
+    envVarName: string
+  ): Partial<ExtendedProviderConfig> {
+    const apiKey = process.env[envVarName];
+    const defaultConfig = CapabilityManager.getDefaultConfig(
+      providerType as keyof ProviderModels
+    );
+
+    return {
+      ...defaultConfig,
+      ...(apiKey && { apiKey }),
+    };
   }
 
   /**
@@ -117,8 +196,9 @@ export abstract class BaseProviderCollector {
   /**
    * Common error handling helper
    */
-  protected handleConnectionError(error: any): ConnectionTestResult {
-    const errorMessage = error?.message || 'Unknown error occurred';
+  protected handleConnectionError(error: unknown): ConnectionTestResult {
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
 
     if (errorMessage.includes('ECONNREFUSED')) {
       return {

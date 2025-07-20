@@ -116,7 +116,7 @@ export const cleanupTestFiles = async () => {
   try {
     const tempDir = path.resolve(TEST_CONFIG.directories.temp);
     await fs.rm(tempDir, { recursive: true, force: true });
-  } catch (error) {
+  } catch (_error) {
     // Ignore cleanup errors
   }
 };

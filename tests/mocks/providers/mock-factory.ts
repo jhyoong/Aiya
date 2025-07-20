@@ -65,26 +65,29 @@ export class MockProviderFactory {
     ...args: any[]
   ): Promise<MockProvider> {
     switch (providerType) {
-      case 'ollama':
+      case 'ollama': {
         const { OLLAMA_TEST_SCENARIOS } = await import('./mock-ollama');
         if (!(scenario in OLLAMA_TEST_SCENARIOS)) {
           throw new Error(`Unknown Ollama scenario: ${scenario}`);
         }
         return OLLAMA_TEST_SCENARIOS[scenario](...args);
+      }
 
-      case 'openai':
+      case 'openai': {
         const { OPENAI_TEST_SCENARIOS } = await import('./mock-openai');
         if (!(scenario in OPENAI_TEST_SCENARIOS)) {
           throw new Error(`Unknown OpenAI scenario: ${scenario}`);
         }
         return OPENAI_TEST_SCENARIOS[scenario](...args);
+      }
 
-      case 'gemini':
+      case 'gemini': {
         const { GEMINI_TEST_SCENARIOS } = await import('./mock-gemini');
         if (!(scenario in GEMINI_TEST_SCENARIOS)) {
           throw new Error(`Unknown Gemini scenario: ${scenario}`);
         }
         return GEMINI_TEST_SCENARIOS[scenario](...args);
+      }
 
       default:
         throw new Error(

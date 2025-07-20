@@ -14,6 +14,43 @@ import {
 } from './models.js';
 import { ExtendedProviderConfig } from './manager.js';
 
+// Interface for Ollama API response
+interface OllamaModel {
+  name: string;
+  size: number;
+  digest: string;
+  modified_at: string;
+}
+
+interface OllamaModelsResponse {
+  models: OllamaModel[];
+}
+
+// Interface for OpenAI API response
+interface OpenAIModel {
+  id: string;
+  object: string;
+  created: number;
+  owned_by: string;
+}
+
+interface OpenAIModelsResponse {
+  object: string;
+  data: OpenAIModel[];
+}
+
+// Interface for Gemini API response
+interface GeminiModel {
+  name: string;
+  displayName: string;
+  description: string;
+  supportedGenerationMethods: string[];
+}
+
+interface GeminiModelsResponse {
+  models: GeminiModel[];
+}
+
 export class ModelRegistry {
   /**
    * Get provider defaults
@@ -210,8 +247,9 @@ export class ModelRegistry {
         return defaultModels;
       }
 
-      const data = await response.json();
-      const availableModels = data.models?.map((m: any) => m.name) || [];
+      const data = (await response.json()) as OllamaModelsResponse;
+      const availableModels =
+        data.models?.map((m: OllamaModel) => m.name) || [];
 
       // Combine with defaults, removing duplicates
       return [...new Set([...availableModels, ...defaultModels])];
@@ -242,13 +280,14 @@ export class ModelRegistry {
         return defaultModels;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as OpenAIModelsResponse;
       const availableModels =
         data.data
           ?.filter(
-            (m: any) => m.id.startsWith('gpt-') && !m.id.includes('instruct')
+            (m: OpenAIModel) =>
+              m.id.startsWith('gpt-') && !m.id.includes('instruct')
           )
-          .map((m: any) => m.id) || [];
+          .map((m: OpenAIModel) => m.id) || [];
 
       // Combine with defaults, removing duplicates and sorting
       return [...new Set([...availableModels, ...defaultModels])].sort();
@@ -277,13 +316,14 @@ export class ModelRegistry {
         return defaultModels;
       }
 
-      const data = await response.json();
+      const data = (await response.json()) as GeminiModelsResponse;
       const availableModels =
         data.models
-          ?.filter((m: any) =>
+          ?.filter((m: GeminiModel) =>
             m.supportedGenerationMethods?.includes('generateContent')
           )
-          .map((m: any) => m.name.split('/').pop()) || [];
+          .map((m: GeminiModel) => m.name.split('/').pop())
+          .filter((name): name is string => name !== undefined) || [];
 
       // Combine with defaults, removing duplicates and sorting
       return [...new Set([...availableModels, ...defaultModels])].sort();
@@ -293,22 +333,19 @@ export class ModelRegistry {
   }
 
   private static getDisplayName(providerType: keyof ProviderModels): string {
-    const displayNames = {
-      ollama: 'Ollama - Local AI models',
-      openai: 'OpenAI - GPT models',
-      gemini: 'Google Gemini - Gemini models',
-    };
-    return displayNames[providerType] || providerType;
+    // Import moved to avoid circular dependency
+    const { PROVIDER_DISPLAY_NAMES } = require('./constants.js');
+    return PROVIDER_DISPLAY_NAMES[providerType] || providerType;
   }
 
   private static getCapabilitiesDescription(
     providerType: keyof ProviderModels
   ): string {
-    const capabilities = {
-      ollama: 'Free, runs locally, good for development',
-      openai: 'Paid API, state-of-the-art models, function calling',
-      gemini: 'Paid API, large context windows, vision support, thinking mode',
-    };
-    return capabilities[providerType] || 'Provider-specific capabilities';
+    // Import moved to avoid circular dependency
+    const { PROVIDER_CAPABILITIES_DESCRIPTIONS } = require('./constants.js');
+    return (
+      PROVIDER_CAPABILITIES_DESCRIPTIONS[providerType] ||
+      'Provider-specific capabilities'
+    );
   }
 }

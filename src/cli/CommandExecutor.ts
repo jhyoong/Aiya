@@ -147,20 +147,20 @@ export class CommandExecutor {
           success: true,
           output: typeof result === 'string' ? result : JSON.stringify(result),
         };
-      } catch (handlerError: any) {
+      } catch (handlerError: unknown) {
         return {
           success: false,
-          error: `Command execution failed: ${handlerError.message}`,
+          error: `Command execution failed: ${handlerError instanceof Error ? handlerError.message : String(handlerError)}`,
           suggestions: [
             `Use /help ${command} for usage information`,
             'Check command arguments and try again',
           ],
         };
       }
-    } catch (parseError: any) {
+    } catch (parseError: unknown) {
       return {
         success: false,
-        error: `Invalid command format: ${parseError.message}`,
+        error: `Invalid command format: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
         suggestions: [
           'Commands must start with /',
           'Use quotes for arguments with spaces',

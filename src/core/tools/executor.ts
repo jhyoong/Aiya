@@ -9,14 +9,18 @@ import { ToolLogger } from './logger.js';
 export class ToolExecutor {
   private mcpService: MCPToolService;
   private verbose: boolean;
-  private confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined;
+  private confirmationCallback?:
+    | ((toolCalls: ToolCall[]) => Promise<boolean>)
+    | undefined;
   private memoryService: ToolMemoryService;
   private toolLogger: ToolLogger;
 
   constructor(
-    mcpService: MCPToolService, 
+    mcpService: MCPToolService,
     verbose: boolean = false,
-    confirmationCallback?: ((toolCalls: ToolCall[]) => Promise<boolean>) | undefined,
+    confirmationCallback?:
+      | ((toolCalls: ToolCall[]) => Promise<boolean>)
+      | undefined,
     memoryService?: ToolMemoryService,
     toolLogger?: ToolLogger
   ) {
@@ -70,9 +74,9 @@ export class ToolExecutor {
         toolsNeedingConfirmation.push(toolCall);
         continue;
       }
-      
+
       const storedPreference = this.memoryService.getPreference(toolCall.name);
-      
+
       if (storedPreference === 'reject') {
         // Auto-reject due to stored preference
         if (this.verbose) {
@@ -102,7 +106,9 @@ export class ToolExecutor {
 
     // Request confirmation for tools without stored preferences
     if (toolsNeedingConfirmation.length > 0 && this.confirmationCallback) {
-      const confirmed = await this.confirmationCallback(toolsNeedingConfirmation);
+      const confirmed = await this.confirmationCallback(
+        toolsNeedingConfirmation
+      );
       if (!confirmed) {
         // User cancelled - return message without tool execution
         if (this.verbose) {
@@ -120,13 +126,15 @@ export class ToolExecutor {
     const toolResults: ToolResult[] = [];
     for (const toolCall of toolCalls) {
       if (this.verbose) {
-        this.toolLogger.logToolExecutionStart(toolCall.name, toolCall.arguments);
+        this.toolLogger.logToolExecutionStart(
+          toolCall.name,
+          toolCall.arguments
+        );
       }
 
       const startTime = Date.now();
       const result = await this.mcpService.executeTool(toolCall);
       const duration = Date.now() - startTime;
-      
       // Log tool execution
       this.toolLogger.logToolExecution(
         toolCall.name,
@@ -135,11 +143,15 @@ export class ToolExecutor {
         result.isError ? result.result : undefined,
         duration
       );
-      
+
       toolResults.push(result);
 
       if (this.verbose) {
-        this.toolLogger.logToolExecutionResult(toolCall.name, result.result, result.isError || false);
+        this.toolLogger.logToolExecutionResult(
+          toolCall.name,
+          result.result,
+          result.isError || false
+        );
       }
     }
 

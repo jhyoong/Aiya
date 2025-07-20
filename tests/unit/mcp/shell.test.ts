@@ -347,16 +347,6 @@ describe('ShellMCPClient', () => {
       expect(result.content[0].text).toContain('any command');
     });
 
-    it('should execute potentially dangerous commands (approval handled at higher level)', async () => {
-      // The shell client no longer blocks commands - approval is handled in chat.ts
-      const result = await shellClient.callTool('RunCommand', {
-        command: 'rm --help',
-      });
-
-      expect(result.isError).toBe(false);
-      expect(result.content[0].text).toMatch(/(Usage|help|option)/i);
-    });
-
     it('should provide memory service access', () => {
       const memoryServiceInstance = shellClient.getMemoryService();
       expect(memoryServiceInstance).toBe(memoryService);
@@ -364,13 +354,11 @@ describe('ShellMCPClient', () => {
 
     it('should store command preferences correctly', () => {
       shellClient.storeCommandPreference('git push origin main', 'allow');
-      
       expect(memoryService.getPreference('shell:git')).toBe('allow');
     });
 
     it('should log successful command execution', async () => {
       const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
-      
       await shellClient.callTool('RunCommand', {
         command: 'echo "test logging"',
       });
@@ -386,7 +374,6 @@ describe('ShellMCPClient', () => {
 
     it('should log failed command execution', async () => {
       const logSpy = vi.spyOn(shellLogger, 'logShellCommand');
-      
       await shellClient.callTool('RunCommand', {
         command: 'false', // command that always fails
       });

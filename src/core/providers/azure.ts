@@ -196,6 +196,8 @@ export class AzureOpenAIProvider extends LLMProvider {
           supportsVision: capabilities.supportsVision,
           supportsFunctionCalling: capabilities.supportsFunctionCalling,
           supportsThinking: false, // Azure OpenAI doesn't have thinking tags
+          maxTokens: capabilities.contextLength,
+          supportsStreaming: true,
           ...(capabilities.costPerToken && {
             costPerToken: capabilities.costPerToken,
           }),
@@ -237,7 +239,7 @@ export class AzureOpenAIProvider extends LLMProvider {
         max_tokens: 1,
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -326,7 +328,15 @@ export class AzureOpenAIProvider extends LLMProvider {
     costPerToken?: { input: number; output: number };
   } {
     // Use the same capabilities as OpenAI models since Azure hosts the same models
-    const capabilities: Record<string, any> = {
+    const capabilities: Record<
+      string,
+      {
+        contextLength: number;
+        supportsVision: boolean;
+        supportsFunctionCalling: boolean;
+        costPerToken?: { input: number; output: number };
+      }
+    > = {
       'gpt-4o': {
         contextLength: 128000,
         supportsVision: true,

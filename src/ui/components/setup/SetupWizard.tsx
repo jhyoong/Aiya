@@ -218,17 +218,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
     const configPath = path.join(projectPath, '.aiya.yaml');
 
-    // Check if config exists and create backup
-    try {
-      await fs.access(configPath);
-      const backupPath = path.join(
-        projectPath,
-        configGenerator.generateBackupFilename()
-      );
-      await fs.copyFile(configPath, backupPath);
-    } catch {
-      // File doesn't exist, no backup needed
-    }
+    // Configuration will overwrite existing file if present
 
     // Generate and save new configuration
     const yamlContent = configGenerator.generateYAML(session);
@@ -340,7 +330,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
           />
         );
 
-      case 'additional-connection-test':
+      case 'additional-connection-test': {
         const lastProvider =
           state.additionalProviders[state.additionalProviders.length - 1];
         if (!lastProvider) {
@@ -354,8 +344,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             onSkip={handleConnectionTestSkip}
           />
         );
+      }
 
-      case 'save-and-exit':
+      case 'save-and-exit': {
         if (!state.primaryProvider) {
           handleError('No primary provider configured');
           return null;
@@ -401,8 +392,9 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             </Box>
           </Box>
         );
+      }
 
-      case 'summary':
+      case 'summary': {
         if (!state.primaryProvider) {
           handleError('No primary provider configured');
           return null;
@@ -441,6 +433,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
             </Box>
           </Box>
         );
+      }
 
       case 'complete':
         return (

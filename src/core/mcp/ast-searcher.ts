@@ -8,7 +8,7 @@ export interface ASTMatch {
   text: string;
   nodeType: string;
   context: string; // Full line containing the match
-  metadata?: Record<string, any>; // Additional context like function name, class name, etc.
+  metadata?: Record<string, unknown>; // Additional context like function name, class name, etc.
 }
 
 export interface ASTSearchOptions {
@@ -73,7 +73,7 @@ export class ASTSearcher {
       });
     } catch (error) {
       // If parsing fails, return empty results rather than throwing
-      console.debug(`AST parsing failed for ${filePath}:`, error);
+      console.warn(`AST parsing failed for ${filePath}:`, error);
       return [];
     }
   }
@@ -103,7 +103,7 @@ export class ASTSearcher {
           errorOnTypeScriptSyntacticAndSemanticIssues: false,
         }),
       });
-    } catch (error) {
+    } catch (_error) {
       return null;
     }
   }
@@ -135,14 +135,14 @@ export class ASTSearcher {
 
       // Recursively traverse child nodes
       for (const key in node) {
-        const value = (node as any)[key];
+        const value = (node as unknown as Record<string, unknown>)[key];
         if (Array.isArray(value)) {
           for (const item of value) {
-            if (item && typeof item === 'object' && item.type) {
+            if (item && typeof item === 'object' && 'type' in item) {
               traverse(item as TSESTree.Node, depth + 1);
             }
           }
-        } else if (value && typeof value === 'object' && value.type) {
+        } else if (value && typeof value === 'object' && 'type' in value) {
           traverse(value as TSESTree.Node, depth + 1);
         }
       }
@@ -273,7 +273,7 @@ export class ASTSearcher {
     const nodeInfo = this.extractNodeInfo(node);
 
     // Check name pattern if specified
-    if (pattern.namePattern && nodeInfo.name) {
+    if (pattern.namePattern && typeof nodeInfo.name === 'string') {
       const nameMatch = nodeInfo.name
         .toLowerCase()
         .includes(pattern.namePattern.toLowerCase());
@@ -301,25 +301,27 @@ export class ASTSearcher {
   /**
    * Extract relevant information from AST node
    */
-  private extractNodeInfo(node: TSESTree.Node): Record<string, any> {
-    const info: Record<string, any> = {};
+  private extractNodeInfo(node: TSESTree.Node): Record<string, unknown> {
+    const info: Record<string, unknown> = {};
 
     switch (node.type) {
-      case 'FunctionDeclaration':
+      case 'FunctionDeclaration': {
         const funcNode = node as TSESTree.FunctionDeclaration;
         info.name = funcNode.id?.name || '<anonymous>';
         info.isAsync = funcNode.async;
         info.isGenerator = funcNode.generator;
         info.paramCount = funcNode.params.length;
         break;
+      }
 
-      case 'ClassDeclaration':
+      case 'ClassDeclaration': {
         const classNode = node as TSESTree.ClassDeclaration;
         info.name = classNode.id?.name || '<anonymous>';
         info.hasSuper = !!classNode.superClass;
         break;
+      }
 
-      case 'ImportDeclaration':
+      case 'ImportDeclaration': {
         const importNode = node as TSESTree.ImportDeclaration;
         info.source = importNode.source.value;
         info.specifiers = importNode.specifiers.map(spec => {
@@ -332,8 +334,9 @@ export class ASTSearcher {
           }
         });
         break;
+      }
 
-      case 'VariableDeclaration':
+      case 'VariableDeclaration': {
         const varNode = node as TSESTree.VariableDeclaration;
         info.kind = varNode.kind;
         info.declarations = varNode.declarations.map(decl => {
@@ -344,18 +347,21 @@ export class ASTSearcher {
           return { name: '<complex>' };
         });
         break;
+      }
 
-      case 'TSInterfaceDeclaration':
+      case 'TSInterfaceDeclaration': {
         const interfaceNode = node as TSESTree.TSInterfaceDeclaration;
         info.name = interfaceNode.id.name;
         info.hasExtends =
           interfaceNode.extends && interfaceNode.extends.length > 0;
         break;
+      }
 
-      case 'TSTypeAliasDeclaration':
+      case 'TSTypeAliasDeclaration': {
         const typeNode = node as TSESTree.TSTypeAliasDeclaration;
         info.name = typeNode.id.name;
         break;
+      }
     }
 
     return info;
@@ -366,7 +372,7 @@ export class ASTSearcher {
    */
   private extractMatchedText(
     context: string,
-    nodeInfo: Record<string, any>,
+    nodeInfo: Record<string, unknown>,
     pattern: SearchPattern
   ): string {
     // Try to extract a meaningful portion of the line

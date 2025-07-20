@@ -20,7 +20,10 @@ describe('ToolExecutor Memory Integration', () => {
 
   const sampleToolCalls: ToolCall[] = [
     { name: 'read-file', arguments: { path: '/test/file.txt' } },
-    { name: 'write-file', arguments: { path: '/test/output.txt', content: 'test' } },
+    {
+      name: 'write-file',
+      arguments: { path: '/test/output.txt', content: 'test' },
+    },
   ];
 
   const sampleMessage: Message = {
@@ -32,7 +35,6 @@ describe('ToolExecutor Memory Integration', () => {
     memoryService = new ToolMemoryService();
     mockMCPService = new MCPToolService([]);
     confirmationCallback = vi.fn();
-    
     toolExecutor = new ToolExecutor(
       mockMCPService,
       false, // verbose = false
@@ -52,14 +54,12 @@ describe('ToolExecutor Memory Integration', () => {
   describe('Memory Integration', () => {
     test('should store tool preferences via storeToolPreference method', () => {
       toolExecutor.storeToolPreference('read-file', 'allow');
-      
       expect(memoryService.getPreference('read-file')).toBe('allow');
       expect(memoryService.hasPreference('read-file')).toBe(true);
     });
 
     test('should provide access to memory service', () => {
       const retrievedMemoryService = toolExecutor.getMemoryService();
-      
       expect(retrievedMemoryService).toBe(memoryService);
     });
 
@@ -67,15 +67,26 @@ describe('ToolExecutor Memory Integration', () => {
       // Test with provided memory service
       const customMemory = new ToolMemoryService();
       customMemory.setPreference('test-tool', 'allow');
-      
-      const executorWithMemory = new ToolExecutor(mockMCPService, false, undefined, customMemory);
+
+      const executorWithMemory = new ToolExecutor(
+        mockMCPService,
+        false,
+        undefined,
+        customMemory
+      );
       expect(executorWithMemory.getMemoryService()).toBe(customMemory);
-      expect(executorWithMemory.getMemoryService().getPreference('test-tool')).toBe('allow');
+      expect(
+        executorWithMemory.getMemoryService().getPreference('test-tool')
+      ).toBe('allow');
 
       // Test without provided memory service (should create new one)
       const executorWithoutMemory = new ToolExecutor(mockMCPService, false);
-      expect(executorWithoutMemory.getMemoryService()).toBeInstanceOf(ToolMemoryService);
-      expect(executorWithoutMemory.getMemoryService().getPreference('test-tool')).toBeNull();
+      expect(executorWithoutMemory.getMemoryService()).toBeInstanceOf(
+        ToolMemoryService
+      );
+      expect(
+        executorWithoutMemory.getMemoryService().getPreference('test-tool')
+      ).toBeNull();
     });
   });
 
@@ -103,7 +114,10 @@ describe('ToolExecutor Memory Integration', () => {
 
       // Should ask for confirmation for the tool without stored preference
       expect(confirmationCallback).toHaveBeenCalledWith([
-        { name: 'write-file', arguments: { path: '/test/output.txt', content: 'test' } }
+        {
+          name: 'write-file',
+          arguments: { path: '/test/output.txt', content: 'test' },
+        },
       ]);
       expect(result.hasToolCalls).toBe(true);
       expect(result.toolResults).toHaveLength(2);
@@ -187,7 +201,10 @@ describe('ToolExecutor Memory Integration', () => {
       const result = await toolExecutor.processMessage(sampleMessage);
 
       expect(confirmationCallback).toHaveBeenCalledWith([
-        { name: 'write-file', arguments: { path: '/test/output.txt', content: 'test' } }
+        {
+          name: 'write-file',
+          arguments: { path: '/test/output.txt', content: 'test' },
+        },
       ]);
       expect(result.hasToolCalls).toBe(false);
       expect(result.toolResults).toHaveLength(0);
@@ -223,7 +240,8 @@ describe('ToolExecutor Memory Integration', () => {
         memoryService
       );
 
-      const result = await executorWithoutCallback.processMessage(sampleMessage);
+      const result =
+        await executorWithoutCallback.processMessage(sampleMessage);
 
       expect(result.hasToolCalls).toBe(true);
       expect(result.toolResults).toHaveLength(2);
@@ -240,7 +258,8 @@ describe('ToolExecutor Memory Integration', () => {
 
       memoryService.setPreference('read-file', 'reject');
 
-      const result = await executorWithoutCallback.processMessage(sampleMessage);
+      const result =
+        await executorWithoutCallback.processMessage(sampleMessage);
 
       expect(result.hasToolCalls).toBe(false);
       expect(result.toolResults).toHaveLength(0);

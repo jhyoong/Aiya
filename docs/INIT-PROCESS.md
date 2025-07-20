@@ -121,7 +121,7 @@ The system chooses between two configuration formats:
 
 ```yaml
 # Aiya Configuration File
-# Generated on: 2024-01-15
+# Generated on: 2025-07-20
 # Documentation: https://github.com/jhyoong/Aiya#configuration
 
 # Single Provider Setup
@@ -205,7 +205,7 @@ max_tokens: 4096  # Default maximum tokens for responses
 
 ```yaml
 # Aiya Configuration File
-# Generated on: 2024-01-15
+# Generated on: 2025-07-20
 # Documentation: https://github.com/jhyoong/Aiya#configuration
 
 # Multi-Provider Setup
@@ -340,7 +340,6 @@ max_tokens: 4096  # Default maximum tokens for responses
 - **Network Issues**: Graceful handling with retry options
 
 ### File System Operations
-- **Backup Creation**: Existing `.aiya.yaml` is backed up before overwrite
 - **Atomic Writes**: Configuration is written atomically to prevent corruption
 - **Permission Errors**: Clear error messages for file system issues
 

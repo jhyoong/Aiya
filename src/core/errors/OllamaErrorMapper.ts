@@ -4,40 +4,46 @@ import {
   ErrorContext,
   ProviderError,
   ProviderResult,
+  ErrorInput,
+  safeGetMessage,
 } from './BaseProviderErrorHandler.js';
 
 export class OllamaErrorMapper extends BaseProviderErrorHandler {
   /**
    * Detect Ollama-specific model not found errors
    */
-  static detectModelNotFound(error: any): boolean {
+  static detectModelNotFound(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('model') &&
-      (error.message?.includes('not found') ||
-        error.message?.includes('does not exist') ||
-        error.message?.includes('not available'))
+      (message?.includes('model') &&
+        (message?.includes('not found') ||
+          message?.includes('does not exist') ||
+          message?.includes('not available'))) ||
+      false
     );
   }
 
   /**
    * Detect Ollama-specific connection errors
    */
-  static detectConnectionError(error: any): boolean {
+  static detectConnectionError(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('ECONNREFUSED') ||
-      error.message?.includes('connection') ||
-      error.message?.includes('Connection refused') ||
-      error.message?.includes('fetch failed')
+      message?.includes('ECONNREFUSED') ||
+      message?.includes('connection') ||
+      message?.includes('Connection refused') ||
+      message?.includes('fetch failed') ||
+      false
     );
   }
 
   /**
    * Detect Ollama server not running errors
    */
-  static detectServerNotRunning(error: any): boolean {
+  static detectServerNotRunning(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('ECONNREFUSED') &&
-      error.message?.includes('11434')
+      (message?.includes('ECONNREFUSED') && message?.includes('11434')) || false
     );
   }
 
@@ -57,7 +63,7 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
           'Check if the model is spelled correctly',
         ];
 
-      case ProviderErrorType.CONNECTION_FAILED:
+      case ProviderErrorType.CONNECTION_FAILED: {
         const suggestions = [
           'Check if Ollama is running: ollama serve',
           'Verify the server URL is correct',
@@ -70,6 +76,7 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
         }
 
         return suggestions;
+      }
 
       case ProviderErrorType.TIMEOUT:
         return [
@@ -123,7 +130,10 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
   /**
    * Handle Ollama-specific error classification and response
    */
-  static handleOllamaError(error: any, context: ErrorContext): ProviderResult {
+  static handleOllamaError(
+    error: ErrorInput,
+    context: ErrorContext
+  ): ProviderResult {
     // Enhanced context with Ollama-specific information
     const ollamaContext: ErrorContext = {
       ...context,
@@ -162,7 +172,7 @@ export class OllamaErrorMapper extends BaseProviderErrorHandler {
 
     // Fall back to generic error handling
     const errorType = this.classifyError(error, ollamaContext);
-    const message = error.message || 'Unknown Ollama error occurred';
+    const message = safeGetMessage(error) || 'Unknown Ollama error occurred';
 
     return this.createOllamaError(errorType, message, ollamaContext);
   }

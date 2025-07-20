@@ -4,71 +4,87 @@ import {
   ErrorContext,
   ProviderError,
   ProviderResult,
+  ErrorInput,
+  safeGetMessage,
+  safeGetStatusCode,
 } from './BaseProviderErrorHandler.js';
 
 export class GeminiErrorMapper extends BaseProviderErrorHandler {
   /**
    * Detect Gemini-specific authentication errors
    */
-  static detectAuthenticationError(error: any, statusCode?: number): boolean {
+  static detectAuthenticationError(
+    error: ErrorInput,
+    statusCode?: number
+  ): boolean {
+    const message = safeGetMessage(error);
     return (
       statusCode === 400 ||
       statusCode === 401 ||
-      error.message?.includes('400') ||
-      error.message?.includes('401') ||
-      error.message?.includes('Invalid API key') ||
-      error.message?.includes('API key not valid') ||
-      error.message?.includes('authentication')
+      message?.includes('400') ||
+      message?.includes('401') ||
+      message?.includes('Invalid API key') ||
+      message?.includes('API key not valid') ||
+      message?.includes('authentication') ||
+      false
     );
   }
 
   /**
    * Detect Gemini-specific API disabled errors
    */
-  static detectAPIDisabledError(error: any): boolean {
+  static detectAPIDisabledError(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('API has not been used') ||
-      error.message?.includes('API is not enabled') ||
-      error.message?.includes('Generative AI API') ||
-      error.message?.includes('enable the API')
+      message?.includes('API has not been used') ||
+      message?.includes('API is not enabled') ||
+      message?.includes('Generative AI API') ||
+      message?.includes('enable the API') ||
+      false
     );
   }
 
   /**
    * Detect Gemini-specific model not found errors
    */
-  static detectModelNotFound(error: any): boolean {
+  static detectModelNotFound(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('model') &&
-      (error.message?.includes('not found') ||
-        error.message?.includes('does not exist') ||
-        error.message?.includes('not available'))
+      (message?.includes('model') &&
+        (message?.includes('not found') ||
+          message?.includes('does not exist') ||
+          message?.includes('not available'))) ||
+      false
     );
   }
 
   /**
    * Detect Gemini-specific quota/billing errors
    */
-  static detectQuotaError(error: any, statusCode?: number): boolean {
+  static detectQuotaError(error: ErrorInput, statusCode?: number): boolean {
+    const message = safeGetMessage(error);
     return (
       statusCode === 429 ||
-      error.message?.includes('429') ||
-      error.message?.includes('quota') ||
-      error.message?.includes('rate limit') ||
-      error.message?.includes('Too Many Requests')
+      message?.includes('429') ||
+      message?.includes('quota') ||
+      message?.includes('rate limit') ||
+      message?.includes('Too Many Requests') ||
+      false
     );
   }
 
   /**
    * Detect Gemini-specific content filtering errors
    */
-  static detectContentFilterError(error: any): boolean {
+  static detectContentFilterError(error: ErrorInput): boolean {
+    const message = safeGetMessage(error);
     return (
-      error.message?.includes('content') &&
-      (error.message?.includes('blocked') ||
-        error.message?.includes('filtered') ||
-        error.message?.includes('safety') ||
-        error.message?.includes('harmful'))
+      (message?.includes('content') &&
+        (message?.includes('blocked') ||
+          message?.includes('filtered') ||
+          message?.includes('safety') ||
+          message?.includes('harmful'))) ||
+      false
     );
   }
 
@@ -179,7 +195,10 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
   /**
    * Handle Gemini-specific error classification and response
    */
-  static handleGeminiError(error: any, context: ErrorContext): ProviderResult {
+  static handleGeminiError(
+    error: ErrorInput,
+    context: ErrorContext
+  ): ProviderResult {
     // Enhanced context with Gemini-specific information
     const geminiContext: ErrorContext = {
       ...context,
@@ -187,14 +206,14 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
     };
 
     // Extract status code from error if available
-    const statusCode = error.status || error.statusCode || context.statusCode;
+    const statusCode = safeGetStatusCode(error) || context.statusCode;
 
     // Gemini-specific error detection
     if (this.detectAPIDisabledError(error)) {
       return this.createGeminiError(
         ProviderErrorType.AUTHENTICATION_FAILED,
         'Gemini API is not enabled',
-        { ...geminiContext, statusCode },
+        { ...geminiContext, ...(statusCode ? { statusCode } : {}) },
         [
           'Enable Gemini API in Google Cloud Console',
           'Check if API is enabled for your project',
@@ -208,7 +227,7 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
       return this.createGeminiError(
         ProviderErrorType.AUTHENTICATION_FAILED,
         'Gemini API authentication failed',
-        { ...geminiContext, statusCode }
+        { ...geminiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -216,7 +235,7 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
       return this.createGeminiError(
         ProviderErrorType.RATE_LIMITED,
         'Gemini API quota exceeded',
-        { ...geminiContext, statusCode }
+        { ...geminiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -224,7 +243,7 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
       return this.createGeminiError(
         ProviderErrorType.MODEL_NOT_FOUND,
         `Gemini model ${context.model} not found`,
-        { ...geminiContext, statusCode }
+        { ...geminiContext, ...(statusCode ? { statusCode } : {}) }
       );
     }
 
@@ -232,7 +251,7 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
       return this.createGeminiError(
         ProviderErrorType.INVALID_REQUEST,
         'Content was blocked by Gemini safety filters',
-        { ...geminiContext, statusCode },
+        { ...geminiContext, ...(statusCode ? { statusCode } : {}) },
         [
           'Review content for harmful material',
           'Adjust safety settings if appropriate',
@@ -245,13 +264,13 @@ export class GeminiErrorMapper extends BaseProviderErrorHandler {
     // Fall back to generic error handling
     const errorType = this.classifyError(error, {
       ...geminiContext,
-      statusCode,
+      ...(statusCode ? { statusCode } : {}),
     });
-    const message = error.message || 'Unknown Gemini error occurred';
+    const message = safeGetMessage(error) || 'Unknown Gemini error occurred';
 
     return this.createGeminiError(errorType, message, {
       ...geminiContext,
-      statusCode,
+      ...(statusCode ? { statusCode } : {}),
     });
   }
 }
