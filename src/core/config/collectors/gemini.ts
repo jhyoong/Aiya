@@ -17,7 +17,8 @@ export class GeminiCollector extends BaseProviderCollector {
     // Add Gemini-specific configurations
     if (!config.gemini) {
       config.gemini = {
-        location: this.options.existingConfig?.gemini?.location || 'us-central1',
+        location:
+          this.options.existingConfig?.gemini?.location || 'us-central1',
         maxTokens: 8192,
         thinkingBudget: 20000,
         includeThoughts: true,
@@ -57,7 +58,10 @@ export class GeminiCollector extends BaseProviderCollector {
   }
 
   getDefaultConfig(): Partial<ExtendedProviderConfig> {
-    const defaultConfig = this.getDefaultConfigWithApiKey('gemini', 'GEMINI_API_KEY');
+    const defaultConfig = this.getDefaultConfigWithApiKey(
+      'gemini',
+      'GEMINI_API_KEY'
+    );
 
     return {
       ...defaultConfig,

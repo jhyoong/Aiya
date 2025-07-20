@@ -227,6 +227,8 @@ export const chatCommand = new Command('chat')
       // Check if configuration exists
       const configExists = await checkConfiguration();
       if (!configExists) {
+        hideLoader();
+        unmount();
         return; // Exit gracefully - user was prompted to run init
       }
 

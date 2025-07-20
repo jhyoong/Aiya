@@ -2,10 +2,8 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { WorkspaceSecurity } from '../security/workspace.js';
-import { TIMEOUTS } from '../config/timing-constants.js';
 
 export interface AtomicOperationOptions {
-  createBackup?: boolean;
   tempDir?: string;
   timeout?: number;
 }
@@ -13,14 +11,12 @@ export interface AtomicOperationOptions {
 export interface AtomicOperationResult {
   success: boolean;
   filePath: string;
-  backupPath: string | undefined;
   tempPath: string | undefined;
   error: string | undefined;
 }
 
 export interface RollbackInfo {
   originalPath: string;
-  backupPath: string | undefined;
   tempPath: string | undefined;
   operation: 'write' | 'edit' | 'create';
   timestamp: number;
@@ -28,10 +24,6 @@ export interface RollbackInfo {
 
 export class AtomicFileOperations {
   private security: WorkspaceSecurity;
-  private defaultOptions: AtomicOperationOptions = {
-    createBackup: true,
-    timeout: TIMEOUTS.LONG,
-  };
   private activeOperations = new Map<string, RollbackInfo>();
 
   constructor(security: WorkspaceSecurity) {
@@ -46,7 +38,8 @@ export class AtomicFileOperations {
     content: string,
     options: AtomicOperationOptions = {}
   ): Promise<AtomicOperationResult> {
-    const mergedOptions = { ...this.defaultOptions, ...options };
+    // Use options with defaults
+    const tempDir = options.tempDir;
     const operationId = randomUUID();
 
     try {
@@ -58,20 +51,14 @@ export class AtomicFileOperations {
         this.security.getRelativePathFromWorkspace(validatedPath);
 
       // Create temporary file
-      const tempPath = await this.createTempFile(validatedPath, content);
+      const tempPath = await this.createTempFile(validatedPath, content, tempDir);
 
       // Check if original file exists
       const fileExists = await this.fileExists(validatedPath);
-      let backupPath: string | undefined;
-
-      if (fileExists && mergedOptions.createBackup) {
-        backupPath = await this.createBackup(validatedPath);
-      }
 
       // Store rollback info
       const rollbackInfo: RollbackInfo = {
         originalPath: validatedPath,
-        backupPath,
         tempPath,
         operation: fileExists ? 'write' : 'create',
         timestamp: Date.now(),
@@ -90,7 +77,6 @@ export class AtomicFileOperations {
       return {
         success: true,
         filePath: relativePath,
-        backupPath: backupPath ? path.basename(backupPath) : undefined,
         tempPath: undefined, // Temp file was moved
         error: undefined,
       };
@@ -105,7 +91,6 @@ export class AtomicFileOperations {
       return {
         success: false,
         filePath: filePath,
-        backupPath: undefined,
         tempPath: undefined,
         error: `Atomic write failed: ${error}`,
       };
@@ -132,7 +117,6 @@ export class AtomicFileOperations {
         return {
           success: false,
           filePath: filePath,
-          backupPath: undefined,
           tempPath: undefined,
           error: 'Content to replace not found in file',
         };
@@ -144,7 +128,6 @@ export class AtomicFileOperations {
       return {
         success: false,
         filePath: filePath,
-        backupPath: undefined,
         tempPath: undefined,
         error: `Atomic edit failed: ${error}`,
       };
@@ -170,21 +153,16 @@ export class AtomicFileOperations {
         return {
           success: false,
           filePath: filePath,
-          backupPath: undefined,
           tempPath: undefined,
           error: 'File already exists',
         };
       }
 
-      return await this.atomicWrite(filePath, content, {
-        ...options,
-        createBackup: false,
-      });
+      return await this.atomicWrite(filePath, content, options);
     } catch (error) {
       return {
         success: false,
         filePath: filePath,
-        backupPath: undefined,
         tempPath: undefined,
         error: `Atomic create failed: ${error}`,
       };
@@ -192,9 +170,11 @@ export class AtomicFileOperations {
   }
 
   /**
-   * Rollback an operation using backup
+   * Clean up active operations for a file
    */
-  async rollback(filePath: string): Promise<AtomicOperationResult> {
+  async cleanupActiveOperations(
+    filePath: string
+  ): Promise<AtomicOperationResult> {
     try {
       const validatedPath = await this.security.validateFileAccess(
         filePath,
@@ -203,140 +183,48 @@ export class AtomicFileOperations {
       const relativePath =
         this.security.getRelativePathFromWorkspace(validatedPath);
 
-      // Find most recent backup
-      const backupPath = await this.findLatestBackup(validatedPath);
-      if (!backupPath) {
-        return {
-          success: false,
-          filePath: relativePath,
-          backupPath: undefined,
-          tempPath: undefined,
-          error: 'No backup found for rollback',
-        };
+      // Find and clean up any active operations for this file
+      let cleanedUp = false;
+      for (const [
+        operationId,
+        rollbackInfo,
+      ] of this.activeOperations.entries()) {
+        if (rollbackInfo.originalPath === validatedPath) {
+          if (rollbackInfo.tempPath) {
+            await this.safeUnlink(rollbackInfo.tempPath);
+          }
+          this.activeOperations.delete(operationId);
+          cleanedUp = true;
+        }
       }
-
-      // Restore from backup
-      await fs.copyFile(backupPath, validatedPath);
 
       return {
         success: true,
         filePath: relativePath,
-        backupPath: path.basename(backupPath),
         tempPath: undefined,
-        error: undefined,
+        error: cleanedUp ? undefined : 'No active operations found for file',
       };
     } catch (error) {
       return {
         success: false,
         filePath: filePath,
-        backupPath: undefined,
         tempPath: undefined,
-        error: `Rollback failed: ${error}`,
+        error: `Cleanup failed: ${error}`,
       };
-    }
-  }
-
-  /**
-   * Clean up old backups
-   */
-  async cleanupBackups(filePath: string, keepCount: number = 5): Promise<void> {
-    try {
-      const validatedPath = await this.security.validateFileAccess(
-        filePath,
-        'read'
-      );
-      const backupDir = path.dirname(validatedPath);
-
-      const files = await fs.readdir(backupDir);
-      const backupFiles = files
-        .filter(file =>
-          file.startsWith(path.basename(validatedPath) + '.backup.')
-        )
-        .map(file => path.join(backupDir, file));
-
-      if (backupFiles.length <= keepCount) {
-        return;
-      }
-
-      // Sort by modification time (newest first)
-      const backupStats = await Promise.all(
-        backupFiles.map(async file => ({
-          file,
-          mtime: (await fs.stat(file)).mtime,
-        }))
-      );
-
-      backupStats.sort((a, b) => b.mtime.getTime() - a.mtime.getTime());
-
-      // Remove old backups
-      const toDelete = backupStats.slice(keepCount);
-      await Promise.all(toDelete.map(({ file }) => this.safeUnlink(file)));
-    } catch (error) {
-      // Ignore cleanup errors
-    }
-  }
-
-  /**
-   * Get list of available backups for a file
-   */
-  async listBackups(
-    filePath: string
-  ): Promise<Array<{ path: string; created: Date; size: number }>> {
-    try {
-      const validatedPath = await this.security.validateFileAccess(
-        filePath,
-        'read'
-      );
-      const backupDir = path.dirname(validatedPath);
-      const baseName = path.basename(validatedPath);
-
-      const files = await fs.readdir(backupDir);
-      const backupFiles = files.filter(file =>
-        file.startsWith(baseName + '.backup.')
-      );
-
-      const backups = await Promise.all(
-        backupFiles.map(async file => {
-          const fullPath = path.join(backupDir, file);
-          const stats = await fs.stat(fullPath);
-          return {
-            path: file,
-            created: stats.mtime,
-            size: stats.size,
-          };
-        })
-      );
-
-      return backups.sort((a, b) => b.created.getTime() - a.created.getTime());
-    } catch (error) {
-      return [];
     }
   }
 
   private async createTempFile(
     targetPath: string,
-    content: string
+    content: string,
+    customTempDir?: string
   ): Promise<string> {
-    const tempDir = path.dirname(targetPath);
+    const tempDir = customTempDir || path.dirname(targetPath);
     const tempName = `.tmp_${randomUUID()}_${path.basename(targetPath)}`;
     const tempPath = path.join(tempDir, tempName);
 
     await fs.writeFile(tempPath, content, 'utf8');
     return tempPath;
-  }
-
-  private async createBackup(filePath: string): Promise<string> {
-    const timestamp = Date.now();
-    const backupPath = `${filePath}.backup.${timestamp}`;
-    await fs.copyFile(filePath, backupPath);
-    return backupPath;
-  }
-
-  private async findLatestBackup(filePath: string): Promise<string | null> {
-    const backups = await this.listBackups(filePath);
-    return backups.length > 0
-      ? path.join(path.dirname(filePath), backups[0]?.path ?? '')
-      : null;
   }
 
   private async fileExists(filePath: string): Promise<boolean> {

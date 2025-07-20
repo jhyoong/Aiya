@@ -73,7 +73,7 @@ export const FILES = {
   CONTENT_SIZE_THRESHOLD: 1024,
 } as const;
 
-// Viewport and display limits  
+// Viewport and display limits
 export const VIEWPORT = {
   /** Test viewport width options */
   TEST_WIDTHS: [40, 60, 80, 100, 120] as const,

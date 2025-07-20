@@ -4,7 +4,11 @@
 
 import { MEMORY } from '../../core/config/limits-constants.js';
 import { TIMEOUTS } from '../../core/config/timing-constants.js';
-import { UI_RATIOS, PERFORMANCE, TOKEN_THRESHOLDS } from '../../core/config/threshold-constants.js';
+import {
+  UI_RATIOS,
+  PERFORMANCE,
+  TOKEN_THRESHOLDS,
+} from '../../core/config/threshold-constants.js';
 
 // Default configuration constants - using centralized constants
 export const MEMORY_LIMITS = {
@@ -247,7 +251,9 @@ export function createCleanupFunction(
 }
 
 // Memory leak detection utility (development mode)
-export function detectMemoryLeaks(thresholdMB = PERFORMANCE.MEMORY_GROWTH_THRESHOLD): () => void {
+export function detectMemoryLeaks(
+  thresholdMB = PERFORMANCE.MEMORY_GROWTH_THRESHOLD
+): () => void {
   const initialUsage = process.memoryUsage();
   let checkCount = 0;
 

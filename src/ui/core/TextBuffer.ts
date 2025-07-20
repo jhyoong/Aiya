@@ -57,7 +57,10 @@ function stripUnsafeCharacters(str: string): string {
         return false;
       }
       const isUnsafe =
-        code === TEXT.DELETE_CHAR_CODE || (code <= TEXT.MAX_CONTROL_CHAR && code !== TEXT.CARRIAGE_RETURN && code !== TEXT.LINE_FEED);
+        code === TEXT.DELETE_CHAR_CODE ||
+        (code <= TEXT.MAX_CONTROL_CHAR &&
+          code !== TEXT.CARRIAGE_RETURN &&
+          code !== TEXT.LINE_FEED);
       return !isUnsafe;
     })
     .join('');

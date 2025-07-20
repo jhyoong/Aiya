@@ -213,7 +213,8 @@ export class TokenCounter extends EventEmitter {
       withinLimit,
       tokenCount,
       contextLimit,
-      suggestTruncation: tokenCount > contextLimit * TOKEN_THRESHOLDS.TRUNCATION_SUGGESTION,
+      suggestTruncation:
+        tokenCount > contextLimit * TOKEN_THRESHOLDS.TRUNCATION_SUGGESTION,
     };
   }
 
@@ -221,7 +222,9 @@ export class TokenCounter extends EventEmitter {
     messages: Array<{ role: string; content: string }>,
     maxTokens?: number
   ): Array<{ role: string; content: string }> {
-    const targetTokens = maxTokens || Math.floor(this.getContextLimit() * TOKEN_THRESHOLDS.TARGET_USAGE);
+    const targetTokens =
+      maxTokens ||
+      Math.floor(this.getContextLimit() * TOKEN_THRESHOLDS.TARGET_USAGE);
     const truncated = [...messages];
 
     // Always keep system message if present

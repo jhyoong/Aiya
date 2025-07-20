@@ -41,6 +41,9 @@ export interface ProviderModels {
   ollama: ModelMetadata[];
   openai: ModelMetadata[];
   gemini: ModelMetadata[];
+  anthropic: ModelMetadata[];
+  azure: ModelMetadata[];
+  bedrock: ModelMetadata[];
 }
 
 export interface ProviderRegistry {
@@ -306,11 +309,100 @@ export const GEMINI_MODELS: ModelMetadata[] = [
   },
 ];
 
+// Anthropic model definitions
+export const ANTHROPIC_MODELS: ModelMetadata[] = [
+  {
+    name: 'claude-3-5-sonnet-20241022',
+    description: 'Most intelligent model, best for complex reasoning',
+    contextLength: 200000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+    costPerToken: {
+      input: 0.003,
+      output: 0.015,
+    },
+  },
+  {
+    name: 'claude-3-5-haiku-20241022',
+    description: 'Fastest model, great for quick tasks',
+    contextLength: 200000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+    costPerToken: {
+      input: 0.001,
+      output: 0.005,
+    },
+  },
+];
+
+// Azure model definitions (same as OpenAI but deployed on Azure)
+export const AZURE_MODELS: ModelMetadata[] = [
+  {
+    name: 'gpt-4o',
+    description: 'Azure-deployed GPT-4o with enterprise features',
+    contextLength: 128000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+  },
+  {
+    name: 'gpt-4o-mini',
+    description: 'Azure-deployed GPT-4o-mini, cost-effective',
+    contextLength: 128000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+  },
+];
+
+// AWS Bedrock model definitions
+export const BEDROCK_MODELS: ModelMetadata[] = [
+  {
+    name: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+    description: 'Claude 3.5 Sonnet on AWS Bedrock',
+    contextLength: 200000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+  },
+  {
+    name: 'anthropic.claude-3-5-haiku-20241022-v1:0',
+    description: 'Claude 3.5 Haiku on AWS Bedrock',
+    contextLength: 200000,
+    capabilities: {
+      supportsFunctionCalling: true,
+      supportsVision: true,
+      supportsStreaming: true,
+      supportsThinking: false,
+    },
+  },
+];
+
 // Combined model definitions
 export const MODEL_DEFINITIONS: ProviderModels = {
   ollama: OLLAMA_MODELS,
   openai: OPENAI_MODELS,
   gemini: GEMINI_MODELS,
+  anthropic: ANTHROPIC_MODELS,
+  azure: AZURE_MODELS,
+  bedrock: BEDROCK_MODELS,
 };
 
 // Utility functions
@@ -366,6 +458,9 @@ export function getDefaultModel(providerType: keyof ProviderModels): string {
     ollama: 'qwen3:8b',
     openai: 'gpt-4o',
     gemini: 'gemini-2.0-flash-exp',
+    anthropic: 'claude-3-5-sonnet-20241022',
+    azure: 'gpt-4o',
+    bedrock: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
   };
 
   return defaults[providerType];
@@ -504,6 +599,105 @@ Troubleshooting:
 • Verify model availability in your region`,
       requiresApiKey: true,
     },
+
+    anthropic: {
+      baseUrl: 'https://api.anthropic.com',
+      model: 'claude-3-5-sonnet-20241022',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: true,
+        supportsStreaming: true,
+        supportsThinking: false,
+        maxTokens: 200000,
+      },
+      helpText: `Anthropic Configuration Help:
+
+• Model: Claude model to use (e.g., claude-3-5-sonnet-20241022)
+• API Key: Your Anthropic API key (starts with sk-ant-)
+• Base URL: API endpoint (default: https://api.anthropic.com)
+
+Prerequisites:
+1. Create Anthropic account: https://console.anthropic.com/
+2. Generate API key: https://console.anthropic.com/settings/keys
+3. Add billing method to your account
+
+Environment Variables:
+• ANTHROPIC_API_KEY: Set your API key as environment variable
+
+Popular models:
+• claude-3-5-sonnet-20241022 - Most intelligent model
+• claude-3-5-haiku-20241022 - Fastest model
+
+Troubleshooting:
+• Ensure API key is valid and starts with 'sk-ant-'
+• Check billing status in Anthropic console`,
+      requiresApiKey: true,
+      apiKeyPrefix: 'sk-ant-',
+    },
+
+    azure: {
+      model: 'gpt-4o',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: true,
+        supportsStreaming: true,
+        supportsThinking: false,
+        maxTokens: 128000,
+      },
+      helpText: `Azure OpenAI Configuration Help:
+
+• Model: Azure-deployed model (e.g., gpt-4o, gpt-4o-mini)
+• API Key: Your Azure OpenAI API key
+• Base URL: Azure OpenAI endpoint URL
+• Deployment Name: Azure deployment name for the model
+
+Prerequisites:
+1. Create Azure account: https://azure.microsoft.com/
+2. Set up Azure OpenAI service
+3. Deploy models in Azure OpenAI Studio
+
+Environment Variables:
+• AZURE_OPENAI_API_KEY: Set your API key as environment variable
+
+Troubleshooting:
+• Ensure API key and endpoint are correct
+• Verify model deployment is active
+• Check subscription quotas`,
+      requiresApiKey: true,
+    },
+
+    bedrock: {
+      model: 'anthropic.claude-3-5-sonnet-20241022-v2:0',
+      capabilities: {
+        supportsFunctionCalling: true,
+        supportsVision: true,
+        supportsStreaming: true,
+        supportsThinking: false,
+        maxTokens: 200000,
+      },
+      helpText: `AWS Bedrock Configuration Help:
+
+• Model: Bedrock model ARN (e.g., anthropic.claude-3-5-sonnet-20241022-v2:0)
+• Region: AWS region (e.g., us-east-1)
+• Access Key ID: AWS access key
+• Secret Access Key: AWS secret key
+
+Prerequisites:
+1. Create AWS account: https://aws.amazon.com/
+2. Enable Bedrock service
+3. Request model access in Bedrock console
+
+Environment Variables:
+• AWS_ACCESS_KEY_ID: AWS access key
+• AWS_SECRET_ACCESS_KEY: AWS secret key
+• AWS_REGION: AWS region
+
+Troubleshooting:
+• Ensure AWS credentials are configured
+• Verify model access is granted
+• Check region availability`,
+      requiresApiKey: true,
+    },
   };
 
 // Create the unified provider registry
@@ -519,6 +713,18 @@ export const PROVIDER_REGISTRY: ProviderRegistry = {
   gemini: {
     models: GEMINI_MODELS,
     defaults: PROVIDER_DEFAULTS.gemini,
+  },
+  anthropic: {
+    models: ANTHROPIC_MODELS,
+    defaults: PROVIDER_DEFAULTS.anthropic,
+  },
+  azure: {
+    models: AZURE_MODELS,
+    defaults: PROVIDER_DEFAULTS.azure,
+  },
+  bedrock: {
+    models: BEDROCK_MODELS,
+    defaults: PROVIDER_DEFAULTS.bedrock,
   },
 };
 

@@ -340,7 +340,6 @@ max_tokens: 4096  # Default maximum tokens for responses
 - **Network Issues**: Graceful handling with retry options
 
 ### File System Operations
-- **Backup Creation**: Existing `.aiya.yaml` is backed up before overwrite
 - **Atomic Writes**: Configuration is written atomically to prevent corruption
 - **Permission Errors**: Clear error messages for file system issues
 

@@ -1,4 +1,7 @@
 import { ExtendedProviderConfig } from '../manager.js';
+import { PROVIDER_DISPLAY_NAMES, PROVIDER_CAPABILITIES_DESCRIPTIONS } from '../constants.js';
+import { CapabilityManager } from '../CapabilityManager.js';
+import type { ProviderModels } from '../models.js';
 
 export interface ConnectionTestResult {
   success: boolean;
@@ -61,8 +64,6 @@ export abstract class BaseProviderCollector {
    * Get provider display name
    */
   getDisplayName(): string {
-    // Import moved to avoid circular dependency
-    const { PROVIDER_DISPLAY_NAMES } = require('../constants.js');
     return PROVIDER_DISPLAY_NAMES[this.providerType] || this.providerType;
   }
 
@@ -70,8 +71,6 @@ export abstract class BaseProviderCollector {
    * Get provider capabilities description
    */
   getCapabilitiesDescription(): string {
-    // Import moved to avoid circular dependency
-    const { PROVIDER_CAPABILITIES_DESCRIPTIONS } = require('../constants.js');
     return (
       PROVIDER_CAPABILITIES_DESCRIPTIONS[this.providerType] ||
       'Provider-specific capabilities'
@@ -92,8 +91,7 @@ export abstract class BaseProviderCollector {
       ...(apiKey && { apiKey }),
     };
 
-    const { CapabilityManager } = require('../CapabilityManager.js');
-    return CapabilityManager.getDefaultConfig(providerType, existingConfig);
+    return CapabilityManager.getDefaultConfig(providerType as keyof ProviderModels, existingConfig);
   }
 
   /**
@@ -112,7 +110,9 @@ export abstract class BaseProviderCollector {
    */
   protected async testConnectionWithValidation(
     config: ExtendedProviderConfig,
-    testMethod: (config: ExtendedProviderConfig) => Promise<ConnectionTestResult>,
+    testMethod: (
+      config: ExtendedProviderConfig
+    ) => Promise<ConnectionTestResult>,
     errorSuggestions: string[] = ['Check configuration']
   ): Promise<ConnectionTestResult> {
     if (!this.options.skipValidation) {
@@ -136,9 +136,8 @@ export abstract class BaseProviderCollector {
     providerType: string,
     config: Partial<ExtendedProviderConfig>
   ): Promise<string[]> {
-    const { CapabilityManager } = require('../CapabilityManager.js');
     return await CapabilityManager.getAvailableModelsWithFetching(
-      providerType,
+      providerType as keyof ProviderModels,
       config
     );
   }
@@ -151,8 +150,7 @@ export abstract class BaseProviderCollector {
     envVarName: string
   ): Partial<ExtendedProviderConfig> {
     const apiKey = process.env[envVarName];
-    const { CapabilityManager } = require('../CapabilityManager.js');
-    const defaultConfig = CapabilityManager.getDefaultConfig(providerType);
+    const defaultConfig = CapabilityManager.getDefaultConfig(providerType as keyof ProviderModels);
 
     return {
       ...defaultConfig,

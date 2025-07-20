@@ -658,18 +658,15 @@ export class FilesystemMCPClient extends MCPClient {
         }
       }
 
-      let backupPath: string | null = null;
       let originalContent: string | null = null;
 
-      // For overwrite mode: Create backup of existing file
+      // For rollback purposes, read original content if overwriting
       if (mode === 'overwrite' && fileExists) {
         try {
           originalContent = await fs.readFile(validatedPath, 'utf8');
-          backupPath = `${validatedPath}.backup.${Date.now()}`;
-          await fs.copyFile(validatedPath, backupPath);
         } catch (error) {
-          // Continue without backup if backup creation fails
-          backupPath = null;
+          // Continue without original content if read fails
+          originalContent = null;
         }
       }
 
@@ -756,12 +753,6 @@ export class FilesystemMCPClient extends MCPClient {
                 metadata: {
                   size: stats.size,
                   lastModified: stats.mtime,
-                  backup: backupPath
-                    ? {
-                        path: backupPath,
-                        created: true,
-                      }
-                    : null,
                 },
               },
               null,
@@ -830,9 +821,7 @@ export class FilesystemMCPClient extends MCPClient {
       const originalContent = await fs.readFile(validatedPath, 'utf8');
       let currentContent = originalContent;
 
-      // Create file backup and state snapshot
-      const backupPath = `${validatedPath}.backup.${Date.now()}`;
-      await fs.copyFile(validatedPath, backupPath);
+      // Store original content for rollback purposes
 
       const appliedEdits: string[] = [];
 
@@ -959,10 +948,6 @@ export class FilesystemMCPClient extends MCPClient {
                   originalSize: Buffer.byteLength(originalContent, 'utf8'),
                   newSize: stats.size,
                   lastModified: stats.mtime,
-                  backup: {
-                    path: backupPath,
-                    created: true,
-                  },
                 },
               },
               null,

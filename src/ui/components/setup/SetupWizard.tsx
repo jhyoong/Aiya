@@ -218,17 +218,7 @@ export const SetupWizard: React.FC<SetupWizardProps> = ({
 
     const configPath = path.join(projectPath, '.aiya.yaml');
 
-    // Check if config exists and create backup
-    try {
-      await fs.access(configPath);
-      const backupPath = path.join(
-        projectPath,
-        configGenerator.generateBackupFilename()
-      );
-      await fs.copyFile(configPath, backupPath);
-    } catch {
-      // File doesn't exist, no backup needed
-    }
+    // Configuration will overwrite existing file if present
 
     // Generate and save new configuration
     const yamlContent = configGenerator.generateYAML(session);

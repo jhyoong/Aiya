@@ -385,12 +385,4 @@ export class ConfigurationGenerator {
 
     return preview;
   }
-
-  /**
-   * Generate backup filename for existing config
-   */
-  generateBackupFilename(): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    return `.aiya.yaml.backup.${timestamp}`;
-  }
 }

@@ -46,7 +46,8 @@ function parseSearchArgs(args: string[]): {
             break;
           case 'maxResults':
             if (nextArg && !nextArg.startsWith('--')) {
-              options.maxResults = parseInt(nextArg, 10) || SEARCH.DEFAULT_MAX_RESULTS;
+              options.maxResults =
+                parseInt(nextArg, 10) || SEARCH.DEFAULT_MAX_RESULTS;
               i++; // Skip next arg as it's the value
             }
             break;

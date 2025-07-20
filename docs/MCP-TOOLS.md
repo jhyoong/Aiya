@@ -171,7 +171,6 @@ The primary MCP client implementation providing comprehensive file system operat
 
 **Features**:
 - **Atomic Operations**: Temp file + rename for consistency
-- **Backup Creation**: Automatic backup before overwriting
 - **Mode Support**: Overwrite, create-only, and append modes
 - **Directory Creation**: Optional parent directory creation
 - **Rollback Support**: Reversible operations with state tracking
@@ -179,7 +178,6 @@ The primary MCP client implementation providing comprehensive file system operat
 **Safety Measures**:
 - Disk space validation
 - Permission checking
-- Backup creation before overwriting
 - Atomic write operations
 - Rollback capability
 
@@ -213,7 +211,6 @@ The primary MCP client implementation providing comprehensive file system operat
 - **Position-based Editing**: Line and column positioning
 - **Sequential Processing**: Edits applied in order
 - **Rollback Support**: Full operation rollback on failure
-- **Backup Creation**: Automatic backup before editing
 
 **Edit Operation Details**:
 
@@ -630,7 +627,6 @@ Both filesystem and shell tools are available to all AI providers through the st
 
 #### Error Recovery
 - **Automatic Rollback**: Failed operations trigger rollback
-- **Backup Restoration**: Restore from backups on failure
 - **Graceful Degradation**: Partial failures don't break entire operation
 - **User Feedback**: Clear error messages with suggestions
 

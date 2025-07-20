@@ -254,7 +254,10 @@ export class CommandUtils {
 
       // Levenshtein distance for typo detection
       const distance = this.levenshteinDistance(inputLower, commandLower);
-      if (distance <= CONTENT.EDIT_DISTANCE_THRESHOLD && command.length > CONTENT.MIN_STRING_LENGTH) {
+      if (
+        distance <= CONTENT.EDIT_DISTANCE_THRESHOLD &&
+        command.length > CONTENT.MIN_STRING_LENGTH
+      ) {
         suggestions.push(command);
       }
     }

@@ -44,7 +44,7 @@ export class ConnectionTester {
       () => controller.abort(),
       ConnectionTester.TIMEOUT_MS
     );
-    
+
     return {
       controller,
       cleanup: () => clearTimeout(timeoutId),
@@ -79,8 +79,12 @@ export class ConnectionTester {
     endpoint: string
   ): ProviderResult | null {
     if (!config.apiKey) {
-      const context = ConnectionTester.createErrorContext(provider, config, endpoint);
-      
+      const context = ConnectionTester.createErrorContext(
+        provider,
+        config,
+        endpoint
+      );
+
       switch (provider) {
         case 'openai':
           return OpenAIErrorMapper.createOpenAIError(
@@ -149,7 +153,11 @@ export class ConnectionTester {
     config: ExtendedProviderConfig,
     endpoint: string
   ): ProviderResult {
-    const context = ConnectionTester.createErrorContext(provider, config, endpoint);
+    const context = ConnectionTester.createErrorContext(
+      provider,
+      config,
+      endpoint
+    );
     const message = `Model ${config.model} not found`;
 
     switch (provider) {
@@ -187,8 +195,9 @@ export class ConnectionTester {
     config: ExtendedProviderConfig
   ): Promise<ConnectionTestResult> {
     try {
-      const { controller, cleanup } = ConnectionTester.createTimeoutController();
-      
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
+
       const response = await fetch(`${config.baseUrl}/api/tags`, {
         signal: controller.signal,
       });
@@ -240,14 +249,19 @@ export class ConnectionTester {
   ): Promise<ConnectionTestResult> {
     try {
       const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
-      
+
       // Validate API key
-      const apiKeyError = ConnectionTester.validateApiKey(config, 'openai', baseUrl);
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'openai',
+        baseUrl
+      );
       if (apiKeyError) {
         return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      const { controller, cleanup } = ConnectionTester.createTimeoutController();
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
       const response = await fetch(`${baseUrl}/models`, {
         headers: {
@@ -304,21 +318,23 @@ export class ConnectionTester {
   ): Promise<ConnectionTestResult> {
     try {
       const endpoint = 'https://generativelanguage.googleapis.com/v1';
-      
+
       // Validate API key
-      const apiKeyError = ConnectionTester.validateApiKey(config, 'gemini', endpoint);
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'gemini',
+        endpoint
+      );
       if (apiKeyError) {
         return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      const { controller, cleanup } = ConnectionTester.createTimeoutController();
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
-      const response = await fetch(
-        `${endpoint}/models?key=${config.apiKey}`,
-        {
-          signal: controller.signal,
-        }
-      );
+      const response = await fetch(`${endpoint}/models?key=${config.apiKey}`, {
+        signal: controller.signal,
+      });
 
       cleanup();
 
@@ -357,7 +373,11 @@ export class ConnectionTester {
 
       return { success: true };
     } catch (error: unknown) {
-      const context = ConnectionTester.createErrorContext('gemini', config, 'https://generativelanguage.googleapis.com/v1');
+      const context = ConnectionTester.createErrorContext(
+        'gemini',
+        config,
+        'https://generativelanguage.googleapis.com/v1'
+      );
       const result = GeminiErrorMapper.handleGeminiError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }
@@ -371,14 +391,19 @@ export class ConnectionTester {
   ): Promise<ConnectionTestResult> {
     try {
       const endpoint = 'https://api.anthropic.com/v1';
-      
+
       // Validate API key
-      const apiKeyError = ConnectionTester.validateApiKey(config, 'anthropic', endpoint);
+      const apiKeyError = ConnectionTester.validateApiKey(
+        config,
+        'anthropic',
+        endpoint
+      );
       if (apiKeyError) {
         return ConnectionTester.convertToConnectionTestResult(apiKeyError);
       }
 
-      const { controller, cleanup } = ConnectionTester.createTimeoutController();
+      const { controller, cleanup } =
+        ConnectionTester.createTimeoutController();
 
       const response = await fetch(`${endpoint}/messages`, {
         method: 'POST',
@@ -426,7 +451,11 @@ export class ConnectionTester {
 
       return { success: true };
     } catch (error: unknown) {
-      const context = ConnectionTester.createErrorContext('anthropic', config, 'https://api.anthropic.com/v1');
+      const context = ConnectionTester.createErrorContext(
+        'anthropic',
+        config,
+        'https://api.anthropic.com/v1'
+      );
       const result = BaseProviderErrorHandler.standardizeError(error, context);
       return ConnectionTester.convertToConnectionTestResult(result);
     }
