@@ -6,6 +6,7 @@ import { ProviderFactory } from '../../core/providers/factory.js';
 import { WorkspaceSecurity } from '../../core/security/workspace.js';
 import { FilesystemMCPClient } from '../../core/mcp/filesystem.js';
 import { ShellMCPClient } from '../../core/mcp/shell.js';
+import { TodoMCPAdapter } from '../../core/mcp/todo-adapter.js';
 import {
   requiresApproval,
   extractCommandName,
@@ -271,6 +272,10 @@ export const chatCommand = new Command('chat')
       await shellClient.connect();
       showLoader('Shell MCP client connected successfully');
 
+      const todoClient = new TodoMCPAdapter();
+      await todoClient.connect();
+      showLoader('Todo MCP client connected successfully');
+
       // Verify connection
       showLoader('Verifying provider health...');
       if (!(await provider.isHealthy())) {
@@ -280,7 +285,7 @@ export const chatCommand = new Command('chat')
       showLoader('Provider health check passed');
 
       // Initialize MCP tool service
-      const toolService = new MCPToolService([mcpClient, shellClient]);
+      const toolService = new MCPToolService([mcpClient, shellClient, todoClient]);
       await toolService.initialize();
       showLoader('MCP tool service initialized');
 

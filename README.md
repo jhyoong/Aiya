@@ -2,11 +2,7 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
-<<<<<<< HEAD
-**Version 1.4.2** - Refactoring and documentation update.
-=======
-**Version 1.4.1** - Added user confirmation check before executing tools.
->>>>>>> main
+**Version 1.5.0** - Todo management integration with MCP tools.
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -191,8 +187,15 @@ Aiya includes a built-in Model Context Protocol (MCP) tool system that enables f
 #### Shell Operations
 - **RunCommand**: Execute bash commands with timeout protection and secure output capture
 
+#### Todo Management
+- **CreateTodo**: Create new todo tasks with titles and descriptions
+- **ListTodos**: List todos with filtering by completion status and pagination
+- **GetTodo**: Retrieve specific todo by ID
+- **UpdateTodo**: Update todo titles and completion status
+- **DeleteTodo**: Remove todos by ID
+
 ### Tool Usage
-The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, batch processing for complex file manipulation tasks, and shell command execution for development workflows.
+The AI model can automatically call these tools when needed during chat sessions. Tools are invoked using JSON function calls and provide secure, workspace-restricted file access. Advanced tools support features like atomic operations, regex patterns, batch processing for complex file manipulation tasks, shell command execution for development workflows, and persistent todo management for task tracking.
 
 ## Basic Security
 
@@ -230,6 +233,7 @@ npm run format:check      # Check code formatting
 
 ## Changelog
 
+- **Version 1.5.0** - Todo management integration with MCP tools.
 - **Version 1.4.2** - Refactoring and documentation update.
 - **Version 1.4.1** - Added user confirmation check before executing tools.
 - **Version 1.4.0** - Added shell command execution capabilities to the MCP tools.
