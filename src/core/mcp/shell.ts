@@ -131,7 +131,6 @@ export class ShellMCPClient extends MCPClient {
       });
 
       const duration = Date.now() - startTime;
-
       // Log successful command execution
       this.shellLogger.logShellCommand(
         command,

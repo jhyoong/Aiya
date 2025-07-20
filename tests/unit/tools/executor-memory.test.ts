@@ -35,7 +35,6 @@ describe('ToolExecutor Memory Integration', () => {
     memoryService = new ToolMemoryService();
     mockMCPService = new MCPToolService([]);
     confirmationCallback = vi.fn();
-
     toolExecutor = new ToolExecutor(
       mockMCPService,
       false, // verbose = false
@@ -55,14 +54,12 @@ describe('ToolExecutor Memory Integration', () => {
   describe('Memory Integration', () => {
     test('should store tool preferences via storeToolPreference method', () => {
       toolExecutor.storeToolPreference('read-file', 'allow');
-
       expect(memoryService.getPreference('read-file')).toBe('allow');
       expect(memoryService.hasPreference('read-file')).toBe(true);
     });
 
     test('should provide access to memory service', () => {
       const retrievedMemoryService = toolExecutor.getMemoryService();
-
       expect(retrievedMemoryService).toBe(memoryService);
     });
 

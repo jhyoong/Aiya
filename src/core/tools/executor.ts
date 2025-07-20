@@ -135,7 +135,6 @@ export class ToolExecutor {
       const startTime = Date.now();
       const result = await this.mcpService.executeTool(toolCall);
       const duration = Date.now() - startTime;
-
       // Log tool execution
       this.toolLogger.logToolExecution(
         toolCall.name,

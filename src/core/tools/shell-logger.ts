@@ -115,7 +115,6 @@ export class ShellLogger extends ToolLogger {
 
   private truncateOutput(output?: string): string | undefined {
     if (!output) return output;
-
     // Truncate very long output to avoid massive log files
     if (output.length > 1000) {
       return output.substring(0, 1000) + '...[truncated]';

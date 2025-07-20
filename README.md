@@ -2,7 +2,11 @@
 
 Artificial Intelligence: Your Assistant (AIYA). A modern(?) terminal tool for AI-assisted development with multi-provider support.
 
+<<<<<<< HEAD
 **Version 1.4.2** - Refactoring and documentation update.
+=======
+**Version 1.4.1** - Added user confirmation check before executing tools.
+>>>>>>> main
 
 [![npm version](https://badge.fury.io/js/aiya-cli.svg)](https://badge.fury.io/js/aiya-cli)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
