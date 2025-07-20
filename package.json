@@ -1,6 +1,6 @@
 {
   "name": "aiya-cli",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "Simple terminal tool for custom model endpoints",
   "keywords": [
     "ai",
