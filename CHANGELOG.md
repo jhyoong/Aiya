@@ -5,19 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2025-07-21
+
+### Added
+- **Enhanced Todo Management**: Upgraded aiya-todo-mcp integration to v0.2.1
+  - **8 comprehensive todo tools**: `todo_CreateTodo`, `todo_ListTodos`, `todo_GetTodo`, `todo_UpdateTodo`, `todo_DeleteTodo`, `todo_SetVerificationMethod`, `todo_UpdateVerificationStatus`, `todo_GetTodosNeedingVerification`
+  - **Rich metadata support**: descriptions, tags, group IDs for enhanced organization
+  - **Verification workflow system**: complete task verification with methods, status tracking, and notes
+  - **Enhanced CRUD operations**: comprehensive task management within AI conversations
+
+### Technical Details
+- Upgraded TodoMCPAdapter to support all v0.2.1 features
+- Enhanced data model with verification fields and metadata
+- Comprehensive parameter validation for all new todo features
+- Backward-compatible implementation ensuring seamless integration
+
 ## [1.5.0] - 2025-07-20
 
 ### Added
 - **Todo Management Integration**: Complete integration with aiya-todo-mcp package
-  - Added 5 new todo management tools: `todo_CreateTodo`, `todo_ListTodos`, `todo_GetTodo`, `todo_UpdateTodo`, `todo_DeleteTodo`
+  - Initial todo management tools implementation
   - Seamless todo persistence with JSON-based storage
-  - Full CRUD operations for task management within AI conversations
   - Adapter pattern implementation for compatibility with Aiya's MCP architecture
 
 ### Technical Details
 - Added `TodoMCPAdapter` class extending Aiya's `MCPClient` interface
-- Integrated aiya-todo-mcp v0.1.1
-- Comprehensive validation and error handling for todo operations
 - Tool prefixing system ensures no conflicts with existing filesystem and shell tools
 - Added to MCPToolService registration for unified tool access
 

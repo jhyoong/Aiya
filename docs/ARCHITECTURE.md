@@ -29,7 +29,8 @@ Aiya is a modern terminal-based CLI tool for AI-assisted development built with 
 │  (Configuration)    (Factory)           (AI Models)        │
 │                                                             │
 │  MCPToolService ← → FilesystemMCPClient ← → Security       │
-│  (Tool Service)     (File Operations)        (Validation)  │
+│  (Tool Service)     (File & Todo Operations)  (Validation)  │
+│                     ShellMCPClient, TodoMCPAdapter          │
 └─────────────────────────────────────────────────────────────┘
                               │
 ┌─────────────────────────────────────────────────────────────┐
@@ -141,6 +142,15 @@ src/
   - Provide comprehensive logging and memory tracking
 - **Pattern**: Command Pattern + Observer Pattern
 
+#### TodoMCPAdapter - Todo Management
+- **Purpose**: Provide comprehensive todo management through MCP integration
+- **Responsibilities**:
+  - Implement 8 todo management tools (CreateTodo, ListTodos, GetTodo, UpdateTodo, DeleteTodo, SetVerificationMethod, UpdateVerificationStatus, GetTodosNeedingVerification)
+  - Support rich metadata (descriptions, tags, groups, verification)
+  - Provide JSON-based persistence with sequential ID management
+  - Enable verification workflows for task completion tracking
+- **Pattern**: Adapter Pattern + Command Pattern
+
 #### WorkspaceSecurity - Security Layer
 - **Purpose**: Ensure secure file operations within workspace boundaries
 - **Responsibilities**:
@@ -193,11 +203,11 @@ src/
 3. Commands execute with proper context and error handling
 4. Results flow back through UI components
 
-### File Operations Flow
-1. Commands request file operations → `MCPToolService`
-2. `MCPToolService` → `FilesystemMCPClient`
-3. `FilesystemMCPClient` validates through `WorkspaceSecurity`
-4. Operations execute with atomic guarantees and rollback support
+### Tool Operations Flow
+1. Commands request tool operations → `MCPToolService`
+2. `MCPToolService` routes to appropriate client (`FilesystemMCPClient`, `ShellMCPClient`, or `TodoMCPAdapter`)
+3. File operations validated through `WorkspaceSecurity`; shell operations through approval system
+4. Operations execute with appropriate guarantees (atomic operations, rollback, logging)
 
 ### UI Update Flow
 1. State changes trigger React re-renders

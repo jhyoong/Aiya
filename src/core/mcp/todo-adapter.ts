@@ -70,6 +70,34 @@ interface GetTodosNeedingVerificationParams {
   groupId?: string;
 }
 
+interface CreateTaskGroupParams {
+  mainTask: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    verificationMethod?: string;
+  };
+  subtasks?: Array<{
+    title: string;
+    description?: string;
+    tags?: string[];
+    dependencies?: number[];
+    verificationMethod?: string;
+  }>;
+  groupId?: string;
+}
+
+interface GetExecutableTasksParams {
+  groupId?: string;
+  limit?: number;
+}
+
+interface UpdateExecutionStatusParams {
+  taskId: string;
+  status: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
+  error?: string;
+}
+
 /**
  * TodoMCPAdapter - Adapter for aiya-todo-mcp package
  *
@@ -312,6 +340,120 @@ export class TodoMCPAdapter extends MCPClient {
           required: [],
         },
       },
+      {
+        name: 'CreateTaskGroup',
+        description: 'Create coordinated task workflows with dependencies',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            mainTask: {
+              type: 'object',
+              properties: {
+                title: {
+                  type: 'string',
+                  description: 'The title of the main task',
+                },
+                description: {
+                  type: 'string',
+                  description: 'Optional description for the main task',
+                },
+                tags: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'Optional tags for the main task',
+                },
+                verificationMethod: {
+                  type: 'string',
+                  description: 'Optional verification method for the main task',
+                },
+              },
+              required: ['title'],
+              description: 'The main task definition',
+            },
+            subtasks: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  title: {
+                    type: 'string',
+                    description: 'The title of the subtask',
+                  },
+                  description: {
+                    type: 'string',
+                    description: 'Optional description for the subtask',
+                  },
+                  tags: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Optional tags for the subtask',
+                  },
+                  dependencies: {
+                    type: 'array',
+                    items: { type: 'number' },
+                    description:
+                      'Array of subtask indices this task depends on',
+                  },
+                  verificationMethod: {
+                    type: 'string',
+                    description: 'Optional verification method for the subtask',
+                  },
+                },
+                required: ['title'],
+              },
+              description: 'Optional array of subtasks with dependencies',
+            },
+            groupId: {
+              type: 'string',
+              description:
+                'Optional group ID for organizing related task groups',
+            },
+          },
+          required: ['mainTask'],
+        },
+      },
+      {
+        name: 'GetExecutableTasks',
+        description: 'Find tasks ready for execution based on dependencies',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            groupId: {
+              type: 'string',
+              description: 'Optional group ID to filter tasks',
+            },
+            limit: {
+              type: 'number',
+              description: 'Maximum number of tasks to return',
+              default: 10,
+            },
+          },
+          required: [],
+        },
+      },
+      {
+        name: 'UpdateExecutionStatus',
+        description: 'Manage execution states with validation',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            taskId: {
+              type: 'string',
+              description: 'The ID of the task to update',
+            },
+            status: {
+              type: 'string',
+              enum: ['pending', 'ready', 'running', 'completed', 'failed'],
+              description: 'The execution status to set',
+            },
+            error: {
+              type: 'string',
+              description: 'Optional error message if status is failed',
+            },
+          },
+          required: ['taskId', 'status'],
+        },
+      },
     ];
   }
 
@@ -346,6 +488,18 @@ export class TodoMCPAdapter extends MCPClient {
         case 'GetTodosNeedingVerification':
           return await this.getTodosNeedingVerification(
             this.validateGetTodosNeedingVerificationParams(args)
+          );
+        case 'CreateTaskGroup':
+          return await this.createTaskGroup(
+            this.validateCreateTaskGroupParams(args)
+          );
+        case 'GetExecutableTasks':
+          return await this.getExecutableTasks(
+            this.validateGetExecutableTasksParams(args)
+          );
+        case 'UpdateExecutionStatus':
+          return await this.updateExecutionStatus(
+            this.validateUpdateExecutionStatusParams(args)
           );
         default:
           throw new MCPToolError(name, `Unknown tool: ${name}`);
@@ -590,6 +744,186 @@ export class TodoMCPAdapter extends MCPClient {
         throw new Error('GroupId must be a string');
       }
       params.groupId = args.groupId;
+    }
+
+    return params;
+  }
+
+  private validateCreateTaskGroupParams(
+    args: Record<string, unknown>
+  ): CreateTaskGroupParams {
+    if (!args.mainTask || typeof args.mainTask !== 'object') {
+      throw new Error('MainTask is required and must be an object');
+    }
+    const mainTask = args.mainTask as Record<string, unknown>;
+    if (!mainTask.title || typeof mainTask.title !== 'string') {
+      throw new Error('MainTask.title is required and must be a string');
+    }
+
+    const params: CreateTaskGroupParams = {
+      mainTask: { title: mainTask.title },
+    };
+
+    if (mainTask.description !== undefined) {
+      if (typeof mainTask.description !== 'string') {
+        throw new Error('MainTask.description must be a string');
+      }
+      params.mainTask.description = mainTask.description;
+    }
+
+    if (mainTask.tags !== undefined) {
+      if (
+        !Array.isArray(mainTask.tags) ||
+        !mainTask.tags.every(tag => typeof tag === 'string')
+      ) {
+        throw new Error('MainTask.tags must be an array of strings');
+      }
+      params.mainTask.tags = mainTask.tags;
+    }
+
+    if (mainTask.verificationMethod !== undefined) {
+      if (typeof mainTask.verificationMethod !== 'string') {
+        throw new Error('MainTask.verificationMethod must be a string');
+      }
+      params.mainTask.verificationMethod = mainTask.verificationMethod;
+    }
+
+    if (args.subtasks !== undefined) {
+      if (!Array.isArray(args.subtasks)) {
+        throw new Error('Subtasks must be an array');
+      }
+      params.subtasks = [];
+      for (const [index, subtask] of args.subtasks.entries()) {
+        if (typeof subtask !== 'object' || !subtask) {
+          throw new Error(`Subtask[${index}] must be an object`);
+        }
+        const sub = subtask as Record<string, unknown>;
+        if (!sub.title || typeof sub.title !== 'string') {
+          throw new Error(
+            `Subtask[${index}].title is required and must be a string`
+          );
+        }
+
+        const validatedSubtask: {
+          title: string;
+          description?: string;
+          tags?: string[];
+          dependencies?: number[];
+          verificationMethod?: string;
+        } = {
+          title: sub.title,
+        };
+
+        if (sub.description !== undefined) {
+          if (typeof sub.description !== 'string') {
+            throw new Error(`Subtask[${index}].description must be a string`);
+          }
+          validatedSubtask.description = sub.description;
+        }
+
+        if (sub.tags !== undefined) {
+          if (
+            !Array.isArray(sub.tags) ||
+            !sub.tags.every(tag => typeof tag === 'string')
+          ) {
+            throw new Error(
+              `Subtask[${index}].tags must be an array of strings`
+            );
+          }
+          validatedSubtask.tags = sub.tags;
+        }
+
+        if (sub.dependencies !== undefined) {
+          if (
+            !Array.isArray(sub.dependencies) ||
+            !sub.dependencies.every(dep => typeof dep === 'number')
+          ) {
+            throw new Error(
+              `Subtask[${index}].dependencies must be an array of numbers`
+            );
+          }
+          validatedSubtask.dependencies = sub.dependencies;
+        }
+
+        if (sub.verificationMethod !== undefined) {
+          if (typeof sub.verificationMethod !== 'string') {
+            throw new Error(
+              `Subtask[${index}].verificationMethod must be a string`
+            );
+          }
+          validatedSubtask.verificationMethod = sub.verificationMethod;
+        }
+
+        params.subtasks.push(validatedSubtask);
+      }
+    }
+
+    if (args.groupId !== undefined) {
+      if (typeof args.groupId !== 'string') {
+        throw new Error('GroupId must be a string');
+      }
+      params.groupId = args.groupId;
+    }
+
+    return params;
+  }
+
+  private validateGetExecutableTasksParams(
+    args: Record<string, unknown>
+  ): GetExecutableTasksParams {
+    const params: GetExecutableTasksParams = {};
+
+    if (args.groupId !== undefined) {
+      if (typeof args.groupId !== 'string') {
+        throw new Error('GroupId must be a string');
+      }
+      params.groupId = args.groupId;
+    }
+
+    if (args.limit !== undefined) {
+      if (typeof args.limit !== 'number') {
+        throw new Error('Limit must be a number');
+      }
+      params.limit = args.limit;
+    }
+
+    return params;
+  }
+
+  private validateUpdateExecutionStatusParams(
+    args: Record<string, unknown>
+  ): UpdateExecutionStatusParams {
+    if (!args.taskId || typeof args.taskId !== 'string') {
+      throw new Error('TaskId is required and must be a string');
+    }
+
+    if (
+      !args.status ||
+      typeof args.status !== 'string' ||
+      !['pending', 'ready', 'running', 'completed', 'failed'].includes(
+        args.status
+      )
+    ) {
+      throw new Error(
+        'Status is required and must be one of: pending, ready, running, completed, failed'
+      );
+    }
+
+    const params: UpdateExecutionStatusParams = {
+      taskId: args.taskId,
+      status: args.status as
+        | 'pending'
+        | 'ready'
+        | 'running'
+        | 'completed'
+        | 'failed',
+    };
+
+    if (args.error !== undefined) {
+      if (typeof args.error !== 'string') {
+        throw new Error('Error must be a string');
+      }
+      params.error = args.error;
     }
 
     return params;
@@ -866,6 +1200,174 @@ export class TodoMCPAdapter extends MCPClient {
           {
             type: 'text',
             text: `Error getting todos needing verification: ${error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async createTaskGroup(
+    params: CreateTaskGroupParams
+  ): Promise<ToolResult> {
+    try {
+      const results = [];
+
+      // Create the main task
+      const mainTaskRequest: CreateTodoRequest = {
+        title: params.mainTask.title,
+      };
+      if (params.mainTask.description)
+        mainTaskRequest.description = params.mainTask.description;
+      if (params.mainTask.tags) mainTaskRequest.tags = params.mainTask.tags;
+      if (params.mainTask.verificationMethod)
+        mainTaskRequest.verificationMethod = params.mainTask.verificationMethod;
+      if (params.groupId) mainTaskRequest.groupId = params.groupId;
+
+      const mainTask = await this.todoManager.createTodo(mainTaskRequest);
+      results.push({ type: 'main', task: mainTask });
+
+      // Create subtasks if provided
+      if (params.subtasks) {
+        const createdSubtasks: { id: string }[] = []; // Track created subtasks for dependency resolution
+
+        for (const [index, subtask] of params.subtasks.entries()) {
+          const subtaskRequest: CreateTodoRequest = {
+            title: subtask.title,
+            executionOrder: index + 1,
+          };
+          if (subtask.description)
+            subtaskRequest.description = subtask.description;
+          if (subtask.tags) subtaskRequest.tags = subtask.tags;
+          if (subtask.verificationMethod)
+            subtaskRequest.verificationMethod = subtask.verificationMethod;
+          if (params.groupId) subtaskRequest.groupId = params.groupId;
+
+          // Handle dependencies - convert numeric indices to actual task IDs
+          if (subtask.dependencies && subtask.dependencies.length > 0) {
+            const dependencies = subtask.dependencies.map(depIndex => {
+              if (depIndex === -1) return mainTask.id; // -1 refers to main task
+              // Use actual task ID from previously created subtasks
+              if (
+                depIndex < createdSubtasks.length &&
+                createdSubtasks[depIndex]
+              ) {
+                return createdSubtasks[depIndex].id;
+              }
+              throw new Error(
+                `Invalid dependency index ${depIndex}: task not yet created`
+              );
+            });
+            subtaskRequest.dependencies = dependencies;
+          }
+
+          const createdSubtask =
+            await this.todoManager.createTodo(subtaskRequest);
+          createdSubtasks.push(createdSubtask);
+          results.push({ type: 'subtask', index, task: createdSubtask });
+        }
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                groupId: params.groupId,
+                mainTask: mainTask,
+                subtasks: results
+                  .filter(r => r.type === 'subtask')
+                  .map(r => r.task),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error creating task group: ${error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async getExecutableTasks(
+    params: GetExecutableTasksParams
+  ): Promise<ToolResult> {
+    try {
+      let result = this.todoManager.getReadyTasks(params.groupId);
+
+      // Apply limit if specified
+      if (params.limit !== undefined) {
+        result = result.slice(0, params.limit);
+      }
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error getting executable tasks: ${error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async updateExecutionStatus(
+    params: UpdateExecutionStatusParams
+  ): Promise<ToolResult> {
+    try {
+      const request: UpdateTodoRequest = {
+        id: params.taskId,
+        executionStatus: {
+          state: params.status,
+        },
+      };
+
+      if (params.error !== undefined) {
+        if (!request.executionStatus) {
+          request.executionStatus = { state: params.status };
+        }
+        request.executionStatus.lastError = params.error;
+      }
+
+      const result = await this.todoManager.updateTodo(request);
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error updating execution status: ${error}`,
           },
         ],
         isError: true,
