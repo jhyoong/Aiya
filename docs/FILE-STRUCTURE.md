@@ -107,6 +107,7 @@ src/core/mcp/
 ├── filesystem-state.ts        # State tracking and rollback system
 ├── shell.ts                   # Shell command execution MCP client
 ├── shell-constants.ts         # Shell command approval configuration
+├── todo-adapter.ts            # Todo management MCP client with 8 todo tools
 ├── fuzzy-matcher.ts           # Fuzzy search implementation
 ├── ast-searcher.ts            # AST-based code search
 ├── IMPLEMENTATION_PLAN.md     # MCP implementation planning
@@ -118,6 +119,7 @@ src/core/mcp/
 
 - **`filesystem.ts`**: Primary MCP client with ReadFile, WriteFile, EditFile, SearchFiles, ListDirectory tools
 - **`shell.ts`**: Shell command execution MCP client with RunCommand tool and security integration
+- **`todo-adapter.ts`**: Todo management MCP client with 8 comprehensive todo tools including verification workflow
 - **`shell-constants.ts`**: Configuration for shell command approval requirements and dangerous command lists
 - **`fuzzy-matcher.ts`**: Fuse.js-based fuzzy matching with confidence scoring
 - **`filesystem-state.ts`**: Change tracking and rollback capabilities for file operations
@@ -271,7 +273,8 @@ tests/
 │   │   └── gemini.test.ts         # Gemini provider tests
 │   ├── mcp/                # MCP tool tests
 │   │   ├── fuzzy-matcher.test.ts  # Fuzzy search tests
-│   │   └── ast-searcher.test.ts   # AST search tests
+│   │   ├── ast-searcher.test.ts   # AST search tests
+│   │   └── todo-adapter.test.ts   # Todo management tests
 │   └── ui/                 # UI component tests
 │       ├── text-processing.test.ts  # Text processing tests
 │       └── visual-layout.test.ts    # Visual layout tests
@@ -358,6 +361,7 @@ memory/
 ### MCP Tool System
 - **`src/core/mcp/filesystem.ts`**: Core file operations with security validation
 - **`src/core/mcp/shell.ts`**: Shell command execution with approval workflow and logging
+- **`src/core/mcp/todo-adapter.ts`**: Comprehensive todo management with 8 tools and verification workflow
 - **`src/core/mcp/shell-constants.ts`**: Shell command security configuration and dangerous command definitions
 - **`src/core/mcp/fuzzy-matcher.ts`**: Advanced fuzzy search with confidence scoring
 - **`src/core/security/workspace.ts`**: Workspace boundary enforcement
@@ -396,7 +400,7 @@ memory/
 4. Add tests in `tests/unit/providers/`
 
 **Adding a New MCP Tool**:
-1. Add tool schema to appropriate MCP client (`src/core/mcp/filesystem.ts` or `src/core/mcp/shell.ts`)
+1. Add tool schema to appropriate MCP client (`src/core/mcp/filesystem.ts`, `src/core/mcp/shell.ts`, or `src/core/mcp/todo-adapter.ts`)
 2. Implement tool logic in the same file
 3. Add security validation and approval workflow if needed
 4. Add logging integration for audit trails

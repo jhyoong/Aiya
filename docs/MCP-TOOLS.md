@@ -456,21 +456,27 @@ The todo MCP client implementation provides comprehensive todo management capabi
 
 **Architecture Pattern**: The client follows an **Adapter Pattern** where the `TodoMCPAdapter` wraps the external `aiya-todo-mcp` package to work seamlessly with Aiya's custom MCP architecture.
 
-#### Five Todo Management Tools
+#### Eleven Todo Management Tools
 
 ### 1. CreateTodo Tool
 
-**Purpose**: Create new todo tasks with titles
+**Purpose**: Create new todo tasks with comprehensive metadata
 
 **Parameters**:
 ```typescript
 {
   title: string;
+  description?: string;
+  tags?: string[];
+  groupId?: string;
+  verificationMethod?: string;
 }
 ```
 
 **Features**:
 - **Title Validation**: Ensures non-empty titles
+- **Rich Metadata**: Support for descriptions, tags, and grouping
+- **Verification Integration**: Optional verification method assignment
 - **Automatic ID Generation**: Sequential ID assignment
 - **Timestamp Creation**: Automatic createdAt timestamp
 - **Persistence**: Immediate save to JSON file
@@ -507,23 +513,31 @@ The todo MCP client implementation provides comprehensive todo management capabi
 **Features**:
 - **ID Validation**: Ensures valid todo ID
 - **Not Found Handling**: Clear error messages for missing todos
-- **Complete Todo Data**: Returns all todo properties
+- **Complete Todo Data**: Returns all todo properties including metadata
 
 ### 4. UpdateTodo Tool
 
-**Purpose**: Update existing todo tasks (title and completion status)
+**Purpose**: Update existing todo tasks with comprehensive field support
 
 **Parameters**:
 ```typescript
 {
   id: string;
   title?: string;
+  description?: string;
   completed?: boolean;
+  tags?: string[];
+  groupId?: string;
+  verificationMethod?: string;
+  verificationStatus?: 'pending' | 'verified' | 'failed';
+  verificationNotes?: string;
 }
 ```
 
 **Features**:
+- **Comprehensive Updates**: Update any todo field including metadata
 - **Partial Updates**: Update only specified fields
+- **Verification Management**: Update verification status and notes
 - **Title Validation**: Ensures non-empty titles when updating
 - **Completion Toggle**: Easy task completion management
 - **Atomic Operations**: Consistent state updates
@@ -544,6 +558,134 @@ The todo MCP client implementation provides comprehensive todo management capabi
 - **Confirmation Response**: Clear success/failure messages
 - **Persistent Deletion**: Immediate removal from storage
 
+### 6. SetVerificationMethod Tool
+
+**Purpose**: Set or update verification method for a todo task
+
+**Parameters**:
+```typescript
+{
+  todoId: string;
+  method: string;
+  notes?: string;
+}
+```
+
+**Features**:
+- **Method Assignment**: Set verification method for todo completion
+- **Optional Notes**: Add notes about the verification method
+- **ID Validation**: Ensures valid todo ID
+- **Atomic Operations**: Consistent state updates
+
+### 7. UpdateVerificationStatus Tool
+
+**Purpose**: Update verification status of a todo task
+
+**Parameters**:
+```typescript
+{
+  todoId: string;
+  status: 'pending' | 'verified' | 'failed';
+  notes?: string;
+}
+```
+
+**Features**:
+- **Status Management**: Update verification status (pending, verified, failed)
+- **Status Notes**: Add notes about verification results
+- **Validation**: Ensures valid status values
+- **Audit Trail**: Track verification progress
+
+### 8. GetTodosNeedingVerification Tool
+
+**Purpose**: Retrieve todos that require verification
+
+**Parameters**:
+```typescript
+{
+  groupId?: string;
+}
+```
+
+**Features**:
+- **Verification Filtering**: Find todos that need verification
+- **Group Filtering**: Optional filtering by group ID
+- **Workflow Support**: Enable verification workflows
+- **Batch Operations**: Process multiple todos requiring verification
+
+### 9. CreateTaskGroup Tool
+
+**Purpose**: Create coordinated task workflows with dependencies
+
+**Parameters**:
+```typescript
+{
+  mainTask: {
+    title: string;
+    description?: string;
+    tags?: string[];
+    verificationMethod?: string;
+  };
+  subtasks?: Array<{
+    title: string;
+    description?: string;
+    tags?: string[];
+    dependencies?: number[];
+    verificationMethod?: string;
+  }>;
+  groupId?: string;
+}
+```
+
+**Features**:
+- **Task Hierarchies**: Create main task with dependent subtasks
+- **Dependency Management**: Define task execution order through dependencies
+- **Group Organization**: Optional group ID for organizing related task workflows
+- **Rich Metadata**: Support for descriptions, tags, and verification methods on all tasks
+- **Flexible Structure**: Main task with optional array of subtasks
+- **Dependency Validation**: Ensures dependency indices are valid
+
+### 10. GetExecutableTasks Tool
+
+**Purpose**: Find tasks ready for execution based on dependencies
+
+**Parameters**:
+```typescript
+{
+  groupId?: string;
+  limit?: number;
+}
+```
+
+**Features**:
+- **Dependency Resolution**: Returns only tasks whose dependencies are completed
+- **Group Filtering**: Optional filtering by group ID to focus on specific workflows
+- **Result Limiting**: Configurable maximum number of tasks to return
+- **Execution Readiness**: Identifies tasks that can be executed immediately
+- **Workflow Coordination**: Enables sequential execution of dependent tasks
+
+### 11. UpdateExecutionStatus Tool
+
+**Purpose**: Manage execution states with validation
+
+**Parameters**:
+```typescript
+{
+  taskId: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'blocked';
+  error?: string;
+  result?: string;
+}
+```
+
+**Features**:
+- **State Management**: Track execution progress through defined states
+- **Status Validation**: Ensures only valid execution states are set
+- **Error Tracking**: Optional error message for failed executions
+- **Result Capture**: Optional result data for completed executions
+- **State Transitions**: Enables proper workflow state management
+- **Audit Trail**: Track execution progress and outcomes
+
 #### Todo Persistence
 
 **Storage Format**:
@@ -553,8 +695,15 @@ The todo MCP client implementation provides comprehensive todo management capabi
     {
       "id": "1",
       "title": "Example Todo",
+      "description": "A detailed description of the todo task",
       "completed": false,
-      "createdAt": "2025-07-20T12:00:00.000Z"
+      "tags": ["work", "urgent"],
+      "groupId": "project-alpha",
+      "verificationMethod": "automated-test",
+      "verificationStatus": "pending",
+      "verificationNotes": "Waiting for CI pipeline completion",
+      "createdAt": "2025-07-20T12:00:00.000Z",
+      "updatedAt": "2025-07-20T12:30:00.000Z"
     }
   ],
   "nextId": 2
@@ -564,7 +713,9 @@ The todo MCP client implementation provides comprehensive todo management capabi
 **Key Features**:
 - **JSON File Storage**: Persistent storage in `todos.json`
 - **Sequential IDs**: Automatic ID generation and management
-- **ISO Timestamps**: Standardized date formats
+- **ISO Timestamps**: Standardized date formats (createdAt, updatedAt)
+- **Rich Metadata**: Support for descriptions, tags, and grouping
+- **Verification System**: Complete verification workflow tracking
 
 #### Integration Benefits
 
@@ -744,7 +895,7 @@ Both filesystem and shell tools are available to all AI providers through the st
 **Tool Registration**:
 - Filesystem tools: `filesystem_ReadFile`, `filesystem_WriteFile`, `filesystem_EditFile`, `filesystem_SearchFiles`, `filesystem_ListDirectory`
 - Shell tools: `shell_RunCommand`
-- Todo tools: `todo_CreateTodo`, `todo_ListTodos`, `todo_GetTodo`, `todo_UpdateTodo`, `todo_DeleteTodo`
+- Todo tools: `todo_CreateTodo`, `todo_ListTodos`, `todo_GetTodo`, `todo_UpdateTodo`, `todo_DeleteTodo`, `todo_SetVerificationMethod`, `todo_UpdateVerificationStatus`, `todo_GetTodosNeedingVerification`, `todo_CreateTaskGroup`, `todo_GetExecutableTasks`, `todo_UpdateExecutionStatus`
 
 **Tool Call Flow**:
 1. **Provider Request**: AI provider requests tool execution
