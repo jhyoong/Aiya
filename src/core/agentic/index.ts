@@ -1,9 +1,7 @@
 export { AgenticOrchestrator } from './AgenticOrchestrator.js';
 export type {
   TaskPlan,
-  ExecutableTask,
   TaskDefinition,
-  AgenticProgress,
 } from './AgenticOrchestrator.js';
 
 export { TaskTemplates } from './TaskTemplates.js';
@@ -16,3 +14,8 @@ export type {
 } from './AgenticErrorHandler.js';
 
 export { AgenticService } from './AgenticService.js';
+
+export { AGENTIC_TOOLS, AGENTIC_SYSTEM_PROMPT } from './AgenticTools.js';
+export type { AgenticTaskDefinition } from './AgenticTools.js';
+
+export { AgenticToolHandler } from './AgenticToolHandler.js';

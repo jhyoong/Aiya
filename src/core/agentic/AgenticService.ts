@@ -4,8 +4,6 @@ import { TaskTemplates } from './TaskTemplates.js';
 import { AgenticErrorHandler } from './AgenticErrorHandler.js';
 import type {
   TaskPlan,
-  ExecutableTask,
-  AgenticProgress,
 } from './AgenticOrchestrator.js';
 import type { RecoveryStrategy } from './AgenticErrorHandler.js';
 
@@ -101,7 +99,7 @@ export class AgenticService {
   /**
    * Get the next task ready for execution
    */
-  async getNextTask(groupId: string): Promise<ExecutableTask | null> {
+  async getNextTask(groupId: string): Promise<any | null> {
     return await this.orchestrator.getNextExecutableTask(groupId);
   }
 
@@ -143,7 +141,7 @@ export class AgenticService {
   /**
    * Get execution progress for a group
    */
-  async getProgress(groupId: string): Promise<AgenticProgress> {
+  async getProgress(groupId: string): Promise<any> {
     return await this.orchestrator.getProgress(groupId);
   }
 

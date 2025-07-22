@@ -146,8 +146,10 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
         id: 'task-1',
         title: 'Ready Task',
         description: 'Task ready for execution',
-        tool: 'filesystem',
-        toolArgs: { action: 'create' },
+        executionConfig: {
+          requiredTool: 'filesystem',
+          toolArgs: { action: 'create' },
+        },
       });
     });
 
@@ -259,7 +261,7 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
         mainTask: {
           id: 'main-1',
           title: 'Main Task',
-          completed: true,
+          executionStatus: { state: 'completed' },
         },
         statistics: {
           total: 5,
@@ -269,13 +271,12 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
           completed: 2,
           failed: 0,
         },
-        completionPercentage: 40,
         isComplete: false,
         hasFailures: false,
       });
     });
 
-    it('should calculate completion percentage correctly', async () => {
+    it('should calculate completion metrics correctly', async () => {
       const mockResult = {
         content: [
           {
@@ -299,8 +300,11 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
 
       const result = await orchestrator.getProgress('test-group');
 
-      expect(result.completionPercentage).toBe(100);
+      expect(result.statistics.completed).toBe(4);
+      expect(result.statistics.total).toBe(4);
+      expect(result.statistics.failed).toBe(0);
       expect(result.isComplete).toBe(true);
+      expect(result.hasFailures).toBe(false);
     });
   });
 
@@ -355,9 +359,12 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
         content: [
           {
             text: JSON.stringify({
-              groupId: 'test-group',
+              groupId: 'agentic-test-uuid-123',
               mainTask: { id: 'main-1', title: 'Test Objective' },
-              subtasks: [{ id: 'sub-1', title: 'Task 1' }],
+              subtasks: [
+                { id: 'sub-1', title: 'Task 1' },
+                { id: 'sub-2', title: 'Task 2' },
+              ],
             }),
           },
         ],
@@ -416,7 +423,11 @@ describe('AgenticOrchestrator TodoMCPAdapter Integration', () => {
         groupId: 'agentic-test-uuid-123',
       });
 
-      expect(result.groupId).toBe('test-group');
+      expect(result).toEqual({
+        groupId: 'agentic-test-uuid-123',
+        taskCount: 3, // 2 subtasks + 1 main task
+        mainTaskId: 'main-1',
+      });
     });
   });
 

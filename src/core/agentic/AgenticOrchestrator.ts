@@ -8,13 +8,6 @@ export interface TaskPlan {
   mainTaskId: string;
 }
 
-export interface ExecutableTask {
-  id: string;
-  title: string;
-  description?: string;
-  tool?: string;
-  toolArgs?: Record<string, unknown>;
-}
 
 export interface TaskDefinition {
   title: string;
@@ -24,25 +17,6 @@ export interface TaskDefinition {
   dependencyIndices: number[];
 }
 
-export interface AgenticProgress {
-  groupId: string;
-  mainTask: {
-    id: string;
-    title: string;
-    completed: boolean;
-  };
-  statistics: {
-    total: number;
-    pending: number;
-    ready: number;
-    running: number;
-    completed: number;
-    failed: number;
-  };
-  completionPercentage: number;
-  isComplete: boolean;
-  hasFailures: boolean;
-}
 
 /**
  * AgenticOrchestrator - The bridge between LLM objectives and TodoMCPAdapter task management
@@ -123,9 +97,9 @@ export class AgenticOrchestrator {
 
   /**
    * Gets next task from todo system that's ready to execute
-   * Uses GetExecutableTasks to find tasks with resolved dependencies
+   * Returns raw todo object for maximum flexibility
    */
-  async getNextExecutableTask(groupId: string): Promise<ExecutableTask | null> {
+  async getNextExecutableTask(groupId: string): Promise<any | null> {
     try {
       const result = await this.todoAdapter.callTool('GetExecutableTasks', {
         groupId,
@@ -138,14 +112,7 @@ export class AgenticOrchestrator {
         return null; // No tasks ready for execution
       }
 
-      const todo = executableTasks[0];
-      return {
-        id: todo.id,
-        title: todo.title,
-        description: todo.description,
-        tool: todo.executionConfig?.requiredTool,
-        toolArgs: todo.executionConfig?.toolArgs,
-      };
+      return executableTasks[0];
     } catch (error) {
       if (error instanceof MCPToolError) {
         throw new Error(`Failed to get next executable task: ${error.message}`);
@@ -181,10 +148,10 @@ export class AgenticOrchestrator {
   }
 
   /**
-   * Gets comprehensive progress information for a task group
-   * Uses GetTaskGroupStatus to provide detailed progress metrics
+   * Gets task group status with essential calculated fields
+   * Returns todo system data enhanced with completion metrics
    */
-  async getProgress(groupId: string): Promise<AgenticProgress> {
+  async getProgress(groupId: string): Promise<any> {
     try {
       const result = await this.todoAdapter.callTool('GetTaskGroupStatus', {
         groupId,
@@ -192,14 +159,7 @@ export class AgenticOrchestrator {
 
       const statusData = JSON.parse(result.content[0]?.text || '{}');
 
-      const completionPercentage =
-        statusData.statistics.total > 0
-          ? Math.round(
-              (statusData.statistics.completed / statusData.statistics.total) *
-                100
-            )
-          : 0;
-
+      // Add essential calculated fields that consumers need for decision-making
       const isComplete =
         statusData.statistics.completed === statusData.statistics.total &&
         statusData.statistics.total > 0;
@@ -207,15 +167,7 @@ export class AgenticOrchestrator {
       const hasFailures = statusData.statistics.failed > 0;
 
       return {
-        groupId,
-        mainTask: {
-          id: statusData.mainTask?.id || '',
-          title: statusData.mainTask?.title || 'Unknown',
-          completed:
-            statusData.mainTask?.executionStatus?.state === 'completed',
-        },
-        statistics: statusData.statistics,
-        completionPercentage,
+        ...statusData,
         isComplete,
         hasFailures,
       };

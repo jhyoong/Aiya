@@ -8,6 +8,8 @@ import { ToolArguments } from '../../types/ProviderTypes.js';
 import { JsonValue } from '../../types/UtilityTypes.js';
 import { TodoMCPAdapter } from '../mcp/todo-adapter.js';
 import { AgenticService } from '../agentic/index.js';
+import { AGENTIC_TOOLS } from '../agentic/AgenticTools.js';
+import { AgenticToolHandler } from '../agentic/AgenticToolHandler.js';
 
 /**
  * JSON Schema property definition for tool parameters
@@ -40,15 +42,17 @@ export interface LLMTool {
 }
 
 /**
- * Service for managing MCP tools and making them available to LLMs
+ * Service for managing MCP tools and agentic tools, making them available to LLMs
  */
 export class MCPToolService {
   private clients: MCPClient[] = [];
   private availableTools: Map<string, { client: MCPClient; tool: MCPTool }> =
     new Map();
+  private agenticHandler: AgenticToolHandler | undefined;
 
-  constructor(clients: MCPClient[]) {
+  constructor(clients: MCPClient[], agenticHandler?: AgenticToolHandler | undefined) {
     this.clients = clients;
+    this.agenticHandler = agenticHandler;
   }
 
   /**
@@ -78,11 +82,12 @@ export class MCPToolService {
   }
 
   /**
-   * Get tool definitions formatted for LLM consumption
+   * Get tool definitions formatted for LLM consumption (includes both MCP and agentic tools)
    */
   getToolDefinitions(): LLMTool[] {
     const tools: LLMTool[] = [];
 
+    // Add MCP tools
     for (const [toolName, { tool }] of this.availableTools) {
       tools.push({
         name: toolName,
@@ -98,13 +103,24 @@ export class MCPToolService {
       });
     }
 
+    // Add agentic tools if handler is available
+    if (this.agenticHandler) {
+      tools.push(...AGENTIC_TOOLS);
+    }
+
     return tools;
   }
 
   /**
-   * Execute a tool call from the LLM
+   * Execute a tool call from the LLM (handles both MCP and agentic tools)
    */
   async executeTool(toolCall: ToolCall): Promise<ToolResult> {
+    // Check if this is an agentic tool call
+    if (this.agenticHandler && AgenticToolHandler.isAgenticTool(toolCall.name)) {
+      return await this.agenticHandler.handleToolCall(toolCall);
+    }
+
+    // Handle MCP tool call
     const toolInfo = this.availableTools.get(toolCall.name);
     if (!toolInfo) {
       return {
@@ -239,10 +255,15 @@ export class MCPToolService {
   }
 
   /**
-   * Get available tool names
+   * Get available tool names (includes both MCP and agentic tools)
    */
   getAvailableToolNames(): string[] {
-    return Array.from(this.availableTools.keys());
+    const mcpToolNames = Array.from(this.availableTools.keys());
+    const agenticToolNames = this.agenticHandler 
+      ? AgenticToolHandler.getSupportedTools()
+      : [];
+    
+    return [...mcpToolNames, ...agenticToolNames];
   }
 
   private formatMCPResult(mcpResult: MCPToolResult): string {
@@ -262,7 +283,7 @@ export class MCPToolService {
   }
 
   private generateCallId(): string {
-    return `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `call_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
   }
 }
 
@@ -277,4 +298,31 @@ export async function createAgenticService(): Promise<AgenticService> {
   await agenticService.initialize();
 
   return agenticService;
+}
+
+/**
+ * Factory function to create an AgenticToolHandler with a connected TodoMCPAdapter
+ */
+export async function createAgenticToolHandler(): Promise<AgenticToolHandler> {
+  const todoAdapter = new TodoMCPAdapter();
+  await todoAdapter.connect();
+
+  const agenticService = new AgenticService(todoAdapter);
+  await agenticService.initialize();
+
+  // Get the orchestrator from the service and create the tool handler
+  const orchestrator = agenticService.getOrchestrator();
+  return new AgenticToolHandler(orchestrator);
+}
+
+/**
+ * Factory function to create a complete MCPToolService with agentic tools enabled
+ */
+export async function createMCPToolServiceWithAgentic(
+  clients: MCPClient[] = []
+): Promise<MCPToolService> {
+  const agenticHandler = await createAgenticToolHandler();
+  const toolService = new MCPToolService(clients, agenticHandler);
+  await toolService.initialize();
+  return toolService;
 }

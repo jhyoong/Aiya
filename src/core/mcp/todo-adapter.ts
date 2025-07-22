@@ -556,7 +556,7 @@ export class TodoMCPAdapter extends MCPClient {
           throw new MCPToolError(name, `Unknown tool: ${name}`);
       }
     } catch (error) {
-      throw new MCPToolError(name, `Tool execution failed: ${error}`);
+      throw new MCPToolError(name, `validation error: ${(error as Error).message}`);
     }
   }
 
@@ -1402,15 +1402,7 @@ export class TodoMCPAdapter extends MCPClient {
         isError: false,
       };
     } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error getting executable tasks: ${error}`,
-          },
-        ],
-        isError: true,
-      };
+      throw new Error(`Error getting executable tasks: ${error}`);
     }
   }
 
@@ -1459,165 +1451,125 @@ export class TodoMCPAdapter extends MCPClient {
   private async getTaskGroupStatus(
     params: GetTaskGroupStatusParams
   ): Promise<ToolResult> {
-    try {
-      // Get all todos in the group
-      const allTodos = this.todoManager.getAllTodos();
-      const groupTodos = allTodos.filter(
-        todo => todo.groupId === params.groupId
-      );
+    // Get all todos in the group
+    const allTodos = this.todoManager.getAllTodos();
+    const groupTodos = allTodos.filter(
+      todo => todo.groupId === params.groupId
+    );
 
-      if (groupTodos.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `No tasks found for group ID '${params.groupId}'`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      // Find main task (the one without dependencies or with executionOrder 0)
-      const mainTask =
-        groupTodos.find(
-          todo =>
-            !todo.dependencies ||
-            todo.dependencies.length === 0 ||
-            todo.executionOrder === 0
-        ) || null;
-
-      // Calculate statistics
-      const stats = {
-        total: groupTodos.length,
-        pending: groupTodos.filter(
-          todo =>
-            todo.executionStatus?.state === 'pending' || !todo.executionStatus
-        ).length,
-        ready: groupTodos.filter(
-          todo => todo.executionStatus?.state === 'ready'
-        ).length,
-        running: groupTodos.filter(
-          todo => todo.executionStatus?.state === 'running'
-        ).length,
-        completed: groupTodos.filter(
-          todo => todo.executionStatus?.state === 'completed'
-        ).length,
-        failed: groupTodos.filter(
-          todo => todo.executionStatus?.state === 'failed'
-        ).length,
-      };
-
-      const result = {
-        groupId: params.groupId,
-        mainTask: mainTask,
-        statistics: stats,
-        tasks: groupTodos.sort(
-          (a, b) => (a.executionOrder || 0) - (b.executionOrder || 0)
-        ),
-      };
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-        isError: false,
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error getting task group status: ${error}`,
-          },
-        ],
-        isError: true,
-      };
+    if (groupTodos.length === 0) {
+      throw new Error(`No tasks found for group ID: ${params.groupId}`);
     }
+
+    // Find main task (the one without dependencies or with executionOrder 0)
+    const mainTask =
+      groupTodos.find(
+        todo =>
+          !todo.dependencies ||
+          todo.dependencies.length === 0 ||
+          todo.executionOrder === 0
+      ) || null;
+
+    // Calculate statistics
+    const stats = {
+      total: groupTodos.length,
+      pending: groupTodos.filter(
+        todo =>
+          todo.executionStatus?.state === 'pending' || !todo.executionStatus
+      ).length,
+      ready: groupTodos.filter(
+        todo => todo.executionStatus?.state === 'ready'
+      ).length,
+      running: groupTodos.filter(
+        todo => todo.executionStatus?.state === 'running'
+      ).length,
+      completed: groupTodos.filter(
+        todo => todo.executionStatus?.state === 'completed'
+      ).length,
+      failed: groupTodos.filter(
+        todo => todo.executionStatus?.state === 'failed'
+      ).length,
+    };
+
+    const result = {
+      groupId: params.groupId,
+      mainTask: mainTask,
+      statistics: stats,
+      tasks: groupTodos.sort(
+        (a, b) => (a.executionOrder || 0) - (b.executionOrder || 0)
+      ),
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+      isError: false,
+    };
   }
 
   private async resetTaskExecution(
     params: ResetTaskExecutionParams
   ): Promise<ToolResult> {
-    try {
-      // Get the task to reset
-      const todo = this.todoManager.getTodo(params.todoId);
-      if (!todo) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `Todo with id '${params.todoId}' not found`,
-            },
-          ],
-          isError: true,
-        };
-      }
-
-      const resetTasks: Todo[] = [];
-
-      // Reset the specified task
-      const resetRequest: UpdateTodoRequest = {
-        id: params.todoId,
-        executionStatus: {
-          state: 'pending',
-          attempts: 0,
-        },
-      };
-
-      const resetTask = await this.todoManager.updateTodo(resetRequest);
-      resetTasks.push(resetTask);
-
-      // If resetDependents is true, reset all tasks that depend on this one
-      if (params.resetDependents) {
-        const allTodos = this.todoManager.getAllTodos();
-        const dependentTasks = allTodos.filter(
-          t => t.dependencies && t.dependencies.includes(params.todoId)
-        );
-
-        for (const dependent of dependentTasks) {
-          const dependentResetRequest: UpdateTodoRequest = {
-            id: dependent.id,
-            executionStatus: {
-              state: 'pending',
-              attempts: 0,
-            },
-          };
-          const resetDependent = await this.todoManager.updateTodo(
-            dependentResetRequest
-          );
-          resetTasks.push(resetDependent);
-        }
-      }
-
-      const result = {
-        resetTasks: resetTasks,
-        message: `Reset ${resetTasks.length} task(s)`,
-      };
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(result, null, 2),
-          },
-        ],
-        isError: false,
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error resetting task execution: ${error}`,
-          },
-        ],
-        isError: true,
-      };
+    // Get the task to reset
+    const todo = this.todoManager.getTodo(params.todoId);
+    if (!todo) {
+      throw new Error(`Todo with id ${params.todoId} not found`);
     }
+
+    const resetTasks: Todo[] = [];
+
+    // Reset the specified task
+    const resetRequest: UpdateTodoRequest = {
+      id: params.todoId,
+      executionStatus: {
+        state: 'pending',
+        attempts: 0,
+      },
+    };
+
+    const resetTask = await this.todoManager.updateTodo(resetRequest);
+    resetTasks.push(resetTask);
+
+    // If resetDependents is true, reset all tasks that depend on this one
+    if (params.resetDependents) {
+      const allTodos = this.todoManager.getAllTodos();
+      const dependentTasks = allTodos.filter(
+        t => t.dependencies && t.dependencies.includes(params.todoId)
+      );
+
+      for (const dependent of dependentTasks) {
+        const dependentResetRequest: UpdateTodoRequest = {
+          id: dependent.id,
+          executionStatus: {
+            state: 'pending',
+            attempts: 0,
+          },
+        };
+        const resetDependent = await this.todoManager.updateTodo(
+          dependentResetRequest
+        );
+        resetTasks.push(resetDependent);
+      }
+    }
+
+    const result = {
+      resetTasks: resetTasks,
+      message: `Reset ${resetTasks.length} task(s)`,
+    };
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+      isError: false,
+    };
   }
 
   // Getter for todo manager access (following shell client pattern)

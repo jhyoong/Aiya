@@ -190,29 +190,29 @@ describe('TodoMCPAdapter', () => {
     it('should validate CreateTodo parameters correctly', async () => {
       // Test missing title
       await expect(adapter.callTool('CreateTodo', {})).rejects.toThrow(
-        'Title is required and must be a string'
+        "Tool 'CreateTodo' error: validation error: Title is required and must be a string"
       );
 
       // Test invalid title type
       await expect(
         adapter.callTool('CreateTodo', { title: 123 })
-      ).rejects.toThrow('Title is required and must be a string');
+      ).rejects.toThrow("Tool 'CreateTodo' error: validation error: Title is required and must be a string");
 
       // Test invalid tags type
       await expect(
         adapter.callTool('CreateTodo', { title: 'Test', tags: 'not-array' })
-      ).rejects.toThrow('Tags must be an array of strings');
+      ).rejects.toThrow("Tool 'CreateTodo' error: validation error: Tags must be an array of strings");
 
       // Test invalid tags content
       await expect(
         adapter.callTool('CreateTodo', { title: 'Test', tags: [123] })
-      ).rejects.toThrow('Tags must be an array of strings');
+      ).rejects.toThrow("Tool 'CreateTodo' error: validation error: Tags must be an array of strings");
     });
 
     it('should validate UpdateTodo parameters correctly', async () => {
       // Test missing id
       await expect(adapter.callTool('UpdateTodo', {})).rejects.toThrow(
-        'ID is required and must be a string'
+        "Tool 'UpdateTodo' error: validation error: ID is required and must be a string"
       );
 
       // Test invalid verificationStatus
@@ -222,7 +222,7 @@ describe('TodoMCPAdapter', () => {
           verificationStatus: 'invalid-status',
         })
       ).rejects.toThrow(
-        'VerificationStatus must be one of: pending, verified, failed'
+        "Tool 'UpdateTodo' error: validation error: VerificationStatus must be one of: pending, verified, failed"
       );
     });
 
@@ -230,19 +230,19 @@ describe('TodoMCPAdapter', () => {
       // Test missing todoId
       await expect(
         adapter.callTool('SetVerificationMethod', { method: 'test' })
-      ).rejects.toThrow('TodoId is required and must be a string');
+      ).rejects.toThrow("Tool 'SetVerificationMethod' error: validation error: TodoId is required and must be a string");
 
       // Test missing method
       await expect(
         adapter.callTool('SetVerificationMethod', { todoId: 'test-id' })
-      ).rejects.toThrow('Method is required and must be a string');
+      ).rejects.toThrow("Tool 'SetVerificationMethod' error: validation error: Method is required and must be a string");
     });
 
     it('should validate UpdateVerificationStatus parameters correctly', async () => {
       // Test missing todoId
       await expect(
         adapter.callTool('UpdateVerificationStatus', { status: 'pending' })
-      ).rejects.toThrow('TodoId is required and must be a string');
+      ).rejects.toThrow("Tool 'UpdateVerificationStatus' error: validation error: TodoId is required and must be a string");
 
       // Test invalid status
       await expect(
@@ -251,32 +251,32 @@ describe('TodoMCPAdapter', () => {
           status: 'invalid',
         })
       ).rejects.toThrow(
-        'Status is required and must be one of: pending, verified, failed'
+        "Tool 'UpdateVerificationStatus' error: validation error: Status is required and must be one of: pending, verified, failed"
       );
     });
 
     it('should validate GetTaskGroupStatus parameters correctly', async () => {
       // Test missing groupId
       await expect(adapter.callTool('GetTaskGroupStatus', {})).rejects.toThrow(
-        'GroupId is required and must be a string'
+        "Tool 'GetTaskGroupStatus' error: validation error: GroupId is required and must be a string"
       );
 
       // Test invalid groupId type
       await expect(
         adapter.callTool('GetTaskGroupStatus', { groupId: 123 })
-      ).rejects.toThrow('GroupId is required and must be a string');
+      ).rejects.toThrow("Tool 'GetTaskGroupStatus' error: validation error: GroupId is required and must be a string");
     });
 
     it('should validate ResetTaskExecution parameters correctly', async () => {
       // Test missing todoId
       await expect(adapter.callTool('ResetTaskExecution', {})).rejects.toThrow(
-        'TodoId is required and must be a string'
+        "Tool 'ResetTaskExecution' error: validation error: TodoId is required and must be a string"
       );
 
       // Test invalid todoId type
       await expect(
         adapter.callTool('ResetTaskExecution', { todoId: 123 })
-      ).rejects.toThrow('TodoId is required and must be a string');
+      ).rejects.toThrow("Tool 'ResetTaskExecution' error: validation error: TodoId is required and must be a string");
 
       // Test invalid resetDependents type
       await expect(
@@ -284,12 +284,12 @@ describe('TodoMCPAdapter', () => {
           todoId: 'test-id',
           resetDependents: 'not-boolean',
         })
-      ).rejects.toThrow('ResetDependents must be a boolean');
+      ).rejects.toThrow("Tool 'ResetTaskExecution' error: validation error: ResetDependents must be a boolean");
     });
 
     it('should throw error for unknown tool', async () => {
       await expect(adapter.callTool('UnknownTool', {})).rejects.toThrow(
-        'Unknown tool: UnknownTool'
+        "Tool 'UnknownTool' error: Unknown tool: UnknownTool"
       );
     });
 
@@ -297,7 +297,7 @@ describe('TodoMCPAdapter', () => {
       const uninitializedAdapter = new TodoMCPAdapter();
       await expect(
         uninitializedAdapter.callTool('CreateTodo', { title: 'Test' })
-      ).rejects.toThrow('Todo server not initialized');
+      ).rejects.toThrow("Tool 'CreateTodo' error: Todo server not initialized");
     });
   });
 
@@ -378,7 +378,7 @@ describe('TodoMCPAdapter', () => {
       // Create task group
       const groupId = `execution-flow-group-${Date.now()}`;
       const groupResult = await adapter.callTool('CreateTaskGroup', {
-        mainTask: { title: 'Execution Flow Test' },
+        mainTask: { title: 'Execution Flow Test', tags: ['main-task'] },
         subtasks: [
           { title: 'First Task', dependencies: [] },
           { title: 'Second Task', dependencies: [0] },
@@ -397,9 +397,7 @@ describe('TodoMCPAdapter', () => {
       expect(executableResult.isError).toBe(false);
 
       const executableTasks = JSON.parse(executableResult.content[0].text);
-      console.log('Executable tasks:', executableTasks);
-      // Note: The main task may also be returned as executable
-      expect(executableTasks.length).toBeGreaterThanOrEqual(1);
+      expect(executableTasks).toHaveLength(1);
       const firstTask = executableTasks.find(t => t.title === 'First Task');
       expect(firstTask).toBeDefined();
 
@@ -417,7 +415,6 @@ describe('TodoMCPAdapter', () => {
       expect(executableResult2.isError).toBe(false);
 
       const executableTasks2 = JSON.parse(executableResult2.content[0].text);
-      console.log('Executable tasks after completion:', executableTasks2);
       const secondTask = executableTasks2.find(t => t.title === 'Second Task');
       expect(secondTask).toBeDefined();
     });
@@ -455,22 +452,16 @@ describe('TodoMCPAdapter', () => {
     });
 
     it('should handle GetTaskGroupStatus for non-existent group', async () => {
-      const statusResult = await adapter.callTool('GetTaskGroupStatus', {
+      await expect(adapter.callTool('GetTaskGroupStatus', {
         groupId: 'non-existent-group',
-      });
-      expect(statusResult.isError).toBe(true);
-      expect(statusResult.content[0].text).toContain(
-        'No tasks found for group ID'
-      );
+      })).rejects.toThrow("Tool 'GetTaskGroupStatus' error: validation error: No tasks found for group ID: non-existent-group");
     });
 
     it('should handle ResetTaskExecution for non-existent task', async () => {
-      const resetResult = await adapter.callTool('ResetTaskExecution', {
+      await expect(adapter.callTool('ResetTaskExecution', {
         todoId: 'non-existent-task',
         resetDependents: false,
-      });
-      expect(resetResult.isError).toBe(true);
-      expect(resetResult.content[0].text).toContain('not found');
+      })).rejects.toThrow("Tool 'ResetTaskExecution' error: validation error: Todo with id non-existent-task not found");
     });
   });
 });

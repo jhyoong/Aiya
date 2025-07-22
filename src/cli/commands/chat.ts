@@ -15,7 +15,7 @@ import { DELAYS } from '../../core/config/timing-constants.js';
 import { PROCESSING } from '../../core/config/limits-constants.js';
 import { Message, ToolCall } from '../../core/providers/base.js';
 import { ProviderResponse } from '../../types/ProviderTypes.js';
-import { MCPToolService } from '../../core/tools/mcp-tools.js';
+import { createMCPToolServiceWithAgentic } from '../../core/tools/mcp-tools.js';
 import { ToolExecutor } from '../../core/tools/executor.js';
 import { ToolMemoryService } from '../../core/tools/memory.js';
 import { ToolLogger } from '../../core/tools/logger.js';
@@ -284,13 +284,12 @@ export const chatCommand = new Command('chat')
       }
       showLoader('Provider health check passed');
 
-      // Initialize MCP tool service
-      const toolService = new MCPToolService([
+      // Initialize MCP tool service with agentic tools
+      const toolService = await createMCPToolServiceWithAgentic([
         mcpClient,
         shellClient,
         todoClient,
       ]);
-      await toolService.initialize();
       showLoader('MCP tool service initialized');
 
       // Create tool confirmation callback that will be set by ChatInterface
