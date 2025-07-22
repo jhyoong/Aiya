@@ -8,7 +8,7 @@ import { ToolArguments } from '../../types/ProviderTypes.js';
 import { JsonValue } from '../../types/UtilityTypes.js';
 import { TodoMCPAdapter } from '../mcp/todo-adapter.js';
 import { AgenticService } from '../agentic/index.js';
-import { AGENTIC_TOOLS } from '../agentic/AgenticTools.js';
+import { AGENTIC_TOOLS, AGENTIC_SYSTEM_PROMPT, AGENTIC_SCENARIO_GUIDANCE } from '../agentic/AgenticTools.js';
 import { AgenticToolHandler } from '../agentic/AgenticToolHandler.js';
 
 /**
@@ -204,6 +204,16 @@ export class MCPToolService {
       'You have access to the following tools. When you need to use a tool, respond with a tool call in this exact format:\n\n';
     message +=
       '```json\n{\n  "tool_calls": [\n    {\n      "id": "call_123",\n      "name": "tool_name",\n      "arguments": {"param": "value"}\n    }\n  ]\n}\n```\n\n';
+
+    // Add agentic system prompt if agentic tools are available
+    if (this.agenticHandler) {
+      message += AGENTIC_SYSTEM_PROMPT + '\n\n';
+      message += '## Additional Scenario Guidance\n\n';
+      for (const [scenario, guidance] of Object.entries(AGENTIC_SCENARIO_GUIDANCE)) {
+        message += `**${scenario}**: ${guidance}\n\n`;
+      }
+    }
+
     message += 'Available tools:\n\n';
 
     for (const tool of tools) {

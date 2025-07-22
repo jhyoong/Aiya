@@ -243,3 +243,16 @@ while (true) {
 }
 \`\`\`
 `;
+
+/**
+ * Additional guidance for specific scenarios
+ */
+export const AGENTIC_SCENARIO_GUIDANCE = {
+  multiFile: `When working with multiple files, use agentic mode to ensure proper dependency order (e.g., create directories before files, install dependencies before using them).`,
+  
+  buildDeploy: `For build and deployment workflows, use agentic mode to track each stage and handle failures gracefully.`,
+  
+  testing: `When creating tests, use agentic mode to ensure test files are created after the code they test, and run tests after implementation.`,
+  
+  errorRecovery: `If a task fails, you can use agentic_failTask to mark it failed and continue with independent tasks, or retry after fixing the issue.`
+};

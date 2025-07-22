@@ -15,7 +15,7 @@ export type {
 
 export { AgenticService } from './AgenticService.js';
 
-export { AGENTIC_TOOLS, AGENTIC_SYSTEM_PROMPT } from './AgenticTools.js';
+export { AGENTIC_TOOLS, AGENTIC_SYSTEM_PROMPT, AGENTIC_SCENARIO_GUIDANCE } from './AgenticTools.js';
 export type { AgenticTaskDefinition } from './AgenticTools.js';
 
 export { AgenticToolHandler } from './AgenticToolHandler.js';
