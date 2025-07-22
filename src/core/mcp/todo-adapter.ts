@@ -18,6 +18,7 @@ import {
   UpdateVerificationStatusRequest,
   GetTodosNeedingVerificationRequest,
   TodoManager,
+  Todo,
 } from 'aiya-todo-mcp';
 
 interface CreateTodoParams {
@@ -96,6 +97,15 @@ interface UpdateExecutionStatusParams {
   taskId: string;
   status: 'pending' | 'ready' | 'running' | 'completed' | 'failed';
   error?: string;
+}
+
+interface GetTaskGroupStatusParams {
+  groupId: string;
+}
+
+interface ResetTaskExecutionParams {
+  todoId: string;
+  resetDependents?: boolean;
 }
 
 /**
@@ -454,6 +464,39 @@ export class TodoMCPAdapter extends MCPClient {
           required: ['taskId', 'status'],
         },
       },
+      {
+        name: 'GetTaskGroupStatus',
+        description: 'Get status and progress of a task group with statistics',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            groupId: {
+              type: 'string',
+              description: 'The group ID to get status for',
+            },
+          },
+          required: ['groupId'],
+        },
+      },
+      {
+        name: 'ResetTaskExecution',
+        description: 'Reset task execution status for retry and recovery',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            todoId: {
+              type: 'string',
+              description: 'ID of task to reset',
+            },
+            resetDependents: {
+              type: 'boolean',
+              description: 'Reset dependent tasks too',
+              default: false,
+            },
+          },
+          required: ['todoId'],
+        },
+      },
     ];
   }
 
@@ -500,6 +543,14 @@ export class TodoMCPAdapter extends MCPClient {
         case 'UpdateExecutionStatus':
           return await this.updateExecutionStatus(
             this.validateUpdateExecutionStatusParams(args)
+          );
+        case 'GetTaskGroupStatus':
+          return await this.getTaskGroupStatus(
+            this.validateGetTaskGroupStatusParams(args)
+          );
+        case 'ResetTaskExecution':
+          return await this.resetTaskExecution(
+            this.validateResetTaskExecutionParams(args)
           );
         default:
           throw new MCPToolError(name, `Unknown tool: ${name}`);
@@ -929,6 +980,33 @@ export class TodoMCPAdapter extends MCPClient {
     return params;
   }
 
+  private validateGetTaskGroupStatusParams(
+    args: Record<string, unknown>
+  ): GetTaskGroupStatusParams {
+    if (!args.groupId || typeof args.groupId !== 'string') {
+      throw new Error('GroupId is required and must be a string');
+    }
+    return { groupId: args.groupId };
+  }
+
+  private validateResetTaskExecutionParams(
+    args: Record<string, unknown>
+  ): ResetTaskExecutionParams {
+    if (!args.todoId || typeof args.todoId !== 'string') {
+      throw new Error('TodoId is required and must be a string');
+    }
+    const params: ResetTaskExecutionParams = { todoId: args.todoId };
+
+    if (args.resetDependents !== undefined) {
+      if (typeof args.resetDependents !== 'boolean') {
+        throw new Error('ResetDependents must be a boolean');
+      }
+      params.resetDependents = args.resetDependents;
+    }
+
+    return params;
+  }
+
   // Private methods for tool implementations
   private async createTodo(params: CreateTodoParams): Promise<ToolResult> {
     try {
@@ -1306,6 +1384,9 @@ export class TodoMCPAdapter extends MCPClient {
     try {
       let result = this.todoManager.getReadyTasks(params.groupId);
 
+      // Filter out main tasks - they should never be executable
+      result = result.filter(todo => !todo.tags?.includes('main-task'));
+
       // Apply limit if specified
       if (params.limit !== undefined) {
         result = result.slice(0, params.limit);
@@ -1368,6 +1449,170 @@ export class TodoMCPAdapter extends MCPClient {
           {
             type: 'text',
             text: `Error updating execution status: ${error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async getTaskGroupStatus(
+    params: GetTaskGroupStatusParams
+  ): Promise<ToolResult> {
+    try {
+      // Get all todos in the group
+      const allTodos = this.todoManager.getAllTodos();
+      const groupTodos = allTodos.filter(
+        todo => todo.groupId === params.groupId
+      );
+
+      if (groupTodos.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `No tasks found for group ID '${params.groupId}'`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Find main task (the one without dependencies or with executionOrder 0)
+      const mainTask =
+        groupTodos.find(
+          todo =>
+            !todo.dependencies ||
+            todo.dependencies.length === 0 ||
+            todo.executionOrder === 0
+        ) || null;
+
+      // Calculate statistics
+      const stats = {
+        total: groupTodos.length,
+        pending: groupTodos.filter(
+          todo =>
+            todo.executionStatus?.state === 'pending' || !todo.executionStatus
+        ).length,
+        ready: groupTodos.filter(
+          todo => todo.executionStatus?.state === 'ready'
+        ).length,
+        running: groupTodos.filter(
+          todo => todo.executionStatus?.state === 'running'
+        ).length,
+        completed: groupTodos.filter(
+          todo => todo.executionStatus?.state === 'completed'
+        ).length,
+        failed: groupTodos.filter(
+          todo => todo.executionStatus?.state === 'failed'
+        ).length,
+      };
+
+      const result = {
+        groupId: params.groupId,
+        mainTask: mainTask,
+        statistics: stats,
+        tasks: groupTodos.sort(
+          (a, b) => (a.executionOrder || 0) - (b.executionOrder || 0)
+        ),
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error getting task group status: ${error}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+  }
+
+  private async resetTaskExecution(
+    params: ResetTaskExecutionParams
+  ): Promise<ToolResult> {
+    try {
+      // Get the task to reset
+      const todo = this.todoManager.getTodo(params.todoId);
+      if (!todo) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Todo with id '${params.todoId}' not found`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      const resetTasks: Todo[] = [];
+
+      // Reset the specified task
+      const resetRequest: UpdateTodoRequest = {
+        id: params.todoId,
+        executionStatus: {
+          state: 'pending',
+          attempts: 0,
+        },
+      };
+
+      const resetTask = await this.todoManager.updateTodo(resetRequest);
+      resetTasks.push(resetTask);
+
+      // If resetDependents is true, reset all tasks that depend on this one
+      if (params.resetDependents) {
+        const allTodos = this.todoManager.getAllTodos();
+        const dependentTasks = allTodos.filter(
+          t => t.dependencies && t.dependencies.includes(params.todoId)
+        );
+
+        for (const dependent of dependentTasks) {
+          const dependentResetRequest: UpdateTodoRequest = {
+            id: dependent.id,
+            executionStatus: {
+              state: 'pending',
+              attempts: 0,
+            },
+          };
+          const resetDependent = await this.todoManager.updateTodo(
+            dependentResetRequest
+          );
+          resetTasks.push(resetDependent);
+        }
+      }
+
+      const result = {
+        resetTasks: resetTasks,
+        message: `Reset ${resetTasks.length} task(s)`,
+      };
+
+      return {
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(result, null, 2),
+          },
+        ],
+        isError: false,
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error resetting task execution: ${error}`,
           },
         ],
         isError: true,

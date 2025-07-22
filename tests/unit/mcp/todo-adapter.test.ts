@@ -62,6 +62,10 @@ describe('TodoMCPAdapter', () => {
       const tools = await adapter.listTools();
       const toolNames = tools.map(tool => tool.name);
 
+      // Verify we have exactly 13 tools
+      expect(tools).toHaveLength(13);
+
+      // Check all 13 tools are present
       expect(toolNames).toContain('CreateTodo');
       expect(toolNames).toContain('ListTodos');
       expect(toolNames).toContain('GetTodo');
@@ -70,6 +74,11 @@ describe('TodoMCPAdapter', () => {
       expect(toolNames).toContain('SetVerificationMethod');
       expect(toolNames).toContain('UpdateVerificationStatus');
       expect(toolNames).toContain('GetTodosNeedingVerification');
+      expect(toolNames).toContain('CreateTaskGroup');
+      expect(toolNames).toContain('GetExecutableTasks');
+      expect(toolNames).toContain('UpdateExecutionStatus');
+      expect(toolNames).toContain('GetTaskGroupStatus');
+      expect(toolNames).toContain('ResetTaskExecution');
     });
 
     it('should have correct CreateTodo tool schema', async () => {
@@ -133,6 +142,43 @@ describe('TodoMCPAdapter', () => {
       );
       expect(getNeedingVerification).toBeDefined();
       expect(getNeedingVerification?.inputSchema.required).toEqual([]);
+    });
+
+    it('should have correct task group and execution tool schemas', async () => {
+      const tools = await adapter.listTools();
+
+      const createTaskGroup = tools.find(
+        tool => tool.name === 'CreateTaskGroup'
+      );
+      expect(createTaskGroup).toBeDefined();
+      expect(createTaskGroup?.inputSchema.required).toEqual(['mainTask']);
+
+      const getExecutableTasks = tools.find(
+        tool => tool.name === 'GetExecutableTasks'
+      );
+      expect(getExecutableTasks).toBeDefined();
+      expect(getExecutableTasks?.inputSchema.required).toEqual([]);
+
+      const updateExecutionStatus = tools.find(
+        tool => tool.name === 'UpdateExecutionStatus'
+      );
+      expect(updateExecutionStatus).toBeDefined();
+      expect(updateExecutionStatus?.inputSchema.required).toEqual([
+        'taskId',
+        'status',
+      ]);
+
+      const getTaskGroupStatus = tools.find(
+        tool => tool.name === 'GetTaskGroupStatus'
+      );
+      expect(getTaskGroupStatus).toBeDefined();
+      expect(getTaskGroupStatus?.inputSchema.required).toEqual(['groupId']);
+
+      const resetTaskExecution = tools.find(
+        tool => tool.name === 'ResetTaskExecution'
+      );
+      expect(resetTaskExecution).toBeDefined();
+      expect(resetTaskExecution?.inputSchema.required).toEqual(['todoId']);
     });
   });
 
@@ -209,6 +255,38 @@ describe('TodoMCPAdapter', () => {
       );
     });
 
+    it('should validate GetTaskGroupStatus parameters correctly', async () => {
+      // Test missing groupId
+      await expect(adapter.callTool('GetTaskGroupStatus', {})).rejects.toThrow(
+        'GroupId is required and must be a string'
+      );
+
+      // Test invalid groupId type
+      await expect(
+        adapter.callTool('GetTaskGroupStatus', { groupId: 123 })
+      ).rejects.toThrow('GroupId is required and must be a string');
+    });
+
+    it('should validate ResetTaskExecution parameters correctly', async () => {
+      // Test missing todoId
+      await expect(adapter.callTool('ResetTaskExecution', {})).rejects.toThrow(
+        'TodoId is required and must be a string'
+      );
+
+      // Test invalid todoId type
+      await expect(
+        adapter.callTool('ResetTaskExecution', { todoId: 123 })
+      ).rejects.toThrow('TodoId is required and must be a string');
+
+      // Test invalid resetDependents type
+      await expect(
+        adapter.callTool('ResetTaskExecution', {
+          todoId: 'test-id',
+          resetDependents: 'not-boolean',
+        })
+      ).rejects.toThrow('ResetDependents must be a boolean');
+    });
+
     it('should throw error for unknown tool', async () => {
       await expect(adapter.callTool('UnknownTool', {})).rejects.toThrow(
         'Unknown tool: UnknownTool'
@@ -246,6 +324,153 @@ describe('TodoMCPAdapter', () => {
       expect(typeof todoManager.setVerificationMethod).toBe('function');
       expect(typeof todoManager.updateVerificationStatus).toBe('function');
       expect(typeof todoManager.getTodosNeedingVerification).toBe('function');
+    });
+  });
+
+  describe('TodoMCPAdapter Complete Integration', () => {
+    beforeEach(async () => {
+      await adapter.connect();
+    });
+
+    it('should create task groups for agentic execution', async () => {
+      const groupId = `test-group-${Date.now()}-1`;
+      const result = await adapter.callTool('CreateTaskGroup', {
+        mainTask: { title: 'Build feature' },
+        subtasks: [
+          { title: 'Plan', dependencies: [] },
+          { title: 'Implement', dependencies: [0] },
+          { title: 'Test', dependencies: [1] },
+        ],
+        groupId: groupId,
+      });
+
+      expect(result.isError).toBe(false);
+      const parsedResult = JSON.parse(result.content[0].text);
+      expect(parsedResult.subtasks).toHaveLength(3);
+      expect(parsedResult.groupId).toBe(groupId);
+      expect(parsedResult.mainTask.title).toBe('Build feature');
+    });
+
+    it('should track execution progress with GetTaskGroupStatus', async () => {
+      // Create task group first
+      const groupId = `progress-test-group-${Date.now()}`;
+      const groupResult = await adapter.callTool('CreateTaskGroup', {
+        mainTask: { title: 'Test Group' },
+        subtasks: [{ title: 'Task 1', dependencies: [] }],
+        groupId: groupId,
+      });
+      expect(groupResult.isError).toBe(false);
+
+      // Get status
+      const statusResult = await adapter.callTool('GetTaskGroupStatus', {
+        groupId: groupId,
+      });
+      expect(statusResult.isError).toBe(false);
+
+      const status = JSON.parse(statusResult.content[0].text);
+      expect(status.groupId).toBe(groupId);
+      expect(status.statistics.total).toBe(2); // main + 1 subtask
+      expect(status.mainTask.title).toBe('Test Group');
+      expect(status.tasks).toHaveLength(2);
+    });
+
+    it('should handle task execution flow', async () => {
+      // Create task group
+      const groupId = `execution-flow-group-${Date.now()}`;
+      const groupResult = await adapter.callTool('CreateTaskGroup', {
+        mainTask: { title: 'Execution Flow Test' },
+        subtasks: [
+          { title: 'First Task', dependencies: [] },
+          { title: 'Second Task', dependencies: [0] },
+        ],
+        groupId: groupId,
+      });
+      expect(groupResult.isError).toBe(false);
+
+      const parsedGroup = JSON.parse(groupResult.content[0].text);
+      const firstTaskId = parsedGroup.subtasks[0].id;
+
+      // Get executable tasks (should return first task only)
+      const executableResult = await adapter.callTool('GetExecutableTasks', {
+        groupId: groupId,
+      });
+      expect(executableResult.isError).toBe(false);
+
+      const executableTasks = JSON.parse(executableResult.content[0].text);
+      console.log('Executable tasks:', executableTasks);
+      // Note: The main task may also be returned as executable
+      expect(executableTasks.length).toBeGreaterThanOrEqual(1);
+      const firstTask = executableTasks.find(t => t.title === 'First Task');
+      expect(firstTask).toBeDefined();
+
+      // Update first task to completed
+      const updateResult = await adapter.callTool('UpdateExecutionStatus', {
+        taskId: firstTaskId,
+        status: 'completed',
+      });
+      expect(updateResult.isError).toBe(false);
+
+      // Get executable tasks again (should now return second task)
+      const executableResult2 = await adapter.callTool('GetExecutableTasks', {
+        groupId: groupId,
+      });
+      expect(executableResult2.isError).toBe(false);
+
+      const executableTasks2 = JSON.parse(executableResult2.content[0].text);
+      console.log('Executable tasks after completion:', executableTasks2);
+      const secondTask = executableTasks2.find(t => t.title === 'Second Task');
+      expect(secondTask).toBeDefined();
+    });
+
+    it('should handle task failure and reset', async () => {
+      // Create a simple task
+      const groupId = `failure-test-group-${Date.now()}`;
+      const createResult = await adapter.callTool('CreateTodo', {
+        title: 'Failure Test Task',
+        groupId: groupId,
+      });
+      expect(createResult.isError).toBe(false);
+
+      const createdTask = JSON.parse(createResult.content[0].text);
+      const taskId = createdTask.id;
+
+      // Mark task as failed
+      const failResult = await adapter.callTool('UpdateExecutionStatus', {
+        taskId: taskId,
+        status: 'failed',
+        error: 'Test failure',
+      });
+      expect(failResult.isError).toBe(false);
+
+      // Reset the task
+      const resetResult = await adapter.callTool('ResetTaskExecution', {
+        todoId: taskId,
+        resetDependents: false,
+      });
+      expect(resetResult.isError).toBe(false);
+
+      const resetData = JSON.parse(resetResult.content[0].text);
+      expect(resetData.resetTasks).toHaveLength(1);
+      expect(resetData.resetTasks[0].executionStatus?.state).toBe('pending');
+    });
+
+    it('should handle GetTaskGroupStatus for non-existent group', async () => {
+      const statusResult = await adapter.callTool('GetTaskGroupStatus', {
+        groupId: 'non-existent-group',
+      });
+      expect(statusResult.isError).toBe(true);
+      expect(statusResult.content[0].text).toContain(
+        'No tasks found for group ID'
+      );
+    });
+
+    it('should handle ResetTaskExecution for non-existent task', async () => {
+      const resetResult = await adapter.callTool('ResetTaskExecution', {
+        todoId: 'non-existent-task',
+        resetDependents: false,
+      });
+      expect(resetResult.isError).toBe(true);
+      expect(resetResult.content[0].text).toContain('not found');
     });
   });
 });

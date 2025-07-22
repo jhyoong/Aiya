@@ -6,6 +6,8 @@ import {
 import { ToolCall, ToolResult } from '../providers/base.js';
 import { ToolArguments } from '../../types/ProviderTypes.js';
 import { JsonValue } from '../../types/UtilityTypes.js';
+import { TodoMCPAdapter } from '../mcp/todo-adapter.js';
+import { AgenticService } from '../agentic/index.js';
 
 /**
  * JSON Schema property definition for tool parameters
@@ -262,4 +264,17 @@ export class MCPToolService {
   private generateCallId(): string {
     return `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
+}
+
+/**
+ * Factory function to create an AgenticService with a connected TodoMCPAdapter
+ */
+export async function createAgenticService(): Promise<AgenticService> {
+  const todoAdapter = new TodoMCPAdapter();
+  await todoAdapter.connect();
+
+  const agenticService = new AgenticService(todoAdapter);
+  await agenticService.initialize();
+
+  return agenticService;
 }
